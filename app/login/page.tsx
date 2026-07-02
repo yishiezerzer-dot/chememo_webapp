@@ -50,6 +50,13 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
+      // Supabase hides "email already registered" to prevent enumeration:
+      // it returns a user with an empty identities array and no session.
+      if (data.user && data.user.identities?.length === 0) {
+        setError("An account with this email already exists. Sign in instead.");
+        setLoading(false);
+        return;
+      }
       if (data.session) {
         router.push("/dashboard");
         router.refresh();
