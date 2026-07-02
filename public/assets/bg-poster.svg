@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <radialGradient id="g1" cx="20%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g2" cx="82%" cy="32%" r="55%">
+      <stop offset="0%" stop-color="#3ee0c4" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#3ee0c4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g3" cx="60%" cy="92%" r="70%">
+      <stop offset="0%" stop-color="#285aa0" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#285aa0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#04080f"/>
+      <stop offset="50%" stop-color="#06121d"/>
+      <stop offset="100%" stop-color="#04101a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#g3)"/>
+  <rect width="1600" height="900" fill="url(#g1)"/>
+  <rect width="1600" height="900" fill="url(#g2)"/>
+  <g stroke="#3ee0c4" stroke-opacity="0.22" stroke-width="1.2" fill="none">
+    <circle cx="430" cy="320" r="6" fill="#7ff0dd" stroke="none"/>
+    <circle cx="620" cy="240" r="5" fill="#7ff0dd" stroke="none"/>
+    <circle cx="560" cy="430" r="7" fill="#3ee0c4" stroke="none"/>
+    <circle cx="780" cy="380" r="5" fill="#7ff0dd" stroke="none"/>
+    <circle cx="900" cy="520" r="6" fill="#34d399" stroke="none"/>
+    <circle cx="1080" cy="300" r="5" fill="#7ff0dd" stroke="none"/>
+    <circle cx="1180" cy="480" r="7" fill="#3ee0c4" stroke="none"/>
+    <line x1="430" y1="320" x2="620" y2="240"/>
+    <line x1="430" y1="320" x2="560" y2="430"/>
+    <line x1="560" y1="430" x2="780" y2="380"/>
+    <line x1="780" y1="380" x2="900" y2="520"/>
+    <line x1="780" y1="380" x2="1080" y2="300"/>
+    <line x1="1080" y1="300" x2="1180" y2="480"/>
+    <line x1="900" y1="520" x2="1180" y2="480"/>
+  </g>
+</svg>
