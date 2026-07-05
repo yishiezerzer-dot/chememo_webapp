@@ -23,6 +23,24 @@ export async function listProjects(): Promise<Project[]> {
   return data ?? [];
 }
 
+// Private bucket → generate short-lived signed URLs so uploaded files open
+// on the detail page (regenerated on every render, so links never go stale).
+export async function signedUrlsFor(
+  paths: string[]
+): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from("experiment-files")
+    .createSignedUrls(paths, 3600);
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  for (const item of data ?? []) {
+    if (item.path && item.signedUrl) map[item.path] = item.signedUrl;
+  }
+  return map;
+}
+
 export async function getExperiment(
   id: string
 ): Promise<{ experiment: Experiment; files: ExperimentFile[] } | null> {

@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getExperiment, listProjects } from "@/lib/experiments";
+import { getExperiment, listProjects, signedUrlsFor } from "@/lib/experiments";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
+import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
-
-const FILE_ICONS: Record<string, string> = {
-  excel: "M4 4h16v16H4z",
-  folder: "M3 7h6l2 2h10v10H3z",
-  image: "M4 5h16v14H4z",
-  spectra: "M3 12h4l3-8 4 16 3-8h4",
-  report: "M6 3h9l4 4v14H6z",
-  si: "M12 3l9 5v8l-9 5-9-5V8z",
-};
+import { FileList } from "@/components/file-list";
+import { FileManager } from "@/components/file-manager";
 
 export default async function ExperimentDetailPage({
   params,
@@ -31,6 +25,17 @@ export default async function ExperimentDetailPage({
   const isOwner = !!user && user.id === e.owner_id;
 
   const projectLabel = projects.find((p) => p.id === e.project)?.label ?? e.project;
+
+  // Uploads live in a private bucket → resolve short-lived signed URLs; links
+  // carry their own external URL. Both become the clickable `href`.
+  const uploadPaths = files
+    .filter((f) => f.kind === "upload" && f.storage_path)
+    .map((f) => f.storage_path as string);
+  const signed = await signedUrlsFor(uploadPaths);
+  const fileItems = files.map((f) => ({
+    ...f,
+    href: f.kind === "link" ? f.url : f.storage_path ? signed[f.storage_path] ?? null : null,
+  }));
 
   const specs: { k: string; v: string; big?: boolean }[] = [
     { k: "pH", v: e.ph !== null ? String(e.ph) : "—", big: true },
@@ -123,31 +128,23 @@ export default async function ExperimentDetailPage({
         <aside className="detail-aside">
           <div className="panel glass">
             <h4 style={{ fontFamily: "var(--display)", margin: "0 0 12px" }}>
-              Files{files.length > 0 ? ` (${files.length})` : ""}
+              Files{fileItems.length > 0 ? ` (${fileItems.length})` : ""}
             </h4>
-            {files.length === 0 ? (
-              <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-                No files linked.
-              </p>
-            ) : (
-              <div className="files-list">
-                {files.map((f) => {
-                  const t = (f.file_type ?? "folder").toLowerCase();
-                  return (
-                    <div key={f.id} className="file-item">
-                      <span className={`file-ico ${FILE_ICONS[t] ? t : "folder"}`}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                          <path d={FILE_ICONS[t] ?? FILE_ICONS.folder} />
-                        </svg>
-                      </span>
-                      <span className="fname">{f.label ?? "(unnamed)"}</span>
-                      <span className="ftype">{f.file_type ?? f.kind}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <FileList
+              files={fileItems}
+              isOwner={isOwner}
+              removeAction={
+                isOwner ? (fileId: string) => removeFile.bind(null, fileId, e.id) : undefined
+              }
+            />
           </div>
+
+          {isOwner && (
+            <FileManager
+              uploadAction={uploadFile.bind(null, e.id)}
+              linkAction={addFileLink.bind(null, e.id)}
+            />
+          )}
 
           <div className="ai-summary-card">
             <div className="ai-head">
