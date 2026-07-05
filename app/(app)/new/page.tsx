@@ -1,15 +1,17 @@
-export default function NewExperimentPage() {
+import { listProjects } from "@/lib/experiments";
+import { ExperimentForm } from "@/components/experiment-form";
+import { createExperiment } from "./actions";
+
+export default async function NewExperimentPage() {
+  const projects = await listProjects();
+
   return (
     <div>
       <span className="eyebrow">New experiment</span>
-      <h2 style={{ fontFamily: "var(--display)", fontSize: 30, margin: "8px 0 18px" }}>
-        New experiment
+      <h2 style={{ fontFamily: "var(--display)", fontSize: 28, margin: "8px 0 20px" }}>
+        Log a new experiment
       </h2>
-      <div className="glass" style={{ padding: "26px 28px", maxWidth: 640 }}>
-        <p style={{ margin: 0, color: "var(--ink-dim)" }}>
-          The structured entry form is built in Phase 3.
-        </p>
-      </div>
+      <ExperimentForm projects={projects} action={createExperiment} submitLabel="Save experiment" />
     </div>
   );
 }

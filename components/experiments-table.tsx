@@ -1,0 +1,213 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Experiment, Project } from "@/lib/types";
+
+type SortKey = "id" | "name" | "date" | "project" | "ph" | "cycles";
+type PhFilter = "all" | "lt7" | "eq7" | "gt8";
+
+export function ExperimentsTable({
+  experiments,
+  projects,
+}: {
+  experiments: Experiment[];
+  projects: Project[];
+}) {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [project, setProject] = useState<string>("all");
+  const [ph, setPh] = useState<PhFilter>("all");
+  const [sort, setSort] = useState<SortKey>("date");
+  const [asc, setAsc] = useState(false);
+
+  const projectLabel = useMemo(
+    () => Object.fromEntries(projects.map((p) => [p.id, p.label])),
+    [projects]
+  );
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    let out = experiments.filter((e) => {
+      if (project !== "all" && e.project !== project) return false;
+      if (ph === "lt7" && !(e.ph !== null && e.ph < 7)) return false;
+      if (ph === "eq7" && e.ph !== 7) return false;
+      if (ph === "gt8" && !(e.ph !== null && e.ph > 8)) return false;
+      if (!needle) return true;
+      const hay = [
+        e.id,
+        e.name,
+        e.researcher,
+        e.reaction_type,
+        ...e.compounds,
+        ...e.metals,
+        ...e.methods,
+        e.observations,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(needle);
+    });
+
+    out = [...out].sort((a, b) => {
+      let av: string | number = "";
+      let bv: string | number = "";
+      switch (sort) {
+        case "ph":
+          av = a.ph ?? -Infinity;
+          bv = b.ph ?? -Infinity;
+          break;
+        case "cycles":
+          av = a.cycles ?? -Infinity;
+          bv = b.cycles ?? -Infinity;
+          break;
+        case "date":
+          av = a.date ?? "";
+          bv = b.date ?? "";
+          break;
+        default:
+          av = (a[sort] ?? "") as string;
+          bv = (b[sort] ?? "") as string;
+      }
+      if (av < bv) return asc ? -1 : 1;
+      if (av > bv) return asc ? 1 : -1;
+      return 0;
+    });
+    return out;
+  }, [experiments, q, project, ph, sort, asc]);
+
+  function toggleSort(key: SortKey) {
+    if (sort === key) setAsc((a) => !a);
+    else {
+      setSort(key);
+      setAsc(key === "name" || key === "id");
+    }
+  }
+
+  const arrow = (key: SortKey) =>
+    sort === key ? <span className="sort-i">{asc ? "▲" : "▼"}</span> : null;
+
+  const phChips: { key: PhFilter; label: string }[] = [
+    { key: "all", label: "All pH" },
+    { key: "lt7", label: "pH < 7" },
+    { key: "eq7", label: "pH = 7" },
+    { key: "gt8", label: "pH > 8" },
+  ];
+
+  return (
+    <>
+      <div className="toolbar">
+        <div className="searchbox" style={{ maxWidth: 340 }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4-4" />
+          </svg>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search experiments…"
+            aria-label="Search experiments"
+          />
+        </div>
+        <div className="filter-chips">
+          <button
+            className={`chip${project === "all" ? " active" : ""}`}
+            onClick={() => setProject("all")}
+          >
+            All projects
+          </button>
+          {projects.map((p) => (
+            <button
+              key={p.id}
+              className={`chip${project === p.id ? " active" : ""}`}
+              onClick={() => setProject(p.id)}
+            >
+              <span className="pdot" style={{ color: p.color ?? "var(--teal)" }}></span>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="filter-chips">
+          {phChips.map((c) => (
+            <button
+              key={c.key}
+              className={`chip${ph === c.key ? " active" : ""}`}
+              onClick={() => setPh(c.key)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <span className="count-pill" style={{ marginLeft: "auto" }}>
+          {rows.length} / {experiments.length}
+        </span>
+      </div>
+
+      <div className="table-scroll">
+        <div className="table-scroll-inner">
+          <table className="exp-table">
+            <thead>
+              <tr>
+                <th className="col-id" onClick={() => toggleSort("id")}>
+                  ID {arrow("id")}
+                </th>
+                <th className="col-name" onClick={() => toggleSort("name")}>
+                  Name {arrow("name")}
+                </th>
+                <th className="col-date" onClick={() => toggleSort("date")}>
+                  Date {arrow("date")}
+                </th>
+                <th className="col-proj" onClick={() => toggleSort("project")}>
+                  Project {arrow("project")}
+                </th>
+                <th className="col-ph" onClick={() => toggleSort("ph")}>
+                  pH {arrow("ph")}
+                </th>
+                <th className="col-cyc" onClick={() => toggleSort("cycles")}>
+                  Cyc {arrow("cycles")}
+                </th>
+                <th className="col-comp">Compounds</th>
+                <th className="col-meth">Methods</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((e) => (
+                <tr key={e.id} onClick={() => router.push(`/experiments/${e.id}`)}>
+                  <td className="td-id">{e.id}</td>
+                  <td className="td-name">
+                    <span className="tn-main">{e.name}</span>
+                    {e.researcher && <small>{e.researcher}</small>}
+                  </td>
+                  <td className="muted">{e.date ?? "—"}</td>
+                  <td>{e.project ? projectLabel[e.project] ?? e.project : "—"}</td>
+                  <td className="td-ph">{e.ph ?? "—"}</td>
+                  <td className="td-center muted">{e.cycles ?? "—"}</td>
+                  <td>
+                    <div className="cell-tags">
+                      {e.compounds.slice(0, 3).map((c) => (
+                        <span key={c} className="tag">
+                          {c}
+                        </span>
+                      ))}
+                      {e.compounds.length > 3 && (
+                        <span className="muted">+{e.compounds.length - 3}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="muted">{e.methods.join(", ") || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length === 0 && (
+            <div className="empty-state">
+              <div className="big">No experiments match</div>
+              Try clearing the search or filters.
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
