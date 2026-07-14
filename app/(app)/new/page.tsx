@@ -1,6 +1,7 @@
 import { listProjects } from "@/lib/experiments";
-import { ExperimentForm } from "@/components/experiment-form";
-import { createExperiment } from "./actions";
+import { isLlmEnabled } from "@/lib/anthropic";
+import { NewExperimentClient } from "@/components/new-experiment-client";
+import { createExperiment, extractFromNotes } from "./actions";
 
 export default async function NewExperimentPage() {
   const projects = await listProjects();
@@ -11,7 +12,12 @@ export default async function NewExperimentPage() {
       <h2 style={{ fontFamily: "var(--display)", fontSize: 28, margin: "8px 0 20px" }}>
         Log a new experiment
       </h2>
-      <ExperimentForm projects={projects} action={createExperiment} submitLabel="Save experiment" />
+      <NewExperimentClient
+        projects={projects}
+        aiEnabled={isLlmEnabled()}
+        createAction={createExperiment}
+        extractAction={extractFromNotes}
+      />
     </div>
   );
 }

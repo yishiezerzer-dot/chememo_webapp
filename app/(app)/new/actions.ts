@@ -3,7 +3,22 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { extractExperimentFields } from "@/lib/anthropic";
 import { METHOD_OPTIONS, type ExperimentInput } from "@/lib/types";
+
+// LLM-assisted entry: parse pasted notes into structured fields for the user to
+// confirm/edit. No-ops (null) until a key exists (Phase 10). Never saves.
+export async function extractFromNotes(
+  notes: string
+): Promise<Partial<ExperimentInput> | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  if (!notes.trim()) return null;
+  return extractExperimentFields(notes);
+}
 
 function parseForm(formData: FormData): ExperimentInput {
   const str = (k: string) => {

@@ -1,5 +1,5 @@
 import type { SearchFilters } from "@/lib/search";
-import type { Experiment } from "@/lib/types";
+import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/types";
 
 // Phase 7 — Claude router + grounded answer generation. INERT until Phase 10:
 // both entry points return null when ANTHROPIC_API_KEY is absent, so the app
@@ -148,4 +148,68 @@ export async function summarizeExperiment(e: Experiment): Promise<string | null>
     messages: [{ role: "user", content: formatRecord(e) }],
   });
   return firstText(res).trim() || null;
+}
+
+// LLM-assisted entry: extract structured fields from messy pasted notes. Only
+// fields actually stated are returned; the user always confirms before saving.
+// Returns null when disabled (no key) or unparseable.
+export async function extractExperimentFields(
+  notes: string
+): Promise<Partial<ExperimentInput> | null> {
+  if (!isLlmEnabled()) return null;
+
+  const system = `Extract structured fields from a chemist's messy experiment notes. Respond with ONLY a JSON object; omit any field you cannot determine (do NOT guess). Never invent values.
+Fields:
+{
+  "name": string,            // short descriptive title
+  "date": string,            // ISO "YYYY-MM-DD" if a date is stated
+  "researcher": string,
+  "reaction_type": string,
+  "compounds": string[],     // full names, e.g. "Zinc chloride"
+  "metals": string[],        // element symbols, e.g. "Zn"
+  "ph": number,
+  "concentration": string,
+  "temperature": string,
+  "cycles": number,
+  "methods": string[],       // only from: ${METHOD_OPTIONS.join(", ")}
+  "mz": number[],
+  "observations": string,
+  "notes": string
+}`;
+
+  try {
+    const client = await getClient();
+    const res = await client.messages.create({
+      model: ANSWER_MODEL,
+      max_tokens: 700,
+      system,
+      messages: [{ role: "user", content: notes }],
+    });
+    const raw = firstText(res).trim().replace(/^```json\s*|\s*```$/g, "");
+    const j = JSON.parse(raw);
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+    const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : undefined);
+    const numArr = (v: unknown) =>
+      Array.isArray(v) ? v.filter((x) => typeof x === "number" && Number.isFinite(x)) : undefined;
+
+    const out: Partial<ExperimentInput> = {};
+    if (str(j.name)) out.name = str(j.name);
+    if (str(j.date)) out.date = str(j.date) ?? null;
+    if (str(j.researcher)) out.researcher = str(j.researcher) ?? null;
+    if (str(j.reaction_type)) out.reaction_type = str(j.reaction_type) ?? null;
+    if (arr(j.compounds)) out.compounds = arr(j.compounds);
+    if (arr(j.metals)) out.metals = arr(j.metals);
+    if (num(j.ph) !== undefined) out.ph = num(j.ph) ?? null;
+    if (str(j.concentration)) out.concentration = str(j.concentration) ?? null;
+    if (str(j.temperature)) out.temperature = str(j.temperature) ?? null;
+    if (num(j.cycles) !== undefined) out.cycles = num(j.cycles) ?? null;
+    if (arr(j.methods)) out.methods = arr(j.methods)!.filter((m) => (METHOD_OPTIONS as readonly string[]).includes(m));
+    if (numArr(j.mz)) out.mz = numArr(j.mz);
+    if (str(j.observations)) out.observations = str(j.observations) ?? null;
+    if (str(j.notes)) out.notes = str(j.notes) ?? null;
+    return out;
+  } catch {
+    return null;
+  }
 }

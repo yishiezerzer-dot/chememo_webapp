@@ -6,7 +6,8 @@ import { METHOD_OPTIONS, type Experiment, type Project } from "@/lib/types";
 type Props = {
   projects: Project[];
   action: (formData: FormData) => void | Promise<void>;
-  initial?: Experiment;
+  // Partial so LLM-extracted fields (Phase 9) can pre-fill the form.
+  initial?: Partial<Experiment>;
   submitLabel: string;
 };
 
