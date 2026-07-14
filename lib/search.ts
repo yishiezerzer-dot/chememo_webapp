@@ -199,16 +199,12 @@ export function parseQuery(
   };
 }
 
-export async function keylessSearch(query: string): Promise<SearchResult> {
-  const trimmed = query.trim();
-  if (!trimmed) {
-    return { query, interpretation: [], results: [], emptyReason: null };
-  }
-
+// Run a parsed filter set as deterministic Postgres queries. Shared by the
+// keyless path and (in Phase 10) the AI router's structured path.
+export async function executeFilters(
+  filters: SearchFilters
+): Promise<Experiment[]> {
   const supabase = await createClient();
-  const vocab = await loadVocab(supabase);
-  const { filters, interpretation } = parseQuery(trimmed, vocab);
-
   let q = supabase.from("experiments").select("*").is("deleted_at", null);
   if (filters.compounds.length) q = q.contains("compounds", filters.compounds);
   if (filters.metals.length) q = q.overlaps("metals", filters.metals);
@@ -237,8 +233,20 @@ export async function keylessSearch(query: string): Promise<SearchResult> {
 
   const { data, error } = await q;
   if (error) throw error;
+  return data ?? [];
+}
 
-  const results = data ?? [];
+export async function keylessSearch(query: string): Promise<SearchResult> {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return { query, interpretation: [], results: [], emptyReason: null };
+  }
+
+  const supabase = await createClient();
+  const vocab = await loadVocab(supabase);
+  const { filters, interpretation } = parseQuery(trimmed, vocab);
+
+  const results = await executeFilters(filters);
   const hadFilter =
     interpretation.length > 0 &&
     (filters.compounds.length ||

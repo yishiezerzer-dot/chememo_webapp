@@ -1,5 +1,25 @@
 import Link from "next/link";
-import { keylessSearch } from "@/lib/search";
+import { Fragment } from "react";
+import { askAI } from "@/lib/rag";
+
+// Render a grounded answer, turning [EXP-###] citations into links.
+function AnswerText({ text }: { text: string }) {
+  const parts = text.split(/(\[EXP-\d+\])/g);
+  return (
+    <>
+      {parts.map((p, i) => {
+        const m = p.match(/^\[(EXP-\d+)\]$/);
+        return m ? (
+          <Link key={i} href={`/experiments/${m[1]}`} className="td-id">
+            {p}
+          </Link>
+        ) : (
+          <Fragment key={i}>{p}</Fragment>
+        );
+      })}
+    </>
+  );
+}
 
 const EXAMPLES = [
   "Histidine + thioglycolic acid + zinc experiments",
@@ -16,7 +36,7 @@ export default async function AskPage({
 }) {
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
-  const search = query ? await keylessSearch(query) : null;
+  const search = query ? await askAI(query) : null;
 
   return (
     <div>
@@ -56,6 +76,16 @@ export default async function AskPage({
 
       {search && (
         <div>
+          {search.answer && (
+            <div className="ai-summary-card" style={{ marginBottom: 18 }}>
+              <div className="ai-head">
+                <span className="eyebrow">Grounded answer</span>
+              </div>
+              <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                <AnswerText text={search.answer} />
+              </p>
+            </div>
+          )}
           {search.interpretation.length > 0 && (
             <div className="glass" style={{ padding: "14px 18px", marginBottom: 18 }}>
               <span className="eyebrow">Interpreted as</span>
