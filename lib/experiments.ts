@@ -41,6 +41,28 @@ export async function signedUrlsFor(
   return map;
 }
 
+export type StoredSummary = {
+  summary: string;
+  model: string | null;
+  created_at: string;
+};
+
+// Latest cached single-experiment AI summary (null if none / pre-Phase-10).
+export async function getExperimentSummary(
+  experimentId: string
+): Promise<StoredSummary | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ai_summaries")
+    .select("summary, model, created_at")
+    .eq("experiment_id", experimentId)
+    .eq("scope", "single")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ?? null;
+}
+
 export async function getExperiment(
   id: string
 ): Promise<{ experiment: Experiment; files: ExperimentFile[] } | null> {

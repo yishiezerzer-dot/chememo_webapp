@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getExperiment, listProjects, signedUrlsFor } from "@/lib/experiments";
+import {
+  getExperiment,
+  getExperimentSummary,
+  listProjects,
+  signedUrlsFor,
+} from "@/lib/experiments";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
+import { generateSummary } from "./summary-actions";
+import { isLlmEnabled } from "@/lib/anthropic";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
 import { FileManager } from "@/components/file-manager";
+import { SummaryCard } from "@/components/summary-card";
 
 export default async function ExperimentDetailPage({
   params,
@@ -14,8 +22,13 @@ export default async function ExperimentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects] = await Promise.all([getExperiment(id), listProjects()]);
+  const [result, projects, summary] = await Promise.all([
+    getExperiment(id),
+    listProjects(),
+    getExperimentSummary(id),
+  ]);
   if (!result) notFound();
+  const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
 
   const supabase = await createClient();
@@ -146,14 +159,11 @@ export default async function ExperimentDetailPage({
             />
           )}
 
-          <div className="ai-summary-card">
-            <div className="ai-head">
-              <h4>AI summary</h4>
-            </div>
-            <p className="muted" style={{ fontSize: 12.5 }}>
-              Grounded AI summaries activate in Phase 10, once API keys are added.
-            </p>
-          </div>
+          <SummaryCard
+            aiEnabled={aiEnabled}
+            summary={summary}
+            action={generateSummary.bind(null, e.id)}
+          />
         </aside>
       </div>
     </div>

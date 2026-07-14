@@ -129,3 +129,23 @@ export async function generateAnswer(
   });
   return firstText(res).trim() || null;
 }
+
+// Grounded single-experiment summary: 2–3 sentences from ONLY this record's
+// fields. Returns null when disabled (no key).
+export async function summarizeExperiment(e: Experiment): Promise<string | null> {
+  if (!isLlmEnabled()) return null;
+
+  const system = `You summarise a single chemistry experiment using ONLY the fields provided. Rules:
+- 2–3 sentences, plain and specific.
+- Use only values present in the record; never invent compounds, pH, m/z, or results.
+- No preamble ("This experiment…") — state the substance directly.`;
+
+  const client = await getClient();
+  const res = await client.messages.create({
+    model: ANSWER_MODEL,
+    max_tokens: 300,
+    system,
+    messages: [{ role: "user", content: formatRecord(e) }],
+  });
+  return firstText(res).trim() || null;
+}
