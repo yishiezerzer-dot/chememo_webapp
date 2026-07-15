@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { Fragment } from "react";
 import { askAI } from "@/lib/rag";
+import { AskBox } from "@/components/ask-box";
 
-// Render a grounded answer, turning [EXP-###] citations into links.
+const EXAMPLES = [
+  "Which samples produced droplets?",
+  "Experiments with m/z 297",
+  "Wet–dry cycling at pH above 8",
+  "What is a coacervate?",
+  "Why does wet–dry cycling drive condensation?",
+];
+
+// Render grounded-answer text, turning [EXP-###] citations into links.
 function AnswerText({ text }: { text: string }) {
   const parts = text.split(/(\[EXP-\d+\])/g);
   return (
@@ -21,14 +30,6 @@ function AnswerText({ text }: { text: string }) {
   );
 }
 
-const EXAMPLES = [
-  "Histidine + thioglycolic acid + zinc experiments",
-  "Which samples produced droplets?",
-  "Experiments with m/z 297",
-  "Wet–dry cycling at pH above 8",
-  "Depsipeptide experiments analysed by NMR",
-];
-
 export default async function AskPage({
   searchParams,
 }: {
@@ -40,80 +41,51 @@ export default async function AskPage({
 
   return (
     <div>
-      <span className="eyebrow">Ask · keyless search</span>
+      <span className="eyebrow">Ask · AI search</span>
       <h2 style={{ fontFamily: "var(--display)", fontSize: 28, margin: "8px 0 6px" }}>
         Ask your notebook
       </h2>
-      <p className="muted" style={{ marginTop: 0, maxWidth: "60ch" }}>
-        Exact, deterministic search over every stored experiment — pH, compounds,
-        metals, m/z, methods, or a word like &ldquo;droplets&rdquo;. Every result
-        is a real record, cited by ID. (Grounded AI answers arrive in Phase 10.)
+      <p className="muted" style={{ marginTop: 0, maxWidth: "62ch" }}>
+        Ask about your experiments and get grounded, cited answers — or ask a
+        general chemistry question and the assistant will answer from its own
+        knowledge (clearly marked as not from your data).
       </p>
 
-      <form method="get" className="ask-box" style={{ margin: "18px 0 14px" }}>
-        <div className="searchbox" style={{ maxWidth: 640 }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4-4" />
-          </svg>
-          <input
-            name="q"
-            defaultValue={query}
-            placeholder="e.g. wet–dry cycling at pH above 8"
-            aria-label="Ask a question"
-            autoFocus
-          />
-        </div>
-      </form>
+      <AskBox initialQuery={query} examples={EXAMPLES} />
 
-      <div className="filter-chips example-chips" style={{ marginBottom: 24 }}>
-        {EXAMPLES.map((ex) => (
-          <Link key={ex} href={`/ask?q=${encodeURIComponent(ex)}`} className="chip">
-            {ex}
-          </Link>
-        ))}
-      </div>
-
-      {search && (
+      {search && search.mode === "ai" && (
         <div>
           {search.answer && (
             <div className="ai-summary-card" style={{ marginBottom: 18 }}>
               <div className="ai-head">
-                <span className="eyebrow">Grounded answer</span>
+                <span className="eyebrow">
+                  {search.grounded ? "Grounded answer" : "General answer"}
+                </span>
               </div>
+              {!search.grounded && (
+                <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
+                  General chemistry knowledge — not based on your lab&rsquo;s
+                  experiments.
+                </p>
+              )}
               <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                <AnswerText text={search.answer} />
+                {search.grounded ? (
+                  <AnswerText text={search.answer} />
+                ) : (
+                  search.answer
+                )}
               </p>
             </div>
           )}
-          {search.interpretation.length > 0 && (
-            <div className="glass" style={{ padding: "14px 18px", marginBottom: 18 }}>
-              <span className="eyebrow">Interpreted as</span>
-              <div className="detail-meta" style={{ marginTop: 8 }}>
-                {search.interpretation.map((i) => (
-                  <span key={i} className="chip active">
-                    {i}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {search.emptyReason ? (
-            <div className="empty-state">
-              <div className="big">{search.emptyReason}</div>
-              {search.results.length === 0 &&
-                "Nothing matched — try a different compound, condition, or word."}
-            </div>
-          ) : (
+          {search.grounded && search.results.length > 0 && (
             <>
               <div className="section-title">
                 <h3 style={{ fontFamily: "var(--display)", fontSize: 18, margin: 0 }}>
-                  {search.results.length} matching experiment
+                  Sources · {search.results.length} experiment
                   {search.results.length === 1 ? "" : "s"}
                 </h3>
               </div>
-
               <div className="card-grid">
                 {search.results.map((e) => (
                   <Link key={e.id} href={`/experiments/${e.id}`} className="exp-card glass">
@@ -141,25 +113,45 @@ export default async function AskPage({
                   </Link>
                 ))}
               </div>
-
-              <div className="glass" style={{ padding: "16px 18px", marginTop: 20 }}>
-                <span className="eyebrow">Sources</span>
-                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-                  {search.results.map((e) => (
-                    <Link
-                      key={e.id}
-                      href={`/experiments/${e.id}`}
-                      style={{ fontSize: 13, textDecoration: "none" }}
-                    >
-                      <span className="td-id" style={{ marginRight: 8 }}>
-                        [{e.id}]
-                      </span>
-                      <span className="muted">{e.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
             </>
+          )}
+        </div>
+      )}
+
+      {search && search.mode === "keyless" && (
+        <div>
+          {search.interpretation.length > 0 && (
+            <div className="glass" style={{ padding: "14px 18px", marginBottom: 18 }}>
+              <span className="eyebrow">Interpreted as</span>
+              <div className="detail-meta" style={{ marginTop: 8 }}>
+                {search.interpretation.map((i) => (
+                  <span key={i} className="chip active">
+                    {i}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {search.emptyReason ? (
+            <div className="empty-state">
+              <div className="big">{search.emptyReason}</div>
+            </div>
+          ) : (
+            <div className="card-grid">
+              {search.results.map((e) => (
+                <Link key={e.id} href={`/experiments/${e.id}`} className="exp-card glass">
+                  <div className="ec-top">
+                    <span className="ec-id">[{e.id}]</span>
+                  </div>
+                  <h4>{e.name}</h4>
+                  <div className="ec-foot">
+                    {e.ph !== null && <span className="ph">pH {e.ph}</span>}
+                    {e.date && <span>{e.date}</span>}
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
         </div>
       )}

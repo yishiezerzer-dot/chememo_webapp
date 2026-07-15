@@ -203,6 +203,18 @@ export async function generateAnswer(
   return text;
 }
 
+// General-knowledge answer — used when the question doesn't match any stored
+// experiment. Answers from general chemistry knowledge, clearly NOT the lab's
+// data. Returns null when disabled.
+export async function generateGeneralAnswer(query: string): Promise<string | null> {
+  if (!isLlmEnabled()) return null;
+  const system = `You are a helpful, knowledgeable assistant for a prebiotic-chemistry research lab. The user's question did not match any of the lab's stored experiments, so answer from your own general knowledge.
+- Be accurate and concise.
+- Do NOT cite experiment IDs or claim anything about the lab's specific experiments.
+- If the question is outside your knowledge or ambiguous, say so briefly.`;
+  return chatComplete({ system, user: query, maxTokens: 800 });
+}
+
 // Grounded single-experiment summary. Returns null when disabled.
 export async function summarizeExperiment(e: Experiment): Promise<string | null> {
   const system = `You summarise a single chemistry experiment using ONLY the fields provided. Rules:
