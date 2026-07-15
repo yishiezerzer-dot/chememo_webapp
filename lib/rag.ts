@@ -25,7 +25,8 @@ async function semanticSearch(semanticQuery: string, k = 8): Promise<Experiment[
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("match_experiments", {
-    query_embedding: embedding as unknown as string,
+    // pgvector expects the vector as its text form, e.g. "[0.1,0.2,…]".
+    query_embedding: JSON.stringify(embedding),
     match_count: k,
   });
   if (error) throw error;

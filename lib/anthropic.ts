@@ -1,19 +1,101 @@
 import type { SearchFilters } from "@/lib/search";
 import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/types";
 
-// Phase 7 — Claude router + grounded answer generation. INERT until Phase 10:
-// both entry points return null when ANTHROPIC_API_KEY is absent, so the app
-// falls back to the deterministic keyless search.
+// Provider-agnostic LLM layer. Switch via AI_PROVIDER (gemini | openai |
+// anthropic); each provider's code path is kept so you can flip back instantly.
+// INERT when the selected provider has no key: every entry point returns null
+// and the app falls back to the deterministic keyless search.
 
-export const ANSWER_MODEL = "claude-sonnet-5";
+type ChatProvider = "gemini" | "openai" | "anthropic";
 
-export function isLlmEnabled(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
+function chatProvider(): ChatProvider {
+  const p = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+  return p === "openai" ? "openai" : p === "anthropic" ? "anthropic" : "gemini";
 }
 
-async function getClient() {
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function chatKey(p: ChatProvider): string | undefined {
+  if (p === "gemini") return process.env.GEMINI_API_KEY;
+  if (p === "openai") return process.env.OPENAI_API_KEY;
+  return process.env.ANTHROPIC_API_KEY;
+}
+
+export function activeChatModel(): string {
+  const p = chatProvider();
+  if (p === "gemini") return process.env.GEMINI_CHAT_MODEL || "gemini-flash-latest";
+  if (p === "openai") return process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+  return process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+}
+
+export function isLlmEnabled(): boolean {
+  return !!chatKey(chatProvider());
+}
+
+// Single completion. Returns trimmed text, or null when disabled.
+async function chatComplete(opts: {
+  system: string;
+  user: string;
+  maxTokens: number;
+}): Promise<string | null> {
+  const p = chatProvider();
+  const key = chatKey(p);
+  if (!key) return null;
+  const model = activeChatModel();
+
+  if (p === "gemini") {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: opts.system }] },
+          contents: [{ role: "user", parts: [{ text: opts.user }] }],
+          // thinkingBudget 0: these are extraction/answer tasks, not reasoning —
+          // avoids the model spending the output budget on hidden thinking.
+          generationConfig: {
+            maxOutputTokens: opts.maxTokens,
+            temperature: 0,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      }
+    );
+    if (!res.ok) {
+      throw new Error(`Gemini chat ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+    const j = await res.json();
+    const parts = j?.candidates?.[0]?.content?.parts ?? [];
+    const text = parts.map((x: { text?: string }) => x.text ?? "").join("").trim();
+    return text || null;
+  }
+
+  if (p === "anthropic") {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: key });
+    const res = await client.messages.create({
+      model,
+      max_tokens: opts.maxTokens,
+      system: opts.system,
+      messages: [{ role: "user", content: opts.user }],
+    });
+    const block = res.content.find((b) => b.type === "text");
+    const text = block && "text" in block ? block.text : "";
+    return text.trim() || null;
+  }
+
+  // openai
+  const { default: OpenAI } = await import("openai");
+  const client = new OpenAI({ apiKey: key });
+  const res = await client.chat.completions.create({
+    model,
+    max_tokens: opts.maxTokens,
+    temperature: 0,
+    messages: [
+      { role: "system", content: opts.system },
+      { role: "user", content: opts.user },
+    ],
+  });
+  return res.choices[0]?.message?.content?.trim() || null;
 }
 
 export type RouteIntent = {
@@ -32,17 +114,17 @@ const EMPTY_FILTERS: SearchFilters = {
   freeText: [],
 };
 
-function firstText(res: { content: Array<{ type: string; text?: string }> }): string {
-  const block = res.content.find((b) => b.type === "text");
-  return block?.text ?? "";
+function parseJson(text: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ""));
+  } catch {
+    return null;
+  }
 }
 
-// Ask Claude to turn the question into a retrieval plan. Structured/parametric
-// intent → filters; fuzzy/free-text intent → semanticQuery. Returns null when
-// disabled or if the model output can't be parsed (caller falls back to keyless).
+// Turn the question into a retrieval plan. Returns null when disabled or
+// unparseable (caller falls back to keyless).
 export async function routeQuery(query: string): Promise<RouteIntent | null> {
-  if (!isLlmEnabled()) return null;
-
   const system = `You are a retrieval router for a chemistry lab notebook. Convert the user's question into a JSON plan. Respond with ONLY a JSON object, no prose.
 Schema:
 {
@@ -57,31 +139,26 @@ Schema:
 }
 Use "filter" for exact/parametric questions (pH, compound, metal, method, m/z), "semantic" for fuzzy descriptions ("looked cloudy", "droplets"), "both" when the question mixes them.`;
 
-  try {
-    const client = await getClient();
-    const res = await client.messages.create({
-      model: ANSWER_MODEL,
-      max_tokens: 500,
-      system,
-      messages: [{ role: "user", content: query }],
-    });
-    const raw = firstText(res).trim().replace(/^```json\s*|\s*```$/g, "");
-    const j = JSON.parse(raw);
-    const filters: SearchFilters = {
-      ...EMPTY_FILTERS,
-      compounds: Array.isArray(j.compounds) ? j.compounds : [],
-      metals: Array.isArray(j.metals) ? j.metals : [],
-      methods: Array.isArray(j.methods) ? j.methods : [],
-      mz: Array.isArray(j.mz) ? j.mz : [],
-      ph: j.ph && typeof j.ph.value === "number" ? j.ph : null,
-      reactionLike: j.reaction ? `%${j.reaction}%` : null,
-    };
-    const mode: RouteIntent["mode"] =
-      j.mode === "semantic" || j.mode === "both" ? j.mode : "filter";
-    return { mode, filters, semanticQuery: j.semanticQuery ?? null };
-  } catch {
-    return null;
-  }
+  const text = await chatComplete({ system, user: query, maxTokens: 500 });
+  if (!text) return null;
+  const j = parseJson(text);
+  if (!j) return null;
+
+  const filters: SearchFilters = {
+    ...EMPTY_FILTERS,
+    compounds: Array.isArray(j.compounds) ? (j.compounds as string[]) : [],
+    metals: Array.isArray(j.metals) ? (j.metals as string[]) : [],
+    methods: Array.isArray(j.methods) ? (j.methods as string[]) : [],
+    mz: Array.isArray(j.mz) ? (j.mz as number[]) : [],
+    ph:
+      j.ph && typeof (j.ph as { value?: unknown }).value === "number"
+        ? (j.ph as SearchFilters["ph"])
+        : null,
+    reactionLike: j.reaction ? `%${j.reaction}%` : null,
+  };
+  const mode: RouteIntent["mode"] =
+    j.mode === "semantic" || j.mode === "both" ? j.mode : "filter";
+  return { mode, filters, semanticQuery: (j.semanticQuery as string) ?? null };
 }
 
 function formatRecord(e: Experiment): string {
@@ -102,8 +179,8 @@ function formatRecord(e: Experiment): string {
     .join("\n");
 }
 
-// Grounded generation: answer ONLY from the provided records, with inline
-// [EXP-###] citations. Returns null when disabled.
+// Grounded generation: answer ONLY from the provided records, inline [EXP-###]
+// citations. Returns null when disabled.
 export async function generateAnswer(
   query: string,
   records: Experiment[]
@@ -118,46 +195,28 @@ export async function generateAnswer(
 - Be concise and specific.`;
 
   const context = records.map(formatRecord).join("\n\n");
-  const client = await getClient();
-  const res = await client.messages.create({
-    model: ANSWER_MODEL,
-    max_tokens: 800,
+  const text = await chatComplete({
     system,
-    messages: [
-      { role: "user", content: `Question: ${query}\n\nExperiment records:\n${context}` },
-    ],
+    user: `Question: ${query}\n\nExperiment records:\n${context}`,
+    maxTokens: 800,
   });
-  return firstText(res).trim() || null;
+  return text;
 }
 
-// Grounded single-experiment summary: 2–3 sentences from ONLY this record's
-// fields. Returns null when disabled (no key).
+// Grounded single-experiment summary. Returns null when disabled.
 export async function summarizeExperiment(e: Experiment): Promise<string | null> {
-  if (!isLlmEnabled()) return null;
-
   const system = `You summarise a single chemistry experiment using ONLY the fields provided. Rules:
 - 2–3 sentences, plain and specific.
 - Use only values present in the record; never invent compounds, pH, m/z, or results.
 - No preamble ("This experiment…") — state the substance directly.`;
-
-  const client = await getClient();
-  const res = await client.messages.create({
-    model: ANSWER_MODEL,
-    max_tokens: 300,
-    system,
-    messages: [{ role: "user", content: formatRecord(e) }],
-  });
-  return firstText(res).trim() || null;
+  return chatComplete({ system, user: formatRecord(e), maxTokens: 400 });
 }
 
-// LLM-assisted entry: extract structured fields from messy pasted notes. Only
-// fields actually stated are returned; the user always confirms before saving.
-// Returns null when disabled (no key) or unparseable.
+// LLM-assisted entry: extract structured fields from messy notes. Only stated
+// fields are returned. Returns null when disabled or unparseable.
 export async function extractExperimentFields(
   notes: string
 ): Promise<Partial<ExperimentInput> | null> {
-  if (!isLlmEnabled()) return null;
-
   const system = `Extract structured fields from a chemist's messy experiment notes. Respond with ONLY a JSON object; omit any field you cannot determine (do NOT guess). Never invent values.
 Fields:
 {
@@ -177,39 +236,32 @@ Fields:
   "notes": string
 }`;
 
-  try {
-    const client = await getClient();
-    const res = await client.messages.create({
-      model: ANSWER_MODEL,
-      max_tokens: 700,
-      system,
-      messages: [{ role: "user", content: notes }],
-    });
-    const raw = firstText(res).trim().replace(/^```json\s*|\s*```$/g, "");
-    const j = JSON.parse(raw);
-    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
-    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-    const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : undefined);
-    const numArr = (v: unknown) =>
-      Array.isArray(v) ? v.filter((x) => typeof x === "number" && Number.isFinite(x)) : undefined;
+  const text = await chatComplete({ system, user: notes, maxTokens: 700 });
+  if (!text) return null;
+  const j = parseJson(text);
+  if (!j) return null;
 
-    const out: Partial<ExperimentInput> = {};
-    if (str(j.name)) out.name = str(j.name);
-    if (str(j.date)) out.date = str(j.date) ?? null;
-    if (str(j.researcher)) out.researcher = str(j.researcher) ?? null;
-    if (str(j.reaction_type)) out.reaction_type = str(j.reaction_type) ?? null;
-    if (arr(j.compounds)) out.compounds = arr(j.compounds);
-    if (arr(j.metals)) out.metals = arr(j.metals);
-    if (num(j.ph) !== undefined) out.ph = num(j.ph) ?? null;
-    if (str(j.concentration)) out.concentration = str(j.concentration) ?? null;
-    if (str(j.temperature)) out.temperature = str(j.temperature) ?? null;
-    if (num(j.cycles) !== undefined) out.cycles = num(j.cycles) ?? null;
-    if (arr(j.methods)) out.methods = arr(j.methods)!.filter((m) => (METHOD_OPTIONS as readonly string[]).includes(m));
-    if (numArr(j.mz)) out.mz = numArr(j.mz);
-    if (str(j.observations)) out.observations = str(j.observations) ?? null;
-    if (str(j.notes)) out.notes = str(j.notes) ?? null;
-    return out;
-  } catch {
-    return null;
-  }
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+  const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : undefined);
+  const numArr = (v: unknown) =>
+    Array.isArray(v) ? v.filter((x) => typeof x === "number" && Number.isFinite(x)) : undefined;
+
+  const out: Partial<ExperimentInput> = {};
+  if (str(j.name)) out.name = str(j.name);
+  if (str(j.date)) out.date = str(j.date) ?? null;
+  if (str(j.researcher)) out.researcher = str(j.researcher) ?? null;
+  if (str(j.reaction_type)) out.reaction_type = str(j.reaction_type) ?? null;
+  if (arr(j.compounds)) out.compounds = arr(j.compounds);
+  if (arr(j.metals)) out.metals = arr(j.metals);
+  if (num(j.ph) !== undefined) out.ph = num(j.ph) ?? null;
+  if (str(j.concentration)) out.concentration = str(j.concentration) ?? null;
+  if (str(j.temperature)) out.temperature = str(j.temperature) ?? null;
+  if (num(j.cycles) !== undefined) out.cycles = num(j.cycles) ?? null;
+  if (arr(j.methods))
+    out.methods = arr(j.methods)!.filter((m) => (METHOD_OPTIONS as readonly string[]).includes(m));
+  if (numArr(j.mz)) out.mz = numArr(j.mz);
+  if (str(j.observations)) out.observations = str(j.observations) ?? null;
+  if (str(j.notes)) out.notes = str(j.notes) ?? null;
+  return out;
 }

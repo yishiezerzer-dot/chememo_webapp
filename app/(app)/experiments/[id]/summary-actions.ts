@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isLlmEnabled, summarizeExperiment, ANSWER_MODEL } from "@/lib/anthropic";
+import { isLlmEnabled, summarizeExperiment, activeChatModel } from "@/lib/anthropic";
 
 // Generate + cache a grounded single-experiment summary. No-ops (inert) until
 // an ANTHROPIC key exists. Regenerating replaces the prior single-scope row.
@@ -41,7 +41,7 @@ export async function generateSummary(experimentId: string) {
     experiment_id: experimentId,
     scope: "single",
     summary,
-    model: ANSWER_MODEL,
+    model: activeChatModel(),
     source_ids: [experimentId],
   });
 

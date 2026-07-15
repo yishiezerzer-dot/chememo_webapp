@@ -1,19 +1,37 @@
 import type { Experiment } from "@/lib/types";
 
-// Phase 6 — embeddings plumbing. Written now, INERT until an OpenAI key exists
-// (Phase 10). Every embed call no-ops (returns null) when the key is absent, so
-// the app never crashes pre-key.
+// Provider-agnostic embeddings. Switch via AI_PROVIDER: "gemini" (default) or
+// "openai" (anthropic has no embeddings → falls back to openai). Both produce
+// 1536-dim vectors to match experiment_embeddings.embedding vector(1536).
+// INERT (returns null) when the selected provider has no key.
+//
+// Kept free of runtime @/ imports so the backfill/test scripts can import it
+// directly under Node's TS type-stripping.
 
-export const EMBEDDING_MODEL = "text-embedding-3-small";
-export const EMBEDDING_DIM = 1536; // must match experiment_embeddings.embedding vector(1536)
+export const EMBEDDING_DIM = 1536;
 
-export function isEmbeddingEnabled(): boolean {
-  return !!process.env.OPENAI_API_KEY;
+type EmbedProvider = "gemini" | "openai";
+
+function embedProvider(): EmbedProvider {
+  const p = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+  return p === "openai" || p === "anthropic" ? "openai" : "gemini";
 }
 
-// Deterministic string fed to the embedder. Includes the semantic fields a
-// researcher would search on. Pure + side-effect free so it is unit-testable
-// and reusable from the backfill script.
+function embedKey(p: EmbedProvider): string | undefined {
+  return p === "gemini" ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
+}
+
+export function embeddingModel(): string {
+  return embedProvider() === "gemini"
+    ? process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001"
+    : process.env.OPENAI_EMBED_MODEL || "text-embedding-3-small";
+}
+
+export function isEmbeddingEnabled(): boolean {
+  return !!embedKey(embedProvider());
+}
+
+// Deterministic string fed to the embedder. Pure + reusable from the backfill.
 export function buildEmbeddingInput(
   e: Pick<
     Experiment,
@@ -36,19 +54,41 @@ export function buildEmbeddingInput(
   return parts.join("\n");
 }
 
-// Lazily construct the client so importing this module never requires a key.
-async function getClient() {
-  const { default: OpenAI } = await import("openai");
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
-
 // Returns a 1536-dim vector, or null when embeddings are disabled (no key).
 export async function embedText(text: string): Promise<number[] | null> {
-  if (!isEmbeddingEnabled()) return null;
-  const client = await getClient();
+  const p = embedProvider();
+  const key = embedKey(p);
+  if (!key) return null;
+  const model = embeddingModel();
+
+  if (p === "gemini") {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: `models/${model}`,
+          content: { parts: [{ text }] },
+          outputDimensionality: EMBEDDING_DIM,
+        }),
+      }
+    );
+    if (!res.ok) {
+      throw new Error(`Gemini embed ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+    const j = await res.json();
+    const v = j?.embedding?.values;
+    return Array.isArray(v) ? v : null;
+  }
+
+  // openai
+  const { default: OpenAI } = await import("openai");
+  const client = new OpenAI({ apiKey: key });
   const res = await client.embeddings.create({
-    model: EMBEDDING_MODEL,
+    model,
     input: text,
+    dimensions: EMBEDDING_DIM,
   });
   return res.data[0].embedding;
 }

@@ -7,8 +7,10 @@ import {
   buildEmbeddingInput,
   embedText,
   isEmbeddingEnabled,
-  EMBEDDING_MODEL,
+  embeddingModel,
 } from "../lib/embeddings.ts";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   if (!isEmbeddingEnabled()) {
@@ -32,7 +34,7 @@ async function main() {
     .is("deleted_at", null);
   if (error) throw error;
 
-  console.log(`[backfill] embedding ${experiments.length} experiments with ${EMBEDDING_MODEL}…`);
+  console.log(`[backfill] embedding ${experiments.length} experiments with ${embeddingModel()}…`);
   let done = 0;
   for (const e of experiments) {
     const content = buildEmbeddingInput(e);
@@ -44,6 +46,7 @@ async function main() {
     if (upErr) throw upErr;
     done++;
     console.log(`  ✓ ${e.id}`);
+    await sleep(600); // stay under free-tier rate limits
   }
   console.log(`[backfill] done — ${done}/${experiments.length} embedded.`);
 }
