@@ -215,7 +215,7 @@ The app shell (sidebar + sticky topbar + centered content) matches the intended 
 
 - [x] **Mobile sidebar** — ✅ 2026-07-16 (Sprint S1): `components/mobile-nav.tsx` toggles `.sidebar.open` with a hamburger, backdrop click, Escape, and close-on-route-change.
 - [x] **Global search input** — ✅ 2026-07-16 (Sprint S1): `components/global-search.tsx` navigates to `/experiments?q=…` on Enter.
-- [ ] **Sidebar project links** — do not filter experiments table. *(Sprint S3, P1 — not yet done)*
+- [x] **Sidebar project links** — ✅ 2026-07-16 (Sprint S3): real `listProjects()` links to `/experiments?project=<id>`; table re-syncs from the URL.
 - [ ] **Auth toggle link** — keyboard activation incomplete on signup/signin switcher.
 - [ ] **Table sort headers** — not accessible via keyboard.
 - [ ] **Upload errors** — server action throws; no user-visible error message in UI.
@@ -258,10 +258,10 @@ Prioritized by impact vs. effort.
 
 ### P1 — Trust & polish
 
-6. **Add toast notification system** — success/error for upload, delete, save, AI generation (use existing `.toast` CSS class).
-7. **Add `error.tsx` and `loading.tsx`** — at `(app)` layout level and `/ask` route.
-8. **Apply `body.dim`** on non-dashboard routes via client effect or layout class.
-9. **Fix sidebar projects** — fetch from `listProjects()` and link to `/experiments?project=wet-dry` (add URL param support to table).
+6. ✅ **Add toast notification system** — `components/toast-provider.tsx` (uses the existing `.toast` CSS) wraps the app; upload/link/remove file actions return `ActionResult` and toast success/error. *(done 2026-07-16, Sprint S4, commit `910b2e4`; save/AI-generation toasts not wired — those redirect or already show inline state)*
+7. ✅ **Add `error.tsx` and `loading.tsx`** — `app/(app)/error.tsx` (retry boundary), `app/(app)/loading.tsx` (glass skeleton), `app/(app)/ask/loading.tsx` (AI spinner). *(done 2026-07-16, Sprint S4, commit `910b2e4`)*
+8. ✅ **Apply `body.dim`** on non-dashboard routes via client effect or layout class. *(done 2026-07-16, Sprint S1 — `components/page-body-class.tsx`)*
+9. ✅ **Fix sidebar projects** — `SidebarNav` now renders real `listProjects()` rows linking to `/experiments?project=<id>`; `ExperimentsTable` re-syncs `q`/`project` from the URL on navigation. *(done 2026-07-16, Sprint S3, commit `910b2e4`)*
 10. **Update stale Phase 10 copy** — `paste-notes.tsx` / `summary-card.tsx` messages when `aiEnabled` is true (already conditional, but verify prod env).
 11. **Dashboard activity feed** — query recent `experiments` by `updated_at`, show last 8 edits with links.
 12. **Meaningful dashboard stats** — replace "100% Cited" with "AI queries this week" or "Experiments this month".
@@ -277,7 +277,7 @@ Prioritized by impact vs. effort.
 
 ### P3 — Feature completeness (from characterization doc)
 
-19. **Retrieval eval set** — `scripts/eval-retrieval.ts` + `eval/queries.json` with expected EXP-IDs; precision/recall report.
+19. ✅ **Retrieval eval set** — `eval/retrieval-queries.json` (10 queries) + self-contained `scripts/eval-retrieval.ts` (`npm run eval:retrieval`), precision/recall@k, gated at 0.8 recall. Dev baseline: 100% recall on all 10, mean precision 56%. *(done 2026-07-16, Sprint S5, commit `910b2e4`)*
 20. **Compound/metal autocomplete** — server action returning distinct values from DB for tag inputs.
 21. **Group summary** — summarize filtered experiment set on Ask results or Experiments page.
 22. **CSV export** — download filtered experiments as CSV from table toolbar.
