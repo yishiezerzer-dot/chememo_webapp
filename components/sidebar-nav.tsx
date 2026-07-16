@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Project } from "@/lib/types";
 
 const ITEMS = [
   {
@@ -49,14 +50,7 @@ const ITEMS = [
   },
 ];
 
-const PROJECTS = [
-  { label: "Wet–dry cycling", color: "#3ee0c4" },
-  { label: "Depsipeptides", color: "#7fd1ff" },
-  { label: "LC-MS/MS", color: "#c2a3ff" },
-  { label: "Microscopy", color: "#ffd479" },
-];
-
-export function SidebarNav() {
+export function SidebarNav({ projects }: { projects: Project[] }) {
   const pathname = usePathname();
 
   return (
@@ -71,20 +65,25 @@ export function SidebarNav() {
         </Link>
       ))}
 
-      <div className="nav-sep"></div>
-      <div className="eyebrow" style={{ padding: "0 14px 8px" }}>
-        Projects
-      </div>
-      {PROJECTS.map((p) => (
-        <Link
-          key={p.label}
-          href="/experiments"
-          className="nav-item"
-          style={{ fontSize: 13.5 }}
-        >
-          <span className="pdot" style={{ color: p.color }}></span> {p.label}
-        </Link>
-      ))}
+      {projects.length > 0 && (
+        <>
+          <div className="nav-sep"></div>
+          <div className="eyebrow" style={{ padding: "0 14px 8px" }}>
+            Projects
+          </div>
+          {projects.map((p) => (
+            <Link
+              key={p.id}
+              href={`/experiments?project=${p.id}`}
+              className="nav-item"
+              style={{ fontSize: 13.5 }}
+            >
+              <span className="pdot" style={{ color: p.color ?? "var(--teal)" }}></span>{" "}
+              {p.label}
+            </Link>
+          ))}
+        </>
+      )}
     </>
   );
 }

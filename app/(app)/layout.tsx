@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { listProjects } from "@/lib/experiments";
 import { BrandMark } from "@/components/brand-mark";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileNav } from "@/components/mobile-nav";
 import { PageBodyClass } from "@/components/page-body-class";
 import { GlobalSearch } from "@/components/global-search";
+import { ToastProvider } from "@/components/toast-provider";
 
 export default async function AppLayout({
   children,
@@ -19,6 +21,8 @@ export default async function AppLayout({
     redirect("/login");
   }
 
+  const projects = await listProjects();
+
   const fullName =
     (user.user_metadata?.full_name as string | undefined) ||
     user.email ||
@@ -31,6 +35,7 @@ export default async function AppLayout({
     .toUpperCase();
 
   return (
+    <ToastProvider>
     <div className="app active">
       <PageBodyClass />
       <aside className="sidebar" id="sidebar">
@@ -44,7 +49,7 @@ export default async function AppLayout({
           </div>
         </div>
 
-        <SidebarNav />
+        <SidebarNav projects={projects} />
 
         <div className="sidebar-foot">
           <div className="user-pill">
@@ -96,5 +101,6 @@ export default async function AppLayout({
         <div className="view">{children}</div>
       </main>
     </div>
+    </ToastProvider>
   );
 }

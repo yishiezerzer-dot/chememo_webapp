@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import type { ExperimentFile } from "@/lib/types";
+import { useState, useTransition } from "react";
+import { useToast } from "@/components/toast-provider";
+import type { ActionResult, ExperimentFile } from "@/lib/types";
 
 const FILE_ICONS: Record<string, string> = {
   excel: "M4 4h16v16H4z",
@@ -14,8 +15,10 @@ const FILE_ICONS: Record<string, string> = {
 
 type Item = ExperimentFile & { href: string | null };
 
-function RemoveButton({ action }: { action: () => void | Promise<void> }) {
+function RemoveButton({ action }: { action: () => Promise<ActionResult> }) {
   const [armed, setArmed] = useState(false);
+  const [pending, start] = useTransition();
+  const { showToast } = useToast();
   if (!armed) {
     return (
       <button
@@ -30,15 +33,21 @@ function RemoveButton({ action }: { action: () => void | Promise<void> }) {
     );
   }
   return (
-    <form action={action}>
-      <button
-        type="submit"
-        className="btn btn-sm"
-        style={{ borderColor: "var(--rose)", color: "var(--rose)", padding: "4px 9px" }}
-      >
-        Remove
-      </button>
-    </form>
+    <button
+      type="button"
+      className="btn btn-sm"
+      disabled={pending}
+      style={{ borderColor: "var(--rose)", color: "var(--rose)", padding: "4px 9px" }}
+      onClick={() =>
+        start(async () => {
+          const res = await action();
+          if (!res.ok) showToast(res.error, "error");
+          else showToast("File removed", "success");
+        })
+      }
+    >
+      {pending ? "Removing…" : "Remove"}
+    </button>
   );
 }
 
@@ -49,7 +58,7 @@ export function FileList({
 }: {
   files: Item[];
   isOwner: boolean;
-  removeAction?: (fileId: string) => () => void | Promise<void>;
+  removeAction?: (fileId: string) => () => Promise<ActionResult>;
 }) {
   if (files.length === 0) {
     return (

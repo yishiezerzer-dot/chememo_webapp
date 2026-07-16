@@ -1,17 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useToast } from "@/components/toast-provider";
+import type { ActionResult } from "@/lib/types";
 
 export function FileManager({
   uploadAction,
   linkAction,
 }: {
-  uploadAction: (formData: FormData) => void | Promise<void>;
-  linkAction: (formData: FormData) => void | Promise<void>;
+  uploadAction: (formData: FormData) => Promise<ActionResult>;
+  linkAction: (formData: FormData) => Promise<ActionResult>;
 }) {
   const uploadFormRef = useRef<HTMLFormElement>(null);
   const linkFormRef = useRef<HTMLFormElement>(null);
   const [uploading, setUploading] = useState(false);
+  const { showToast } = useToast();
 
   return (
     <div className="panel glass" style={{ marginTop: 16 }}>
@@ -25,8 +28,13 @@ export function FileManager({
         action={async (fd) => {
           setUploading(true);
           try {
-            await uploadAction(fd);
+            const res = await uploadAction(fd);
+            if (!res.ok) {
+              showToast(res.error, "error");
+              return;
+            }
             uploadFormRef.current?.reset();
+            showToast("File uploaded", "success");
           } finally {
             setUploading(false);
           }
@@ -52,7 +60,18 @@ export function FileManager({
 
       <div className="nav-sep" style={{ margin: "14px 0" }}></div>
 
-      <form ref={linkFormRef} action={async (fd) => { await linkAction(fd); linkFormRef.current?.reset(); }}>
+      <form
+        ref={linkFormRef}
+        action={async (fd) => {
+          const res = await linkAction(fd);
+          if (!res.ok) {
+            showToast(res.error, "error");
+            return;
+          }
+          linkFormRef.current?.reset();
+          showToast("Link added", "success");
+        }}
+      >
         <div className="field">
           <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>Or link an external folder / file</span>
           <input name="url" type="url" placeholder="https://onedrive… or Drive URL" required />

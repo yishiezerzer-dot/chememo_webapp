@@ -4,6 +4,10 @@ export type Project = {
   color: string | null;
 };
 
+// Result shape for user-facing server actions so the client can toast a
+// friendly message instead of throwing to the error boundary.
+export type ActionResult = { ok: true } | { ok: false; error: string };
+
 export type ExperimentFile = {
   id: string;
   experiment_id: string;

@@ -1,0 +1,66 @@
+[
+  {
+    "id": "q01",
+    "query": "Which samples produced droplets?",
+    "expected_ids": ["EXP-004", "EXP-006", "EXP-012"],
+    "mode": "semantic"
+  },
+  {
+    "id": "q02",
+    "query": "coacervate formation after rehydration",
+    "expected_ids": ["EXP-004", "EXP-006", "EXP-012"],
+    "mode": "semantic"
+  },
+  {
+    "id": "q03",
+    "query": "fiber and fibril formation under the microscope",
+    "expected_ids": ["EXP-007"],
+    "mode": "semantic"
+  },
+  {
+    "id": "q04",
+    "query": "depsipeptide ester-amide oligomerization",
+    "expected_ids": ["EXP-002", "EXP-006", "EXP-010"],
+    "mode": "semantic"
+  },
+  {
+    "id": "q05",
+    "query": "blue crystalline needles metal coordination",
+    "expected_ids": ["EXP-003"],
+    "mode": "semantic"
+  },
+  {
+    "id": "q06",
+    "query": "high pH coacervate droplet phase",
+    "expected_ids": ["EXP-004", "EXP-012"],
+    "mode": "semantic"
+  },
+  {
+    "id": "q07",
+    "query": "experiments with m/z 297",
+    "expected_ids": ["EXP-001", "EXP-004", "EXP-008", "EXP-009", "EXP-011"],
+    "mode": "filter",
+    "filter": { "mz": 297 }
+  },
+  {
+    "id": "q08",
+    "query": "iron-containing experiments",
+    "expected_ids": ["EXP-005", "EXP-011"],
+    "mode": "filter",
+    "filter": { "metals": ["Fe"] }
+  },
+  {
+    "id": "q09",
+    "query": "copper coordination experiments",
+    "expected_ids": ["EXP-003", "EXP-009"],
+    "mode": "filter",
+    "filter": { "metals": ["Cu"] }
+  },
+  {
+    "id": "q10",
+    "query": "reactions run above pH 8",
+    "expected_ids": ["EXP-004", "EXP-009"],
+    "mode": "filter",
+    "filter": { "ph_gt": 8 }
+  }
+]

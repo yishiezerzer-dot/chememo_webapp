@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Experiment, Project } from "@/lib/types";
 
@@ -24,6 +24,11 @@ export function ExperimentsTable({
   const [ph, setPh] = useState<PhFilter>("all");
   const [sort, setSort] = useState<SortKey>("date");
   const [asc, setAsc] = useState(false);
+
+  // Re-sync from the URL when navigation changes the params (e.g. clicking a
+  // sidebar project link, or a global search, while already on this page).
+  useEffect(() => setProject(initialProject), [initialProject]);
+  useEffect(() => setQ(initialQuery), [initialQuery]);
 
   const projectLabel = useMemo(
     () => Object.fromEntries(projects.map((p) => [p.id, p.label])),

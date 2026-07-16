@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "eval:retrieval": "node --env-file=.env.local scripts/eval-retrieval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",

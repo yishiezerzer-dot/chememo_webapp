@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { ActionResult } from "@/lib/types";
 
 const BUCKET = "experiment-files";
 
@@ -20,7 +21,10 @@ function sanitize(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
 }
 
-export async function uploadFile(experimentId: string, formData: FormData) {
+export async function uploadFile(
+  experimentId: string,
+  formData: FormData
+): Promise<ActionResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,13 +32,13 @@ export async function uploadFile(experimentId: string, formData: FormData) {
   if (!user) redirect("/login");
 
   const file = formData.get("file") as File | null;
-  if (!file || file.size === 0) return;
+  if (!file || file.size === 0) return { ok: false, error: "No file selected." };
 
   const path = `${experimentId}/${Date.now()}_${sanitize(file.name)}`;
   const { error: upErr } = await supabase.storage
     .from(BUCKET)
     .upload(path, file, { contentType: file.type || undefined });
-  if (upErr) throw upErr;
+  if (upErr) return { ok: false, error: `Upload failed: ${upErr.message}` };
 
   const { error: rowErr } = await supabase.from("experiment_files").insert({
     experiment_id: experimentId,
@@ -46,13 +50,17 @@ export async function uploadFile(experimentId: string, formData: FormData) {
   if (rowErr) {
     // roll back the orphaned object so storage and the table stay consistent
     await supabase.storage.from(BUCKET).remove([path]);
-    throw rowErr;
+    return { ok: false, error: `Upload failed: ${rowErr.message}` };
   }
 
   revalidatePath(`/experiments/${experimentId}`);
+  return { ok: true };
 }
 
-export async function addFileLink(experimentId: string, formData: FormData) {
+export async function addFileLink(
+  experimentId: string,
+  formData: FormData
+): Promise<ActionResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -62,7 +70,7 @@ export async function addFileLink(experimentId: string, formData: FormData) {
   const url = (formData.get("url") as string | null)?.trim();
   const label = (formData.get("label") as string | null)?.trim();
   const fileType = (formData.get("file_type") as string | null)?.trim() || "folder";
-  if (!url) return;
+  if (!url) return { ok: false, error: "Enter a URL to link." };
 
   const { error } = await supabase.from("experiment_files").insert({
     experiment_id: experimentId,
@@ -71,12 +79,16 @@ export async function addFileLink(experimentId: string, formData: FormData) {
     label: label || url,
     url,
   });
-  if (error) throw error;
+  if (error) return { ok: false, error: `Could not add link: ${error.message}` };
 
   revalidatePath(`/experiments/${experimentId}`);
+  return { ok: true };
 }
 
-export async function removeFile(fileId: string, experimentId: string) {
+export async function removeFile(
+  fileId: string,
+  experimentId: string
+): Promise<ActionResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -94,7 +106,8 @@ export async function removeFile(fileId: string, experimentId: string) {
   }
   // RLS on experiment_files restricts deletion to the parent experiment's owner.
   const { error } = await supabase.from("experiment_files").delete().eq("id", fileId);
-  if (error) throw error;
+  if (error) return { ok: false, error: `Could not remove file: ${error.message}` };
 
   revalidatePath(`/experiments/${experimentId}`);
+  return { ok: true };
 }
