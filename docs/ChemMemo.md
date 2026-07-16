@@ -4,7 +4,7 @@ project_id: CM
 title: ChemMemo AI Lab Notebook
 status: active
 priority: high
-next_action: Two open items — (1) retrieval eval set (~10 Q→expected EXP-IDs + precision/recall script); (2) promote dev→prod (apply ALL migrations incl. storage + match_experiments to chememo prod, set prod env incl. AI_PROVIDER+GEMINI_API_KEY, Auth Site/Redirect URLs, backfill prod embeddings). AI is LIVE on dev via Gemini (switchable to openai/anthropic via AI_PROVIDER). (Reminder: chememo-dev auto-pauses after ~8 days idle — restore_project first.)
+next_action: Continuing the audit's P0 sprint sequence ([[ChemMemo_Audit_Roadmap]]). Sprint S1 (mobile nav + global search) done 2026-07-16. Remaining P0: Sprint S2 (embedding sync on save + EXP-ID sequence — deferred, user wants a stronger model for this) and Sprint S6 (prod promotion — needs explicit confirmation before running, production-deploy stakes). Also open: retrieval eval set (S5, P2). AI is LIVE on dev via Gemini (switchable to openai/anthropic via AI_PROVIDER). (Reminder: chememo-dev auto-pauses after ~8 days idle — restore_project first.)
 ---
 
 # 🧪 ChemMemo — AI Lab Notebook
@@ -18,6 +18,7 @@ This is the **hub note**. Start here each session.
 ## 📄 Project notes
 - [[ChemMemo_Characterization]] — what the app *is*: vision, MVP, good-to-haves, future, UX.
 - [[ChemMemo_Implementation_Plan]] — the detailed, phase-by-phase build plan + **progress log** (where we left off).
+- [[ChemMemo_Audit_Roadmap]] — comprehensive audit of the built app (UI/UX, architecture, bugs) + prioritized roadmap (P0–P3) + sprint blueprint. **Read §0 for the standing priority list.**
 
 ## 🧭 Current status
 - **Phase:** Phases 0–9 ✅ + **Phase 10 AI ACTIVATED on dev via Gemini** 🟢 — full RAG/summaries/assisted-entry live. Pending: retrieval eval set + prod promotion.

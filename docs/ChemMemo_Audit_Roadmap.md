@@ -213,9 +213,9 @@ The app shell (sidebar + sticky topbar + centered content) matches the intended 
 
 #### UX / functional bugs
 
-- [ ] **Mobile sidebar** — CSS drawer without toggle button; navigation unreachable on small screens.
-- [ ] **Global search input** — non-functional placeholder in topbar.
-- [ ] **Sidebar project links** — do not filter experiments table.
+- [x] **Mobile sidebar** — ✅ 2026-07-16 (Sprint S1): `components/mobile-nav.tsx` toggles `.sidebar.open` with a hamburger, backdrop click, Escape, and close-on-route-change.
+- [x] **Global search input** — ✅ 2026-07-16 (Sprint S1): `components/global-search.tsx` navigates to `/experiments?q=…` on Enter.
+- [ ] **Sidebar project links** — do not filter experiments table. *(Sprint S3, P1 — not yet done)*
 - [ ] **Auth toggle link** — keyboard activation incomplete on signup/signin switcher.
 - [ ] **Table sort headers** — not accessible via keyboard.
 - [ ] **Upload errors** — server action throws; no user-visible error message in UI.
@@ -250,8 +250,8 @@ Prioritized by impact vs. effort.
 
 ### P0 — Ship-blocking / adoption
 
-1. **Implement mobile navigation** — hamburger in topbar, toggle `sidebar.open`, backdrop click to close, trap focus in drawer.
-2. **Wire global search** — topbar input navigates to `/experiments?q=…` or `/ask?q=…`; pass initial filter to `ExperimentsTable` via URL search param.
+1. ✅ **Implement mobile navigation** — hamburger in topbar, toggle `sidebar.open`, backdrop click to close, trap focus in drawer. *(done 2026-07-16, Sprint S1, commit `d159b6c`; focus-trap not implemented — Escape + backdrop cover the common cases)*
+2. ✅ **Wire global search** — topbar input navigates to `/experiments?q=…`; pass initial filter to `ExperimentsTable` via URL search param. *(done 2026-07-16, Sprint S1, commit `d159b6c`)*
 3. **Auto-sync embeddings on save** — after create/update server action, call `embedExperiment` + upsert via admin client (async, non-blocking preferred).
 4. **Promote dev → prod** — apply all migrations to production Supabase; set Railway prod env vars (`AI_PROVIDER`, keys, Auth URLs); run backfill on prod.
 5. **Replace EXP-ID generator with DB sequence** — migration: `create sequence experiment_id_seq;` + trigger or atomic SQL function.
