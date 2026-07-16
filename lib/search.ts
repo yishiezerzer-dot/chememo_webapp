@@ -199,6 +199,14 @@ export function parseQuery(
   };
 }
 
+// Build one ilike condition for an .or() group. Double-quotes the value so
+// PostgREST treats `, ( ) %` as literal instead of or()-syntax (matters for
+// AI-router-supplied free text like "poly(A)"); wildcards stay active.
+function ilikeCond(col: string, term: string): string {
+  const v = term.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `${col}.ilike."%${v}%"`;
+}
+
 // Run a parsed filter set as deterministic Postgres queries. Shared by the
 // keyless path and (in Phase 10) the AI router's structured path.
 export async function executeFilters(
@@ -222,9 +230,9 @@ export async function executeFilters(
   if (filters.freeText.length) {
     const ors = filters.freeText
       .flatMap((w) => [
-        `observations.ilike.%${w}%`,
-        `name.ilike.%${w}%`,
-        `notes.ilike.%${w}%`,
+        ilikeCond("observations", w),
+        ilikeCond("name", w),
+        ilikeCond("notes", w),
       ])
       .join(",");
     q = q.or(ors);

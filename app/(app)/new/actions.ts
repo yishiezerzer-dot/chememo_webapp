@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { extractExperimentFields } from "@/lib/anthropic";
 import { nextExperimentId } from "@/lib/experiment-id";
 import { syncExperimentEmbedding } from "@/lib/sync-embedding";
@@ -108,6 +109,17 @@ export async function updateExperiment(id: string, formData: FormData) {
   void syncExperimentEmbedding(id).catch((e) =>
     console.error(`[sync-embedding] update ${id} failed:`, e)
   );
+
+  // Edited fields make any cached AI summary stale — drop it so the detail page
+  // shows "regenerate" instead of an out-of-date summary. Best-effort.
+  void createAdminClient()
+    .from("ai_summaries")
+    .delete()
+    .eq("experiment_id", id)
+    .eq("scope", "single")
+    .then(({ error }) => {
+      if (error) console.error(`[summary-invalidate] update ${id} failed:`, error);
+    });
 
   revalidatePath(`/experiments/${id}`);
   revalidatePath("/experiments");

@@ -17,11 +17,17 @@ export default async function DashboardPage() {
   const withMetals = experiments.filter((e) => e.metals.length > 0).length;
   const recent = experiments.slice(0, 6);
 
+  const now = new Date();
+  const loggedThisMonth = experiments.filter((e) => {
+    const d = new Date(e.created_at);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+
   const stats = [
     { num: experiments.length, lbl: "Experiments" },
     { num: projects.length, lbl: "Project streams" },
     { num: withMetals, lbl: "Metal-containing" },
-    { num: "100%", lbl: "Cited results" },
+    { num: loggedThisMonth, lbl: "Logged this month" },
   ];
 
   return (
