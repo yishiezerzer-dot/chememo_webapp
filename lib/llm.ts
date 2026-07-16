@@ -224,6 +224,19 @@ export async function summarizeExperiment(e: Experiment): Promise<string | null>
   return chatComplete({ system, user: formatRecord(e), maxTokens: 400 });
 }
 
+export async function summarizeGroup(experiments: Experiment[]): Promise<string | null> {
+  if (experiments.length === 0) return null;
+  const system = `You summarise a SET of chemistry experiments using ONLY the fields provided. Rules:
+- 3–5 sentences: shared themes, notable contrasts, and any standouts.
+- Cite each experiment you reference as [EXP-###] using the IDs given; cite an ID at most once.
+- Use only values present in the records; never invent compounds, pH, m/z, or results.
+- No preamble — state the substance directly.`;
+  const user = experiments
+    .map((e) => `[${e.id}]\n${formatRecord(e)}`)
+    .join("\n\n---\n\n");
+  return chatComplete({ system, user, maxTokens: 600 });
+}
+
 // LLM-assisted entry: extract structured fields from messy notes. Only stated
 // fields are returned. Returns null when disabled or unparseable.
 export async function extractExperimentFields(

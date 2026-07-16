@@ -9,6 +9,8 @@ type Props = {
   // Partial so LLM-extracted fields (Phase 9) can pre-fill the form.
   initial?: Partial<Experiment>;
   submitLabel: string;
+  // Distinct compound/metal values for autocomplete (optional).
+  vocab?: { compounds: string[]; metals: string[] };
 };
 
 function TagField({
@@ -16,20 +18,26 @@ function TagField({
   label,
   metal,
   initial,
+  suggestions = [],
 }: {
   name: string;
   label: string;
   metal?: boolean;
   initial: string[];
+  suggestions?: string[];
 }) {
   const [tags, setTags] = useState<string[]>(initial);
   const [draft, setDraft] = useState("");
+  const listId = `dl-${name}`;
 
-  function add() {
-    const v = draft.trim();
+  function add(value?: string) {
+    const v = (value ?? draft).trim();
     if (v && !tags.includes(v)) setTags([...tags, v]);
     setDraft("");
   }
+
+  // Suggest values not already picked; the browser filters by what's typed.
+  const options = suggestions.filter((s) => !tags.includes(s));
 
   return (
     <div className="field">
@@ -44,7 +52,13 @@ function TagField({
         ))}
         <input
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          list={options.length ? listId : undefined}
+          onChange={(e) => {
+            const v = e.target.value;
+            // Selecting a datalist option fires change with the full value.
+            if (options.includes(v)) add(v);
+            else setDraft(v);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === ",") {
               e.preventDefault();
@@ -53,15 +67,22 @@ function TagField({
               setTags(tags.slice(0, -1));
             }
           }}
-          onBlur={add}
+          onBlur={() => add()}
           placeholder="type and press Enter"
         />
+        {options.length > 0 && (
+          <datalist id={listId}>
+            {options.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        )}
       </div>
     </div>
   );
 }
 
-export function ExperimentForm({ projects, action, initial, submitLabel }: Props) {
+export function ExperimentForm({ projects, action, initial, submitLabel, vocab }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
 
   function toggleMethod(m: string) {
@@ -114,8 +135,8 @@ export function ExperimentForm({ projects, action, initial, submitLabel }: Props
             <span className="sec-num">02</span>Chemistry
           </h3>
           <p className="sec-sub">Compounds, metals and conditions.</p>
-          <TagField name="compounds" label="Compounds" initial={initial?.compounds ?? []} />
-          <TagField name="metals" label="Metals" metal initial={initial?.metals ?? []} />
+          <TagField name="compounds" label="Compounds" initial={initial?.compounds ?? []} suggestions={vocab?.compounds} />
+          <TagField name="metals" label="Metals" metal initial={initial?.metals ?? []} suggestions={vocab?.metals} />
           <div className="grid-3">
             <div className="field">
               <label>pH</label>

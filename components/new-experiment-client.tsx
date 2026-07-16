@@ -10,11 +10,13 @@ export function NewExperimentClient({
   aiEnabled,
   createAction,
   extractAction,
+  vocab,
 }: {
   projects: Project[];
   aiEnabled: boolean;
   createAction: (formData: FormData) => void | Promise<void>;
   extractAction: (notes: string) => Promise<Partial<Experiment> | null>;
+  vocab?: { compounds: string[]; metals: string[] };
 }) {
   const [initial, setInitial] = useState<Partial<Experiment> | undefined>();
   // Bump the key so the (uncontrolled) form remounts with pre-filled defaults.
@@ -36,6 +38,7 @@ export function NewExperimentClient({
         action={createAction}
         initial={initial}
         submitLabel="Save experiment"
+        vocab={vocab}
       />
     </>
   );

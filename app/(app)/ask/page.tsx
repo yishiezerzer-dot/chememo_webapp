@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { askAI } from "@/lib/rag";
 import { AskBox } from "@/components/ask-box";
+import { GroupSummary } from "@/components/group-summary";
+import { generateGroupSummary } from "./actions";
 
 const EXAMPLES = [
   "Which samples produced droplets?",
@@ -80,6 +82,12 @@ export default async function AskPage({
 
           {search.grounded && search.results.length > 0 && (
             <>
+              {search.results.length > 1 && (
+                <GroupSummary
+                  ids={search.results.map((e) => e.id)}
+                  action={generateGroupSummary}
+                />
+              )}
               <div className="section-title">
                 <h3 style={{ fontFamily: "var(--display)", fontSize: 18, margin: 0 }}>
                   Sources · {search.results.length} experiment

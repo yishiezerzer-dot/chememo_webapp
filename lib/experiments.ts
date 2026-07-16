@@ -23,6 +23,24 @@ export async function listProjects(): Promise<Project[]> {
   return data ?? [];
 }
 
+// Distinct compound/metal values across live experiments — powers the
+// autocomplete suggestions on the experiment form. Small dataset, so fetch all
+// and dedupe in memory rather than a per-keystroke query.
+export async function listVocab(): Promise<{ compounds: string[]; metals: string[] }> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("experiments")
+    .select("compounds, metals")
+    .is("deleted_at", null);
+  const compounds = new Set<string>();
+  const metals = new Set<string>();
+  for (const row of data ?? []) {
+    (row.compounds ?? []).forEach((c: string) => compounds.add(c));
+    (row.metals ?? []).forEach((m: string) => metals.add(m));
+  }
+  return { compounds: [...compounds].sort(), metals: [...metals].sort() };
+}
+
 // Private bucket → generate short-lived signed URLs so uploaded files open
 // on the detail page (regenerated on every render, so links never go stale).
 export async function signedUrlsFor(

@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getExperiment, listProjects } from "@/lib/experiments";
+import { getExperiment, listProjects, listVocab } from "@/lib/experiments";
 import { updateExperiment } from "@/app/(app)/new/actions";
 import { ExperimentForm } from "@/components/experiment-form";
 
@@ -10,7 +10,11 @@ export default async function EditExperimentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects] = await Promise.all([getExperiment(id), listProjects()]);
+  const [result, projects, vocab] = await Promise.all([
+    getExperiment(id),
+    listProjects(),
+    listVocab(),
+  ]);
   if (!result) notFound();
 
   const supabase = await createClient();
@@ -33,6 +37,7 @@ export default async function EditExperimentPage({
         action={updateExperiment.bind(null, id)}
         initial={result.experiment}
         submitLabel="Save changes"
+        vocab={vocab}
       />
     </div>
   );

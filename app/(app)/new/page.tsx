@@ -1,10 +1,10 @@
-import { listProjects } from "@/lib/experiments";
+import { listProjects, listVocab } from "@/lib/experiments";
 import { isLlmEnabled } from "@/lib/llm";
 import { NewExperimentClient } from "@/components/new-experiment-client";
 import { createExperiment, extractFromNotes } from "./actions";
 
 export default async function NewExperimentPage() {
-  const projects = await listProjects();
+  const [projects, vocab] = await Promise.all([listProjects(), listVocab()]);
 
   return (
     <div>
@@ -17,6 +17,7 @@ export default async function NewExperimentPage() {
         aiEnabled={isLlmEnabled()}
         createAction={createExperiment}
         extractAction={extractFromNotes}
+        vocab={vocab}
       />
     </div>
   );
