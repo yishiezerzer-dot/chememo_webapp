@@ -35,6 +35,30 @@ Everything else below stands. Priorities use **P0 (ship-blocking) → P3 (nice-t
 
 ---
 
+## 0.1 📊 Sprint progress board (glance here for what's left)
+
+> Updated after every finished audit item. Full detail: §4 (priorities) and §5 (sprint blueprint).
+
+| Sprint | What | Priority | Status | Commit |
+|---|---|---|---|---|
+| **Pre** | Ask loading spinner + dynamic general answers | P1 | ✅ done 2026-07-15 | `a626184` |
+| **S1** | Mobile nav + working global search + subdued bg | P0/P1 | ✅ done 2026-07-16 | `d159b6c` |
+| **S2** | Embedding sync on save + atomic EXP-ID sequence | P0 | ✅ done 2026-07-16 (dev only) | `a65bcbb` |
+| **S3** | Dynamic sidebar projects + URL filter parity | P1 | ✅ done 2026-07-16 | `910b2e4` |
+| **S4** | Toasts + error/loading boundaries | P1 | ✅ done 2026-07-16 | `910b2e4` |
+| **S5** | Retrieval eval framework (`npm run eval:retrieval`) | P2/P3 | ✅ done 2026-07-16 (100% recall) | `910b2e4` |
+| **S6** | **Production promotion** (migrations + prod env + backfill) | **P0** | ⬜ **remaining — needs go-ahead** | — |
+
+**✅ Everything that doesn't touch production is done (S1–S5).** The only structured sprint left is **S6 (prod promotion)** — deliberately deferred to the end.
+
+**Still-open backlog beyond the sprints** (all optional polish/features — see §4):
+- **P1:** dashboard activity feed (#11) · meaningful dashboard stats, replace "100% Cited" (#12) · verify Phase-10 copy in prod (#10)
+- **P2:** rename `lib/anthropic.ts`→`lib/llm.ts` (#13) · `next/font` (#14) · Tailwind keep-or-remove (#15) · README (#16) · PostgREST `%,()` escaping in free-text `.or()` (#17) · invalidate cached summary on experiment edit (#18)
+- **P3:** compound/metal autocomplete (#20) · group summary (#21) · CSV export (#22) · Ask via POST/streaming (#23) · edit history table (#24)
+- **Owed manual check (S2 acceptance):** create an experiment on dev → confirm a fresh `experiment_embeddings` row appears within ~30s.
+
+---
+
 ## 1. UI/UX & Design Analysis
 
 ### Overall impression

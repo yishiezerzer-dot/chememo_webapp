@@ -18,7 +18,7 @@ This is the **hub note**. Start here each session.
 ## 📄 Project notes
 - [[ChemMemo_Characterization]] — what the app *is*: vision, MVP, good-to-haves, future, UX.
 - [[ChemMemo_Implementation_Plan]] — the detailed, phase-by-phase build plan + **progress log** (where we left off).
-- [[ChemMemo_Audit_Roadmap]] — comprehensive audit of the built app (UI/UX, architecture, bugs) + prioritized roadmap (P0–P3) + sprint blueprint. **Read §0 for the standing priority list.**
+- [[ChemMemo_Audit_Roadmap]] — comprehensive audit of the built app (UI/UX, architecture, bugs) + prioritized roadmap (P0–P3) + sprint blueprint. **👉 See §0.1 "Sprint progress board" for what's done vs. what's left at a glance** (kept current after every finished item).
 
 ## 🧭 Current status
 - **Phase:** Phases 0–9 ✅ + **Phase 10 AI ACTIVATED on dev via Gemini** 🟢 — full RAG/summaries/assisted-entry live. Pending: retrieval eval set + prod promotion.
