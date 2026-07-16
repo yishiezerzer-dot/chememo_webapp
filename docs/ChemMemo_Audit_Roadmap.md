@@ -54,7 +54,7 @@ Everything else below stands. Priorities use **P0 (ship-blocking) → P3 (nice-t
 **Still-open backlog beyond the sprints** (finishing these before prod, per user; see §4):
 - ✅ Done 2026-07-16 (`1ef18f3`): #12 real dashboard stat · #17 PostgREST free-text escaping · #18 invalidate summary on edit.
 - **P1:** dashboard activity feed (#11) · verify Phase-10 copy in prod (#10 — really an S6 step)
-- **P2:** rename `lib/anthropic.ts`→`lib/llm.ts` (#13) · `next/font` (#14) · Tailwind keep-or-remove (#15) — *#14/#15 touch build/font config; do with user present to visually verify. ✅ #16 README done.*
+- ✅ **P2 all closed 2026-07-16:** #13 rename→`llm.ts` (`31c8ebe`) · #14 `next/font` (`31c8ebe`) · #16 README (`7bdb9f3`) · #17 filter escaping (`1ef18f3`) · #18 summary invalidation (`1ef18f3`) · #15 Tailwind removal — **won't-do, reverted** (`574525e`, broke `npm ci`).
 - **P3:** compound/metal autocomplete (#20) · group summary (#21) · CSV export (#22) · Ask via POST/streaming (#23) · edit history table (#24)
 - **Owed manual check (S2 acceptance):** create an experiment on dev → confirm a fresh `experiment_embeddings` row appears within ~30s.
 
@@ -293,9 +293,9 @@ Prioritized by impact vs. effort.
 
 ### P2 — Technical debt
 
-13. **Rename `lib/anthropic.ts` → `lib/llm.ts`** — re-export for backward compat.
-14. **Migrate fonts to `next/font`** — remove external Google Fonts `<link>`.
-15. **Remove or commit to Tailwind** — either delete unused Tailwind setup or extract repeated inline styles to utilities.
+13. ✅ **Rename `lib/anthropic.ts` → `lib/llm.ts`** — renamed (it dispatches all providers); 5 importers repointed. No shim needed (all callers internal). *(done 2026-07-16, commit `31c8ebe`)*
+14. ✅ **Migrate fonts to `next/font`** — Fraunces/Sora/JetBrains Mono self-hosted via `next/font/google`; removed the external Google Fonts `<link>`; `chemmemo.css` vars point at the font vars. *(done 2026-07-16, commit `31c8ebe`)*
+15. ⏭️ **Remove Tailwind — WON'T DO (reverted).** Removing it churned `package-lock.json` around Tailwind's native `@emnapi`/`oxide` deps and Railway's `npm ci` rejected the out-of-sync lock (deploy failed twice). Tailwind is unused but harmless, so it was restored to the known-good state (revert commit `574525e`). Not worth the lockfile/deploy risk. *(closed 2026-07-16)*
 16. ✅ **Consolidate README** — project-specific README: stack, architecture, env vars, scripts (dev/build/eval/backfill), deploy model, Supabase refs. *(done 2026-07-16, commit `7bdb9f3`)*
 17. ✅ **PostgREST filter escaping** — `ilikeCond()` in `lib/search.ts` double-quotes free-text `.or()` values so `%,()` are literal (guards the AI-router path). *(done 2026-07-16, commit `1ef18f3`)*
 18. ✅ **Invalidate summary on experiment update** — `updateExperiment` drops the cached single-scope `ai_summaries` row so edits don't show a stale summary. *(done 2026-07-16, commit `1ef18f3`)*
