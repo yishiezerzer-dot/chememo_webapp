@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ChemMemo — AI Lab Notebook
 
-## Getting Started
+An online, AI-assisted lab notebook for prebiotic chemistry in the **MFP (Frenkel-Pinter) lab**. Structured experiment records + linked analytical files + natural-language querying (RAG) over past experiments.
 
-First, run the development server:
+- **Live (production):** https://chememowebapp-production.up.railway.app
+- **Dev:** https://chememowebapp-dev.up.railway.app
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router) · React 19 · TypeScript · Turbopack |
+| Backend | Supabase — Postgres + Auth + Storage + `pgvector` |
+| AI (switchable) | Gemini (default) / OpenAI / Anthropic via `AI_PROVIDER` |
+| Hosting | Railway (app) + Supabase (data); GitHub auto-deploy |
+
+Multi-user from day one: **read-all, edit-own** via Postgres RLS.
+
+## Architecture
+
+- **Auth & RLS** — `@supabase/ssr` cookie sessions; every table is RLS-guarded (read-all, owner-only writes). Service-role client (`lib/supabase/admin.ts`) is used only for trusted server writes (AI summaries, embedding sync).
+- **Retrieval (RAG)** — `lib/rag.ts` orchestrates: an LLM router (`routeQuery`) turns a question into structured filters + a semantic query → deterministic Postgres filters (`lib/search.ts`) and/or `pgvector` nearest-neighbour (`match_experiments` RPC) → a grounded, `[EXP-###]`-citing answer, falling back to a labelled general-knowledge answer when nothing relevant matches (threshold `SEMANTIC_MIN_SIMILARITY`, default 0.5).
+- **Embeddings** — `lib/embeddings.ts` (1536-dim). Kept current on every save by `lib/sync-embedding.ts`; one-off backfill via `scripts/backfill-embeddings.ts`.
+- **Provider abstraction** — `lib/anthropic.ts` (chat) + `lib/embeddings.ts` dispatch on `AI_PROVIDER`; switching providers is a one-line env change.
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+# create .env.local (see below), then:
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment variables (`.env.local` — never commit)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=          # Supabase project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=     # Supabase anon key
+SUPABASE_SERVICE_ROLE_KEY=         # service role — server-only, never client
+AI_PROVIDER=gemini                 # gemini | openai | anthropic
+GEMINI_API_KEY=                    # when AI_PROVIDER=gemini
+GEMINI_CHAT_MODEL=gemini-flash-latest
+GEMINI_EMBED_MODEL=gemini-embedding-001
+# OPENAI_API_KEY= / ANTHROPIC_API_KEY= for the other providers
+SEMANTIC_MIN_SIMILARITY=0.5        # optional; grounded/general answer cutoff
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Without an AI key the app runs fully as a **keyless notebook** (deterministic search, no LLM) — the AI layer is inert by design.
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run dev                # dev server
+npm run build              # production build
+npm run lint               # eslint
+npm run eval:retrieval     # retrieval precision/recall vs eval/retrieval-queries.json
+node --env-file=.env.local scripts/backfill-embeddings.ts   # (re)build all embeddings
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Database
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Migrations live in `supabase/migrations/`. Apply with the Supabase CLI (`supabase db push`) or the dashboard SQL editor. Notable objects: `experiments`, `experiment_files`, `experiment_embeddings` (HNSW cosine index), `ai_summaries`, `projects`, the `match_experiments` RPC, and the `experiment_id_seq` sequence (`next_experiment_id()`).
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Railway builds from GitHub: **`master` → production**, **`dev` → dev**. Each environment has its own Supabase project and env vars. Promoting a change: merge to the target branch, then ensure that environment's Supabase has the matching migrations and its embeddings backfilled.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Supabase projects
+
+- Production: `chememo` (ref `iazuubcyxneavrahjgww`, eu-central-1)
+- Dev: `chememo-dev` (ref `khkpqnpmhravdpbogqai`, eu-central-1)
+
+Full build plan, audit, and roadmap live in `docs/` (synced from the project's Obsidian vault).
