@@ -206,9 +206,9 @@ The app shell (sidebar + sticky topbar + centered content) matches the intended 
 
 #### Data integrity bugs
 
-- [ ] **Embedding drift:** Create/update experiment does not upsert `experiment_embeddings` → semantic search stale/missing for new records.
-- [ ] **EXP-ID collision:** Concurrent `createExperiment` calls can produce duplicate `EXP-###` IDs (PK violation or overwrite attempt).
-- [ ] **Soft delete orphans:** Deleting experiment does not remove storage objects, `experiment_files` rows, or `experiment_embeddings` (files cascade via FK on hard delete only; soft delete leaves orphans).
+- [x] **Embedding drift** — ✅ 2026-07-16 (Sprint S2): `lib/sync-embedding.ts` re-embeds on create/update and drops the embedding on soft-delete; wired fire-and-forget into `new/actions.ts`.
+- [x] **EXP-ID collision** — ✅ 2026-07-16 (Sprint S2): migration `20260716120000` adds `experiment_id_seq` + `next_experiment_id()` RPC (seeded at EXP-013 on dev); `lib/experiment-id.ts` replaces read-max-plus-one.
+- [ ] **Soft delete orphans:** Deleting experiment does not remove storage objects or `experiment_files` rows (embeddings now handled by Sprint S2; files/storage still orphan on soft delete).
 - [ ] **Summary cache stale:** Editing experiment does not invalidate `ai_summaries` — regenerate shows old context until manual regen.
 
 #### UX / functional bugs
@@ -252,9 +252,9 @@ Prioritized by impact vs. effort.
 
 1. ✅ **Implement mobile navigation** — hamburger in topbar, toggle `sidebar.open`, backdrop click to close, trap focus in drawer. *(done 2026-07-16, Sprint S1, commit `d159b6c`; focus-trap not implemented — Escape + backdrop cover the common cases)*
 2. ✅ **Wire global search** — topbar input navigates to `/experiments?q=…`; pass initial filter to `ExperimentsTable` via URL search param. *(done 2026-07-16, Sprint S1, commit `d159b6c`)*
-3. **Auto-sync embeddings on save** — after create/update server action, call `embedExperiment` + upsert via admin client (async, non-blocking preferred).
-4. **Promote dev → prod** — apply all migrations to production Supabase; set Railway prod env vars (`AI_PROVIDER`, keys, Auth URLs); run backfill on prod.
-5. **Replace EXP-ID generator with DB sequence** — migration: `create sequence experiment_id_seq;` + trigger or atomic SQL function.
+3. ✅ **Auto-sync embeddings on save** — `lib/sync-embedding.ts` upserts via admin client on create/update, deletes on soft-delete; fire-and-forget from `new/actions.ts`. *(done 2026-07-16, Sprint S2, commit `a65bcbb`)*
+4. **Promote dev → prod** — apply all migrations to production Supabase; set Railway prod env vars (`AI_PROVIDER`, keys, Auth URLs); run backfill on prod. *(Sprint S6 — still pending, needs explicit go-ahead before running)*
+5. ✅ **Replace EXP-ID generator with DB sequence** — migration `20260716120000` adds `experiment_id_seq` + `next_experiment_id()`; `lib/experiment-id.ts` calls it. *(done 2026-07-16, Sprint S2, commit `a65bcbb`; applied to dev only)*
 
 ### P1 — Trust & polish
 
