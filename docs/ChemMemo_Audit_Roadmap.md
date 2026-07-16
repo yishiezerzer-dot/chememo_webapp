@@ -55,7 +55,7 @@ Everything else below stands. Priorities use **P0 (ship-blocking) → P3 (nice-t
 - ✅ Done 2026-07-16 (`1ef18f3`): #12 real dashboard stat · #17 PostgREST free-text escaping · #18 invalidate summary on edit.
 - **P1:** ✅ dashboard activity feed (#11, `0e44aff`) · verify Phase-10 copy in prod (#10 — really an S6 step)
 - ✅ **P2 all closed 2026-07-16:** #13 rename→`llm.ts` (`31c8ebe`) · #14 `next/font` (`31c8ebe`) · #16 README (`7bdb9f3`) · #17 filter escaping (`1ef18f3`) · #18 summary invalidation (`1ef18f3`) · #15 Tailwind removal — **won't-do, reverted** (`574525e`, broke `npm ci`).
-- **P3:** ✅ CSV export (#22, `0e44aff`) · remaining: compound/metal autocomplete (#20) · group summary (#21) · Ask via POST/streaming (#23) · edit history table (#24)
+- **P3:** ✅ CSV export (#22, `0e44aff`) · ✅ autocomplete (#20, `ac83f1e`) · ✅ group summary (#21, `ac83f1e`) · remaining: Ask via POST/streaming (#23) · edit history table (#24, needs a migration)
 - **Owed manual check (S2 acceptance):** create an experiment on dev → confirm a fresh `experiment_embeddings` row appears within ~30s.
 
 ---
@@ -303,8 +303,8 @@ Prioritized by impact vs. effort.
 ### P3 — Feature completeness (from characterization doc)
 
 19. ✅ **Retrieval eval set** — `eval/retrieval-queries.json` (10 queries) + self-contained `scripts/eval-retrieval.ts` (`npm run eval:retrieval`), precision/recall@k, gated at 0.8 recall. Dev baseline: 100% recall on all 10, mean precision 56%. *(done 2026-07-16, Sprint S5, commit `910b2e4`)*
-20. **Compound/metal autocomplete** — server action returning distinct values from DB for tag inputs.
-21. **Group summary** — summarize filtered experiment set on Ask results or Experiments page.
+20. ✅ **Compound/metal autocomplete** — `listVocab()` returns distinct compounds/metals; the form `TagField` shows a native `<datalist>` on new + edit (fetched once, browser-filtered — no per-keystroke query). *(done 2026-07-16, commit `ac83f1e`)*
+21. ✅ **Group summary** — `summarizeGroup()` + `generateGroupSummary` action; a "Summarise these N experiments" button on multi-result grounded asks returns a cited summary (on demand, not cached). *(done 2026-07-16, commit `ac83f1e`)*
 22. ✅ **CSV export** — "Export CSV" button in the experiments toolbar downloads the currently-filtered rows; hand-rolled CSV (no new dependency), RFC-style quoting. *(done 2026-07-16, commit `0e44aff`)*
 23. **Ask AI POST + streaming** — move query to server action or route handler with streamed response; avoid URL logging.
 24. **Edit history** — `experiment_revisions` table + trigger on update storing JSON diff.
