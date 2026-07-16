@@ -10,7 +10,7 @@ import {
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";
-import { isLlmEnabled } from "@/lib/anthropic";
+import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
 import { FileManager } from "@/components/file-manager";

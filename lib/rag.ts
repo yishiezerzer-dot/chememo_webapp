@@ -6,7 +6,7 @@ import {
   routeQuery,
   generateAnswer,
   generateGeneralAnswer,
-} from "@/lib/anthropic";
+} from "@/lib/llm";
 import { embedText } from "@/lib/embeddings";
 import type { Experiment } from "@/lib/types";
 

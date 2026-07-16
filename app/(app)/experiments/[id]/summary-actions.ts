@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isLlmEnabled, summarizeExperiment, activeChatModel } from "@/lib/anthropic";
+import { isLlmEnabled, summarizeExperiment, activeChatModel } from "@/lib/llm";
 
 // Generate + cache a grounded single-experiment summary. No-ops (inert) until
 // an ANTHROPIC key exists. Regenerating replaces the prior single-scope row.

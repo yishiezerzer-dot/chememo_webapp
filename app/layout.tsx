@@ -1,6 +1,26 @@
 import type { Metadata } from "next";
+import { Fraunces, Sora, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "./chemmemo.css";
+
+// Self-hosted via next/font (no external Google Fonts <link>). Exposed as CSS
+// variables consumed by chemmemo.css (--display / --ui / --mono).
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
+  display: "swap",
+});
+const sora = Sora({
+  subsets: ["latin"],
+  variable: "--font-ui",
+  display: "swap",
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "ChemMemo · MFP Lab Notebook",
@@ -17,18 +37,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark">
+    <html
+      lang="en"
+      data-theme="dark"
+      className={`${fraunces.variable} ${sora.variable} ${jetbrainsMono.variable}`}
+    >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body>

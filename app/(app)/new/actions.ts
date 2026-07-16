@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { extractExperimentFields } from "@/lib/anthropic";
+import { extractExperimentFields } from "@/lib/llm";
 import { nextExperimentId } from "@/lib/experiment-id";
 import { syncExperimentEmbedding } from "@/lib/sync-embedding";
 import { METHOD_OPTIONS, type ExperimentInput } from "@/lib/types";

@@ -1,5 +1,5 @@
 import { listProjects } from "@/lib/experiments";
-import { isLlmEnabled } from "@/lib/anthropic";
+import { isLlmEnabled } from "@/lib/llm";
 import { NewExperimentClient } from "@/components/new-experiment-client";
 import { createExperiment, extractFromNotes } from "./actions";
 

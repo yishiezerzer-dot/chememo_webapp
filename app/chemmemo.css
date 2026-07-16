@@ -36,9 +36,9 @@
   --radius-sm: 11px;
   --shadow-lg: 0 30px 80px -30px rgba(0,0,0,.8);
 
-  --mono: "JetBrains Mono", ui-monospace, monospace;
-  --ui: "Sora", system-ui, sans-serif;
-  --display: "Fraunces", Georgia, serif;
+  --mono: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
+  --ui: var(--font-ui), "Sora", system-ui, sans-serif;
+  --display: var(--font-display), "Fraunces", Georgia, serif;
 
   /* sidebar width as a variable so responsive rules are consistent */
   --sidebar-w: 248px;
