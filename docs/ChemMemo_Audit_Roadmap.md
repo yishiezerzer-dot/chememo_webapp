@@ -53,9 +53,9 @@ Everything else below stands. Priorities use **P0 (ship-blocking) → P3 (nice-t
 
 **Still-open backlog beyond the sprints** (finishing these before prod, per user; see §4):
 - ✅ Done 2026-07-16 (`1ef18f3`): #12 real dashboard stat · #17 PostgREST free-text escaping · #18 invalidate summary on edit.
-- **P1:** dashboard activity feed (#11) · verify Phase-10 copy in prod (#10 — really an S6 step)
+- **P1:** ✅ dashboard activity feed (#11, `0e44aff`) · verify Phase-10 copy in prod (#10 — really an S6 step)
 - ✅ **P2 all closed 2026-07-16:** #13 rename→`llm.ts` (`31c8ebe`) · #14 `next/font` (`31c8ebe`) · #16 README (`7bdb9f3`) · #17 filter escaping (`1ef18f3`) · #18 summary invalidation (`1ef18f3`) · #15 Tailwind removal — **won't-do, reverted** (`574525e`, broke `npm ci`).
-- **P3:** compound/metal autocomplete (#20) · group summary (#21) · CSV export (#22) · Ask via POST/streaming (#23) · edit history table (#24)
+- **P3:** ✅ CSV export (#22, `0e44aff`) · remaining: compound/metal autocomplete (#20) · group summary (#21) · Ask via POST/streaming (#23) · edit history table (#24)
 - **Owed manual check (S2 acceptance):** create an experiment on dev → confirm a fresh `experiment_embeddings` row appears within ~30s.
 
 ---
@@ -288,7 +288,7 @@ Prioritized by impact vs. effort.
 8. ✅ **Apply `body.dim`** on non-dashboard routes via client effect or layout class. *(done 2026-07-16, Sprint S1 — `components/page-body-class.tsx`)*
 9. ✅ **Fix sidebar projects** — `SidebarNav` now renders real `listProjects()` rows linking to `/experiments?project=<id>`; `ExperimentsTable` re-syncs `q`/`project` from the URL on navigation. *(done 2026-07-16, Sprint S3, commit `910b2e4`)*
 10. **Update stale Phase 10 copy** — `paste-notes.tsx` / `summary-card.tsx` messages when `aiEnabled` is true (already conditional, but verify prod env).
-11. **Dashboard activity feed** — query recent `experiments` by `updated_at`, show last 8 edits with links.
+11. ✅ **Dashboard activity feed** — "Recent activity" panel shows the last 8 experiments by `updated_at` with relative timestamps, each linking to its detail (reuses `.act-row` CSS). *(done 2026-07-16, commit `0e44aff`)*
 12. ✅ **Meaningful dashboard stats** — replaced the hardcoded "100% Cited" with "Logged this month" (counts `experiments.created_at` in the current month). *(done 2026-07-16, commit `1ef18f3`)*
 
 ### P2 — Technical debt
@@ -305,7 +305,7 @@ Prioritized by impact vs. effort.
 19. ✅ **Retrieval eval set** — `eval/retrieval-queries.json` (10 queries) + self-contained `scripts/eval-retrieval.ts` (`npm run eval:retrieval`), precision/recall@k, gated at 0.8 recall. Dev baseline: 100% recall on all 10, mean precision 56%. *(done 2026-07-16, Sprint S5, commit `910b2e4`)*
 20. **Compound/metal autocomplete** — server action returning distinct values from DB for tag inputs.
 21. **Group summary** — summarize filtered experiment set on Ask results or Experiments page.
-22. **CSV export** — download filtered experiments as CSV from table toolbar.
+22. ✅ **CSV export** — "Export CSV" button in the experiments toolbar downloads the currently-filtered rows; hand-rolled CSV (no new dependency), RFC-style quoting. *(done 2026-07-16, commit `0e44aff`)*
 23. **Ask AI POST + streaming** — move query to server action or route handler with streamed response; avoid URL logging.
 24. **Edit history** — `experiment_revisions` table + trigger on update storing JSON diff.
 
