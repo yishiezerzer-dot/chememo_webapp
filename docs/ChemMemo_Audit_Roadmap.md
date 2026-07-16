@@ -51,9 +51,10 @@ Everything else below stands. Priorities use **P0 (ship-blocking) → P3 (nice-t
 
 **✅ Everything that doesn't touch production is done (S1–S5).** The only structured sprint left is **S6 (prod promotion)** — deliberately deferred to the end.
 
-**Still-open backlog beyond the sprints** (all optional polish/features — see §4):
-- **P1:** dashboard activity feed (#11) · meaningful dashboard stats, replace "100% Cited" (#12) · verify Phase-10 copy in prod (#10)
-- **P2:** rename `lib/anthropic.ts`→`lib/llm.ts` (#13) · `next/font` (#14) · Tailwind keep-or-remove (#15) · README (#16) · PostgREST `%,()` escaping in free-text `.or()` (#17) · invalidate cached summary on experiment edit (#18)
+**Still-open backlog beyond the sprints** (finishing these before prod, per user; see §4):
+- ✅ Done 2026-07-16 (`1ef18f3`): #12 real dashboard stat · #17 PostgREST free-text escaping · #18 invalidate summary on edit.
+- **P1:** dashboard activity feed (#11) · verify Phase-10 copy in prod (#10 — really an S6 step)
+- **P2:** rename `lib/anthropic.ts`→`lib/llm.ts` (#13) · `next/font` (#14) · Tailwind keep-or-remove (#15) · README (#16)
 - **P3:** compound/metal autocomplete (#20) · group summary (#21) · CSV export (#22) · Ask via POST/streaming (#23) · edit history table (#24)
 - **Owed manual check (S2 acceptance):** create an experiment on dev → confirm a fresh `experiment_embeddings` row appears within ~30s.
 
@@ -288,7 +289,7 @@ Prioritized by impact vs. effort.
 9. ✅ **Fix sidebar projects** — `SidebarNav` now renders real `listProjects()` rows linking to `/experiments?project=<id>`; `ExperimentsTable` re-syncs `q`/`project` from the URL on navigation. *(done 2026-07-16, Sprint S3, commit `910b2e4`)*
 10. **Update stale Phase 10 copy** — `paste-notes.tsx` / `summary-card.tsx` messages when `aiEnabled` is true (already conditional, but verify prod env).
 11. **Dashboard activity feed** — query recent `experiments` by `updated_at`, show last 8 edits with links.
-12. **Meaningful dashboard stats** — replace "100% Cited" with "AI queries this week" or "Experiments this month".
+12. ✅ **Meaningful dashboard stats** — replaced the hardcoded "100% Cited" with "Logged this month" (counts `experiments.created_at` in the current month). *(done 2026-07-16, commit `1ef18f3`)*
 
 ### P2 — Technical debt
 
@@ -296,8 +297,8 @@ Prioritized by impact vs. effort.
 14. **Migrate fonts to `next/font`** — remove external Google Fonts `<link>`.
 15. **Remove or commit to Tailwind** — either delete unused Tailwind setup or extract repeated inline styles to utilities.
 16. **Consolidate README** — project-specific setup: env vars, Supabase link, dev/prod Railway URLs, backfill command.
-17. **PostgREST filter escaping** — helper to escape `%`, `,`, `(`, `)` in free-text tokens before `.or()`.
-18. **Invalidate summary on experiment update** — delete cached `ai_summaries` row when experiment fields change.
+17. ✅ **PostgREST filter escaping** — `ilikeCond()` in `lib/search.ts` double-quotes free-text `.or()` values so `%,()` are literal (guards the AI-router path). *(done 2026-07-16, commit `1ef18f3`)*
+18. ✅ **Invalidate summary on experiment update** — `updateExperiment` drops the cached single-scope `ai_summaries` row so edits don't show a stale summary. *(done 2026-07-16, commit `1ef18f3`)*
 
 ### P3 — Feature completeness (from characterization doc)
 
