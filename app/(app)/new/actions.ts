@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { extractExperimentFields } from "@/lib/anthropic";
+import { nextExperimentId } from "@/lib/experiment-id";
+import { syncExperimentEmbedding } from "@/lib/sync-embedding";
 import { METHOD_OPTIONS, type ExperimentInput } from "@/lib/types";
 
 // LLM-assisted entry: parse pasted notes into structured fields for the user to
@@ -62,23 +64,6 @@ function parseForm(formData: FormData): ExperimentInput {
   };
 }
 
-async function nextExperimentId(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<string> {
-  // Continue the EXP-### sequence. Reads the current max; fine for a lab-scale
-  // single-writer-at-a-time tool. A DB sequence would harden this later.
-  const { data } = await supabase
-    .from("experiments")
-    .select("id")
-    .like("id", "EXP-%")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const last = data?.id ? parseInt(data.id.replace("EXP-", ""), 10) : 0;
-  const n = Number.isFinite(last) ? last + 1 : 1;
-  return `EXP-${String(n).padStart(3, "0")}`;
-}
-
 export async function createExperiment(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -89,11 +74,17 @@ export async function createExperiment(formData: FormData) {
   const input = parseForm(formData);
   if (!input.name) return; // name is required; the form enforces this too
 
-  const id = await nextExperimentId(supabase);
+  const id = await nextExperimentId();
   const { error } = await supabase
     .from("experiments")
     .insert({ id, owner_id: user.id, ...input });
   if (error) throw error;
+
+  // Keep semantic search current; fire-and-forget so a slow embed API can't
+  // block the redirect (Railway's persistent server finishes it in the bg).
+  void syncExperimentEmbedding(id).catch((e) =>
+    console.error(`[sync-embedding] create ${id} failed:`, e)
+  );
 
   revalidatePath("/experiments");
   redirect(`/experiments/${id}`);
@@ -113,6 +104,11 @@ export async function updateExperiment(id: string, formData: FormData) {
   const { error } = await supabase.from("experiments").update(input).eq("id", id);
   if (error) throw error;
 
+  // Re-embed the edited record so semantic search reflects the changes.
+  void syncExperimentEmbedding(id).catch((e) =>
+    console.error(`[sync-embedding] update ${id} failed:`, e)
+  );
+
   revalidatePath(`/experiments/${id}`);
   revalidatePath("/experiments");
   redirect(`/experiments/${id}`);
@@ -130,6 +126,11 @@ export async function softDeleteExperiment(id: string) {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+
+  // Drop the now-deleted experiment from semantic search.
+  void syncExperimentEmbedding(id).catch((e) =>
+    console.error(`[sync-embedding] delete ${id} failed:`, e)
+  );
 
   revalidatePath("/experiments");
   redirect("/experiments");
