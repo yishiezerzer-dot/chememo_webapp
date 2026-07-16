@@ -7,6 +7,32 @@ import type { Experiment, Project } from "@/lib/types";
 type SortKey = "id" | "name" | "date" | "project" | "ph" | "cycles";
 type PhFilter = "all" | "lt7" | "eq7" | "gt8";
 
+// Quote a CSV cell only when it contains a comma, quote, or newline.
+function csvCell(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toCsv(rows: Experiment[], projectLabel: Record<string, string>): string {
+  const headers = [
+    "ID", "Name", "Date", "Researcher", "Project", "Reaction type",
+    "pH", "Cycles", "Compounds", "Metals", "Methods", "m/z",
+    "Observations", "Notes",
+  ];
+  const lines = rows.map((e) =>
+    [
+      e.id, e.name, e.date, e.researcher,
+      e.project ? projectLabel[e.project] ?? e.project : "",
+      e.reaction_type, e.ph, e.cycles,
+      e.compounds.join("; "), e.metals.join("; "), e.methods.join("; "),
+      e.mz.join("; "), e.observations, e.notes,
+    ]
+      .map(csvCell)
+      .join(",")
+  );
+  return [headers.join(","), ...lines].join("\r\n");
+}
+
 export function ExperimentsTable({
   experiments,
   projects,
@@ -104,6 +130,19 @@ export function ExperimentsTable({
     { key: "gt8", label: "pH > 8" },
   ];
 
+  function exportCsv() {
+    const csv = toCsv(rows, projectLabel);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `chememo-experiments-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <>
       <div className="toolbar">
@@ -151,6 +190,16 @@ export function ExperimentsTable({
         <span className="count-pill" style={{ marginLeft: "auto" }}>
           {rows.length} / {experiments.length}
         </span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={exportCsv}
+          disabled={rows.length === 0}
+          title="Download the filtered rows as CSV"
+          style={{ marginLeft: 8 }}
+        >
+          Export CSV
+        </button>
       </div>
 
       <div className="table-scroll">

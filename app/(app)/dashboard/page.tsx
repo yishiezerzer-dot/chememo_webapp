@@ -2,6 +2,21 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { listExperiments, listProjects } from "@/lib/experiments";
 
+// Compact "3h ago" / "2d ago" relative time for the activity feed.
+function timeAgo(iso: string): string {
+  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  const mins = secs / 60;
+  const hours = mins / 60;
+  const days = hours / 24;
+  if (secs < 60) return `${Math.floor(secs)}s ago`;
+  if (mins < 60) return `${Math.floor(mins)}m ago`;
+  if (hours < 24) return `${Math.floor(hours)}h ago`;
+  if (days < 7) return `${Math.floor(days)}d ago`;
+  if (days < 30.4) return `${Math.floor(days / 7)}w ago`;
+  if (days < 365) return `${Math.floor(days / 30.4)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const [{ data: { user } }, experiments, projects] = await Promise.all([
@@ -16,6 +31,9 @@ export default async function DashboardPage() {
   const projectLabel = Object.fromEntries(projects.map((p) => [p.id, p.label]));
   const withMetals = experiments.filter((e) => e.metals.length > 0).length;
   const recent = experiments.slice(0, 6);
+  const activity = [...experiments]
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
+    .slice(0, 8);
 
   const now = new Date();
   const loggedThisMonth = experiments.filter((e) => {
@@ -104,6 +122,33 @@ export default async function DashboardPage() {
             </Link>
           ))}
         </div>
+      )}
+
+      {activity.length > 0 && (
+        <>
+          <div className="section-title" style={{ marginTop: 26 }}>
+            <h3 style={{ fontFamily: "var(--display)", fontSize: 19, margin: 0 }}>
+              Recent activity
+            </h3>
+          </div>
+          <div className="panel glass">
+            <div className="activity">
+              {activity.map((e) => (
+                <Link
+                  key={e.id}
+                  href={`/experiments/${e.id}`}
+                  className="act-row"
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <span className="act-dot"></span>
+                  <span className="ai-label">{e.id}</span>
+                  <span className="at">{e.name}</span>
+                  <time dateTime={e.updated_at}>{timeAgo(e.updated_at)}</time>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
