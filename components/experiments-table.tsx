@@ -10,13 +10,17 @@ type PhFilter = "all" | "lt7" | "eq7" | "gt8";
 export function ExperimentsTable({
   experiments,
   projects,
+  initialQuery = "",
+  initialProject = "all",
 }: {
   experiments: Experiment[];
   projects: Project[];
+  initialQuery?: string;
+  initialProject?: string;
 }) {
   const router = useRouter();
-  const [q, setQ] = useState("");
-  const [project, setProject] = useState<string>("all");
+  const [q, setQ] = useState(initialQuery);
+  const [project, setProject] = useState<string>(initialProject);
   const [ph, setPh] = useState<PhFilter>("all");
   const [sort, setSort] = useState<SortKey>("date");
   const [asc, setAsc] = useState(false);

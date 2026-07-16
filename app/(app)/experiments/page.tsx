@@ -2,8 +2,13 @@ import Link from "next/link";
 import { listExperiments, listProjects } from "@/lib/experiments";
 import { ExperimentsTable } from "@/components/experiments-table";
 
-export default async function ExperimentsPage() {
-  const [experiments, projects] = await Promise.all([
+export default async function ExperimentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; project?: string }>;
+}) {
+  const [{ q, project }, experiments, projects] = await Promise.all([
+    searchParams,
     listExperiments(),
     listProjects(),
   ]);
@@ -21,7 +26,12 @@ export default async function ExperimentsPage() {
           + New experiment
         </Link>
       </div>
-      <ExperimentsTable experiments={experiments} projects={projects} />
+      <ExperimentsTable
+        experiments={experiments}
+        projects={projects}
+        initialQuery={q}
+        initialProject={project}
+      />
     </div>
   );
 }

@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { BrandMark } from "@/components/brand-mark";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MobileNav } from "@/components/mobile-nav";
+import { PageBodyClass } from "@/components/page-body-class";
+import { GlobalSearch } from "@/components/global-search";
 
 export default async function AppLayout({
   children,
@@ -29,6 +32,7 @@ export default async function AppLayout({
 
   return (
     <div className="app active">
+      <PageBodyClass />
       <aside className="sidebar" id="sidebar">
         <div className="brand">
           <BrandMark />
@@ -82,15 +86,10 @@ export default async function AppLayout({
 
       <main className="main">
         <header className="topbar">
+          <MobileNav />
           <h1>ChemMemo</h1>
           <div className="spacer"></div>
-          <div className="searchbox">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4-4" />
-            </svg>
-            <input placeholder="Search experiments…  ↵" aria-label="Global search" />
-          </div>
+          <GlobalSearch />
           <ThemeToggle />
         </header>
 
