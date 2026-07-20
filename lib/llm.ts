@@ -98,6 +98,102 @@ async function chatComplete(opts: {
   return res.choices[0]?.message?.content?.trim() || null;
 }
 
+// Streaming completion. Yields text chunks as they arrive. Gemini streams via
+// SSE; openai/anthropic fall back to yielding the full completion once (still
+// correct, just not incremental). Yields nothing when disabled.
+async function* chatStream(opts: {
+  system: string;
+  user: string;
+  maxTokens: number;
+}): AsyncGenerator<string> {
+  const p = chatProvider();
+  const key = chatKey(p);
+  if (!key) return;
+  const model = activeChatModel();
+
+  if (p === "gemini") {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: opts.system }] },
+          contents: [{ role: "user", parts: [{ text: opts.user }] }],
+          generationConfig: {
+            maxOutputTokens: opts.maxTokens,
+            temperature: 0,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      }
+    );
+    if (!res.ok || !res.body) {
+      throw new Error(`Gemini stream ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const j = JSON.parse(payload);
+          const parts = j?.candidates?.[0]?.content?.parts ?? [];
+          const t = parts.map((x: { text?: string }) => x.text ?? "").join("");
+          if (t) yield t;
+        } catch {
+          // partial JSON across chunks is rare with line-framed SSE; skip
+        }
+      }
+    }
+    return;
+  }
+
+  // openai / anthropic: no incremental streaming here — yield the whole answer.
+  const full = await chatComplete(opts);
+  if (full) yield full;
+}
+
+const GROUNDED_SYSTEM = `You answer questions about a chemistry lab's experiments using ONLY the provided records. Rules:
+- Cite every claim inline with the experiment ID in square brackets, e.g. [EXP-004].
+- If the records do not contain the answer, reply exactly: "No matching experiments found."
+- Never invent compounds, values, or results that are not in the records.
+- Be concise and specific.`;
+
+const GENERAL_SYSTEM = `You are a helpful, knowledgeable assistant for a prebiotic-chemistry research lab. The user's question did not match any of the lab's stored experiments, so answer from your own general knowledge.
+- Be accurate and concise.
+- Do NOT cite experiment IDs or claim anything about the lab's specific experiments.
+- If the question is outside your knowledge or ambiguous, say so briefly.`;
+
+// Streaming grounded answer (same prompt as generateAnswer).
+export async function* streamAnswer(
+  query: string,
+  records: Experiment[]
+): AsyncGenerator<string> {
+  if (!isLlmEnabled() || records.length === 0) return;
+  const context = records.map(formatRecord).join("\n\n");
+  yield* chatStream({
+    system: GROUNDED_SYSTEM,
+    user: `Question: ${query}\n\nExperiment records:\n${context}`,
+    maxTokens: 800,
+  });
+}
+
+// Streaming general-knowledge answer (same prompt as generateGeneralAnswer).
+export async function* streamGeneralAnswer(query: string): AsyncGenerator<string> {
+  if (!isLlmEnabled()) return;
+  yield* chatStream({ system: GENERAL_SYSTEM, user: query, maxTokens: 800 });
+}
+
 export type RouteIntent = {
   mode: "filter" | "semantic" | "both";
   filters: SearchFilters;

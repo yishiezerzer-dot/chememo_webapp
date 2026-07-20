@@ -56,6 +56,24 @@ async function semanticSearch(semanticQuery: string, k = 8): Promise<Experiment[
   return (rows ?? []).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 }
 
+// Retrieval only (no answer generation) — routes the query, runs filters and/or
+// semantic search, returns the deduped records. Used by the streaming route
+// handler, which generates the answer itself. [] when the router is unavailable.
+export async function retrieveRecords(query: string): Promise<Experiment[]> {
+  const intent = await routeQuery(query);
+  if (!intent) return [];
+  const seen = new Map<string, Experiment>();
+  if (intent.mode !== "semantic") {
+    for (const e of await executeFilters(intent.filters)) seen.set(e.id, e);
+  }
+  if (intent.mode !== "filter" && intent.semanticQuery) {
+    for (const e of await semanticSearch(intent.semanticQuery)) {
+      if (!seen.has(e.id)) seen.set(e.id, e);
+    }
+  }
+  return [...seen.values()];
+}
+
 async function keylessAsk(query: string): Promise<AskResult> {
   const ks = await keylessSearch(query);
   return {
