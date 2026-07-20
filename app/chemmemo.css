@@ -842,8 +842,7 @@ table.exp-table {
 }
 .file-item .ftype { font-size: 10.5px; color: var(--ink-mute); margin-left: auto; text-transform: uppercase; letter-spacing: .07em; flex: none; }
 
-.detail-aside { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; scrollbar-width: none; }
-.detail-aside::-webkit-scrollbar { display: none; }
+.detail-aside { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 76px; }
 .ai-summary-card {
   padding: 20px; border-radius: var(--radius); position: relative; overflow: hidden;
   border: 1px solid var(--border-strong);
