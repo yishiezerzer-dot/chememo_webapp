@@ -57,7 +57,7 @@ Everything else below stands. Priorities use **P0 (ship-blocking) → P3 (nice-t
 - ✅ **P2 all closed 2026-07-16:** #13 rename→`llm.ts` (`31c8ebe`) · #14 `next/font` (`31c8ebe`) · #16 README (`7bdb9f3`) · #17 filter escaping (`1ef18f3`) · #18 summary invalidation (`1ef18f3`) · #15 Tailwind removal — **won't-do, reverted** (`574525e`, broke `npm ci`).
 - ✅ **P3 all closed:** #22 CSV export (`0e44aff`) · #20 autocomplete (`ac83f1e`) · #21 group summary (`ac83f1e`) · #23 Ask POST/streaming (`836707d`) · #24 edit history (`99e1e2a`, dev migration).
 - 🎯 **Every audit item is now done except Sprint S6 (production promotion).** That's the only thing left before ChemMemo is fully shipped.
-- **Owed manual check (S2 acceptance):** create an experiment on dev → confirm a fresh `experiment_embeddings` row appears within ~30s.
+- ✅ **Dev acceptance checks verified 2026-07-20:** created EXP-013 → embedding auto-synced (13 experiments / 13 embeddings); edit → 1 `experiment_revisions` row (History panel populated); sequence handed out EXP-013. Also fixed a latent owner-view crash found here (`f25e2c4`).
 
 ---
 
