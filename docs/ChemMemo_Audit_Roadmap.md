@@ -643,58 +643,75 @@ eval-queries.json
 
 ---
 
-### Sprint S6 — Production promotion runbook (ops, not code)
+### Sprint S6 — Production promotion runbook (THE LAST STEP) 🚀
 
-Execute manually or via Supabase CLI with approval gates.
+> **This is the only remaining work.** Everything else in the audit is shipped on `dev`. Follow this top-to-bottom. It is ops, not code — each live-prod step trips the auto-mode approval gate (that's expected; approve each one). **Start a fresh session** and point it here.
+>
+> **Facts as of 2026-07-20:**
+> - Prod Supabase project **`chememo`** (ref `iazuubcyxneavrahjgww`, eu-central-1) is **INACTIVE (paused)** → must be restored first.
+> - Dev Supabase **`chememo-dev`** (ref `khkpqnpmhravdpbogqai`) has everything and is the reference to mirror.
+> - Railway auto-deploys **`master` → production**, **`dev` → dev**. All audit work is on `dev`; prod code ships by merging `dev`→`master`.
+> - AI is **Gemini** (`AI_PROVIDER=gemini`). Embeddings auto-sync on save now (Sprint S2), so a prod backfill is only needed for rows that exist *before* the app goes live (i.e. the seed rows, if you keep them).
+> - Secrets live only in `C:\dev\chememo_webapp\.env.local` (gitignored) and Railway env — never commit them. Re-fetch prod keys: `supabase projects api-keys --project-ref iazuubcyxneavrahjgww`.
 
-#### S6.1 — Supabase prod migrations
+#### S6.0 — Restore prod + decide the seed strategy
+- Restore the paused prod project (Supabase MCP `restore_project` on `iazuubcyxneavrahjgww`, or the dashboard). Wait for ACTIVE_HEALTHY.
+- **Decision (ask Yishi):** should prod start **with the 12 demo experiments** (migration `20260702120100_seed_reference_and_experiments.sql`) or **empty** for real lab use? If empty, skip/scrub that seed migration when applying — but KEEP the `projects` reference seed if the app expects it. Default recommendation: **keep projects, drop the 12 demo experiments** so the lab starts clean.
 
-```bash
-# From repo root, linked to prod project
-supabase db push --project-ref iazuubcyxneavrahjgww
-# Verify: storage bucket, match_experiments function, experiment_id_seq
-```
+#### S6.1 — Apply all migrations to prod (in order)
+Apply every migration in `supabase/migrations/` to prod (via `supabase db push --project-ref iazuubcyxneavrahjgww`, or Supabase MCP `apply_migration` one at a time). Full set:
+1. `20260702120000_init_schema.sql` — tables, RLS, triggers
+2. `20260702120100_seed_reference_and_experiments.sql` — **see S6.0 seed decision** (projects vs demo experiments)
+3. `20260702130000_fix_soft_delete_rls.sql`
+4. `20260705140000_storage_experiment_files.sql` — storage bucket + policies
+5. `20260705150000_fix_storage_rls_name_shadowing.sql`
+6. `20260713120000_match_experiments.sql` — pgvector HNSW + RPC
+7. `20260716120000_experiment_id_sequence.sql` — **NEW (S2)** EXP-ID sequence
+8. `20260720120000_experiment_revisions.sql` — **NEW (#24)** edit-history table + trigger
+- **Verify on prod:** `experiments`, `experiment_files`, `experiment_embeddings` (HNSW index), `ai_summaries`, `projects`, `experiment_revisions` tables; `match_experiments()`, `next_experiment_id()`, `record_experiment_revision()` functions; `experiment_id_seq` sequence; the `experiment-files` storage bucket.
 
-#### S6.2 — Supabase Auth URL configuration (prod)
-
-In Supabase Dashboard → Authentication → URL Configuration:
-
+#### S6.2 — Supabase Auth URL config (prod dashboard → Authentication → URL Configuration)
 - **Site URL:** `https://chememowebapp-production.up.railway.app`
-- **Redirect URLs:**
-  - `https://chememowebapp-production.up.railway.app/auth/callback`
-  - `http://localhost:3000/auth/callback`
+- **Redirect URLs:** `https://chememowebapp-production.up.railway.app/auth/callback` and `http://localhost:3000/auth/callback`
 
-#### S6.3 — Railway production environment variables
-
-Set on production service (mirror dev):
-
+#### S6.3 — Railway production env vars (service in `production` env; mirror dev)
 ```
-NEXT_PUBLIC_SUPABASE_URL=<prod url>
+NEXT_PUBLIC_SUPABASE_URL=https://iazuubcyxneavrahjgww.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<prod anon>
 SUPABASE_SERVICE_ROLE_KEY=<prod service role>
 AI_PROVIDER=gemini
-GEMINI_API_KEY=<key>
+GEMINI_API_KEY=<the Gemini key from dev/.env.local>
 GEMINI_CHAT_MODEL=gemini-flash-latest
 GEMINI_EMBED_MODEL=gemini-embedding-001
 SEMANTIC_MIN_SIMILARITY=0.5
 ```
+(Get anon/service-role via `supabase projects api-keys --project-ref iazuubcyxneavrahjgww`.)
 
-#### S6.4 — Prod embedding backfill
+#### S6.4 — Ship the code: merge `dev` → `master`
+- `git checkout master && git merge dev && git push origin master` (fast-forward; all work is on dev). Railway auto-builds prod. **Confirm the prod deploy reaches SUCCESS** (`railway deployment list -e production`). Watch for the same `npm ci` lockfile strictness — the lock is already clean, so it should pass.
 
+#### S6.5 — Prod embedding backfill (only if seed experiments were kept, or after first real entries)
 ```bash
+# temporarily point .env.local at PROD Supabase creds, then:
 node --env-file=.env.local scripts/backfill-embeddings.ts
-# Use prod credentials in .env.local temporarily OR pass env vars
+# restore .env.local to dev creds afterwards
 ```
+New/edited experiments auto-embed (S2), so this is a one-time catch-up for pre-existing rows only.
 
-#### S6.5 — Prod smoke test checklist
+#### S6.6 — Prod smoke test
+1. Sign up / sign in on the production URL (confirms Auth URLs).
+2. Create an experiment → appears in table → detail correct → **ID is `EXP-###` from the sequence**.
+3. Edit it → **History panel** shows the change (confirms #24 trigger on prod).
+4. Upload an image → opens via signed URL.
+5. Ask a question → answer **streams in**, grounded ones cite `[EXP-###]` (confirms #23 + embeddings).
+6. Generate a summary on the detail page → cached in `ai_summaries`.
+7. Mobile viewport → sidebar toggle works; global search + sidebar project filters work.
 
-1. Sign up / sign in on production URL.
-2. Create experiment → appears in table → detail correct.
-3. Upload image → opens via signed URL.
-4. Ask "pH above 8 cycling" → grounded answer with [EXP-###] citations.
-5. Generate summary on detail page → cached in `ai_summaries`.
-6. Paste notes on /new → fields pre-filled.
-7. Mobile viewport → sidebar toggle works.
+#### S6.7 — Post-launch
+- Update the vault: tick S6 in §0.1, set status to **PRODUCTION LIVE**, note the launch date.
+- (Optional) delete any leftover test rows; confirm `experiment_embeddings` count matches live experiments.
+
+**Definition of done:** production URL is fully functional end-to-end (auth, CRUD, files, streaming AI, history), prod Supabase has all 8 migrations + embeddings, and `master` == `dev`.
 
 ---
 
