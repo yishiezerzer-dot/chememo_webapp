@@ -55,7 +55,8 @@ Everything else below stands. Priorities use **P0 (ship-blocking) → P3 (nice-t
 - ✅ Done 2026-07-16 (`1ef18f3`): #12 real dashboard stat · #17 PostgREST free-text escaping · #18 invalidate summary on edit.
 - **P1:** ✅ dashboard activity feed (#11, `0e44aff`) · verify Phase-10 copy in prod (#10 — really an S6 step)
 - ✅ **P2 all closed 2026-07-16:** #13 rename→`llm.ts` (`31c8ebe`) · #14 `next/font` (`31c8ebe`) · #16 README (`7bdb9f3`) · #17 filter escaping (`1ef18f3`) · #18 summary invalidation (`1ef18f3`) · #15 Tailwind removal — **won't-do, reverted** (`574525e`, broke `npm ci`).
-- **P3:** ✅ CSV export (#22, `0e44aff`) · ✅ autocomplete (#20, `ac83f1e`) · ✅ group summary (#21, `ac83f1e`) · remaining: Ask via POST/streaming (#23) · edit history table (#24, needs a migration)
+- ✅ **P3 all closed:** #22 CSV export (`0e44aff`) · #20 autocomplete (`ac83f1e`) · #21 group summary (`ac83f1e`) · #23 Ask POST/streaming (`836707d`) · #24 edit history (`99e1e2a`, dev migration).
+- 🎯 **Every audit item is now done except Sprint S6 (production promotion).** That's the only thing left before ChemMemo is fully shipped.
 - **Owed manual check (S2 acceptance):** create an experiment on dev → confirm a fresh `experiment_embeddings` row appears within ~30s.
 
 ---
@@ -265,7 +266,7 @@ The app shell (sidebar + sticky topbar + centered content) matches the intended 
 
 - [ ] **Animated backgrounds** — `will-change: transform` + infinite animations on fixed layers; minor GPU cost, mitigated by `prefers-reduced-motion`.
 - [ ] **Signed URL batch** — `createSignedUrls` for all upload paths each render; fine for small file counts.
-- [ ] **No streaming** — Ask page blocks until full RAG pipeline completes (embed + route + generate).
+- [x] **No streaming** — ✅ 2026-07-20 (#23): `POST /api/ask` streams the answer token-by-token; retrieval runs first, then the generation streams.
 
 ---
 
@@ -306,8 +307,8 @@ Prioritized by impact vs. effort.
 20. ✅ **Compound/metal autocomplete** — `listVocab()` returns distinct compounds/metals; the form `TagField` shows a native `<datalist>` on new + edit (fetched once, browser-filtered — no per-keystroke query). *(done 2026-07-16, commit `ac83f1e`)*
 21. ✅ **Group summary** — `summarizeGroup()` + `generateGroupSummary` action; a "Summarise these N experiments" button on multi-result grounded asks returns a cited summary (on demand, not cached). *(done 2026-07-16, commit `ac83f1e`)*
 22. ✅ **CSV export** — "Export CSV" button in the experiments toolbar downloads the currently-filtered rows; hand-rolled CSV (no new dependency), RFC-style quoting. *(done 2026-07-16, commit `0e44aff`)*
-23. **Ask AI POST + streaming** — move query to server action or route handler with streamed response; avoid URL logging.
-24. **Edit history** — `experiment_revisions` table + trigger on update storing JSON diff.
+23. ✅ **Ask AI POST + streaming** — `POST /api/ask` streams the answer (Gemini SSE; metadata first line, then tokens); query is in the POST body, not the URL. `ask/page` is a shell; `ask-client.tsx` renders the answer incrementally. *(done 2026-07-20, commit `836707d`)*
+24. ✅ **Edit history** — `experiment_revisions` table + AFTER UPDATE trigger snapshotting the prior row (applied to chememo-dev); "History" panel on the detail page shows each edit's changed fields. *(done 2026-07-20, commit `99e1e2a`; migration dev-only)*
 
 ---
 
