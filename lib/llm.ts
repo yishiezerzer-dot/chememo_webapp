@@ -126,6 +126,9 @@ async function* chatStream(opts: {
             thinkingConfig: { thinkingBudget: 0 },
           },
         }),
+        // Gemini occasionally accepts the connection but never sends a chunk;
+        // without a deadline that hangs the reader (and the client) forever.
+        signal: AbortSignal.timeout(30_000),
       }
     );
     if (!res.ok || !res.body) {

@@ -170,6 +170,12 @@ export function AskClient({
         </div>
       )}
 
+      {failed && (
+        <p className="muted" style={{ fontSize: 12.5 }}>
+          Something went wrong answering that. Please try again.
+        </p>
+      )}
+
       {meta?.mode === "ai" && (
         <div>
           {showAnswerCard && (
@@ -195,11 +201,6 @@ export function AskClient({
             <div className="empty-state">
               <div className="big">No matching experiments found.</div>
             </div>
-          )}
-          {failed && (
-            <p className="muted" style={{ fontSize: 12.5 }}>
-              Something went wrong answering that. Please try again.
-            </p>
           )}
 
           {meta.grounded && meta.results.length > 0 && (
