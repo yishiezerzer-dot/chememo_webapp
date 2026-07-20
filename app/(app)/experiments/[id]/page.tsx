@@ -149,9 +149,8 @@ export default async function ExperimentDetailPage({
             <FileList
               files={fileItems}
               isOwner={isOwner}
-              removeAction={
-                isOwner ? (fileId: string) => removeFile.bind(null, fileId, e.id) : undefined
-              }
+              experimentId={e.id}
+              removeAction={isOwner ? removeFile : undefined}
             />
           </div>
 

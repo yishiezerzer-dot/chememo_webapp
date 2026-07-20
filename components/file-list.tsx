@@ -55,10 +55,15 @@ export function FileList({
   files,
   isOwner,
   removeAction,
+  experimentId,
 }: {
   files: Item[];
   isOwner: boolean;
-  removeAction?: (fileId: string) => () => Promise<ActionResult>;
+  // The raw server action (passable to a client component); we build the
+  // per-file click closure here rather than passing a plain factory from the
+  // server (which RSC forbids).
+  removeAction?: (fileId: string, experimentId: string) => Promise<ActionResult>;
+  experimentId: string;
 }) {
   if (files.length === 0) {
     return (
@@ -101,7 +106,9 @@ export function FileList({
                 {inner}
               </div>
             )}
-            {isOwner && removeAction && <RemoveButton action={removeAction(f.id)} />}
+            {isOwner && removeAction && (
+              <RemoveButton action={() => removeAction(f.id, experimentId)} />
+            )}
           </div>
         );
       })}
