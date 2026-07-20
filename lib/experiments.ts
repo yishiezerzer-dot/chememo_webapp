@@ -1,6 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { Experiment, ExperimentFile, Project } from "@/lib/types";
+import type {
+  Experiment,
+  ExperimentFile,
+  ExperimentRevision,
+  Project,
+} from "@/lib/types";
 
 // RLS already hides other users' soft-deleted rows; we also filter deleted_at
 // so an owner's own trash stays out of normal list/detail views.
@@ -39,6 +44,19 @@ export async function listVocab(): Promise<{ compounds: string[]; metals: string
     (row.metals ?? []).forEach((m: string) => metals.add(m));
   }
   return { compounds: [...compounds].sort(), metals: [...metals].sort() };
+}
+
+// Prior states of an experiment (newest first), captured by the update trigger.
+export async function listRevisions(
+  experimentId: string
+): Promise<ExperimentRevision[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("experiment_revisions")
+    .select("*")
+    .eq("experiment_id", experimentId)
+    .order("created_at", { ascending: false });
+  return data ?? [];
 }
 
 // Private bucket → generate short-lived signed URLs so uploaded files open

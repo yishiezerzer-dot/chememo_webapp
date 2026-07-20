@@ -8,6 +8,15 @@ export type Project = {
 // friendly message instead of throwing to the error boundary.
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+// A prior state of an experiment, captured by the update trigger (audit #24).
+export type ExperimentRevision = {
+  id: string;
+  experiment_id: string;
+  editor_id: string | null;
+  snapshot: Experiment;
+  created_at: string;
+};
+
 export type ExperimentFile = {
   id: string;
   experiment_id: string;

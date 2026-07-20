@@ -5,6 +5,7 @@ import {
   getExperiment,
   getExperimentSummary,
   listProjects,
+  listRevisions,
   signedUrlsFor,
 } from "@/lib/experiments";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
@@ -15,6 +16,7 @@ import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
 import { FileManager } from "@/components/file-manager";
 import { SummaryCard } from "@/components/summary-card";
+import { HistoryPanel } from "@/components/history-panel";
 
 export default async function ExperimentDetailPage({
   params,
@@ -22,10 +24,11 @@ export default async function ExperimentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects, summary] = await Promise.all([
+  const [result, projects, summary, revisions] = await Promise.all([
     getExperiment(id),
     listProjects(),
     getExperimentSummary(id),
+    listRevisions(id),
   ]);
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
@@ -164,6 +167,8 @@ export default async function ExperimentDetailPage({
             summary={summary}
             action={generateSummary.bind(null, e.id)}
           />
+
+          <HistoryPanel current={e} revisions={revisions} />
         </aside>
       </div>
     </div>
