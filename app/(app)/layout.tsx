@@ -49,7 +49,7 @@ export default async function AppLayout({
           </div>
         </div>
 
-        <SidebarNav projects={projects} />
+        <SidebarNav projects={projects} currentUserId={user.id} />
 
         <div className="sidebar-foot">
           <div className="user-pill">

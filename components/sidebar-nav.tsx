@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import type { Project } from "@/lib/types";
+import { useToast } from "@/components/toast-provider";
+import { createProject, deleteProject } from "@/app/(app)/projects-actions";
 
 const ITEMS = [
   {
@@ -50,8 +53,53 @@ const ITEMS = [
   },
 ];
 
-export function SidebarNav({ projects }: { projects: Project[] }) {
+const SWATCHES = ["#3ee0c4", "#6fe3ff", "#7fd1ff", "#c2a3ff", "#ffd479", "#ff8fa3"];
+
+export function SidebarNav({
+  projects,
+  currentUserId,
+}: {
+  projects: Project[];
+  currentUserId: string;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [color, setColor] = useState(SWATCHES[0]);
+  const [busy, setBusy] = useState(false);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    const res = await createProject(name, color);
+    setBusy(false);
+    if (res.ok) {
+      showToast("Project created", "success");
+      setName("");
+      setColor(SWATCHES[0]);
+      setCreating(false);
+      router.refresh();
+    } else {
+      showToast(res.error, "error");
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (busy) return;
+    setBusy(true);
+    const res = await deleteProject(id);
+    setBusy(false);
+    if (res.ok) {
+      showToast("Project deleted", "success");
+      router.refresh();
+    } else {
+      showToast(res.error, "error");
+    }
+  }
 
   return (
     <>
@@ -65,24 +113,121 @@ export function SidebarNav({ projects }: { projects: Project[] }) {
         </Link>
       ))}
 
-      {projects.length > 0 && (
-        <>
-          <div className="nav-sep"></div>
-          <div className="eyebrow" style={{ padding: "0 14px 8px" }}>
-            Projects
-          </div>
-          {projects.map((p) => (
+      <div className="nav-sep"></div>
+      <div className="eyebrow" style={{ padding: "0 14px 8px" }}>
+        Projects
+      </div>
+
+      {projects.map((p) => {
+        const canDelete = p.owner_id === currentUserId || p.owner_id === null;
+        return (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Link
-              key={p.id}
               href={`/experiments?project=${p.id}`}
               className="nav-item"
-              style={{ fontSize: 13.5 }}
+              style={{ fontSize: 13.5, flex: 1, minWidth: 0 }}
             >
               <span className="pdot" style={{ color: p.color ?? "var(--teal)" }}></span>{" "}
-              {p.label}
+              <span
+                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {p.label}
+              </span>
             </Link>
-          ))}
-        </>
+            {canDelete && (
+              <button
+                type="button"
+                aria-label={`Delete ${p.label}`}
+                onClick={() => handleDelete(p.id)}
+                disabled={busy}
+                className="btn-ghost btn-sm"
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: "var(--ink-mute)",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  flex: "none",
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      {!creating ? (
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="nav-item"
+          style={{ fontSize: 13.5, background: "none", border: "1px solid transparent", cursor: "pointer", width: "100%", textAlign: "left" }}
+        >
+          + New project
+        </button>
+      ) : (
+        <form
+          onSubmit={handleCreate}
+          style={{
+            padding: "8px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Project name"
+            autoFocus
+            disabled={busy}
+            style={{
+              background: "rgba(255,255,255,.04)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "6px 10px",
+              color: "var(--ink)",
+              fontSize: 13,
+            }}
+          />
+          <div style={{ display: "flex", gap: 6 }}>
+            {SWATCHES.map((sw) => (
+              <button
+                key={sw}
+                type="button"
+                aria-label={`Color ${sw}`}
+                onClick={() => setColor(sw)}
+                disabled={busy}
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: sw,
+                  border: color === sw ? "2px solid var(--ink)" : "2px solid transparent",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button type="submit" className="btn btn-sm" disabled={busy}>
+              Add
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={busy}
+              onClick={() => {
+                setCreating(false);
+                setName("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       )}
     </>
   );

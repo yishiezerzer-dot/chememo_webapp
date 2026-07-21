@@ -2,6 +2,7 @@ export type Project = {
   id: string;
   label: string;
   color: string | null;
+  owner_id: string | null;
 };
 
 // Result shape for user-facing server actions so the client can toast a
