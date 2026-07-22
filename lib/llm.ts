@@ -50,12 +50,15 @@ async function chatComplete(opts: {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: opts.system }] },
           contents: [{ role: "user", parts: [{ text: opts.user }] }],
-          // thinkingBudget 0: these are extraction/answer tasks, not reasoning —
-          // avoids the model spending the output budget on hidden thinking.
+          // Minimal thinking budget: these are extraction/answer tasks, not
+          // reasoning, so we keep thinking small to avoid the model spending the
+          // output budget on hidden thinking. Must be > 0 — the current
+          // gemini-flash-latest (→ gemini-3.x) rejects thinkingBudget:0 with a
+          // 400, unlike the 2.5-era model this was built against.
           generationConfig: {
             maxOutputTokens: opts.maxTokens,
             temperature: 0,
-            thinkingConfig: { thinkingBudget: 0 },
+            thinkingConfig: { thinkingBudget: 128 },
           },
         }),
       }
@@ -123,7 +126,8 @@ async function* chatStream(opts: {
           generationConfig: {
             maxOutputTokens: opts.maxTokens,
             temperature: 0,
-            thinkingConfig: { thinkingBudget: 0 },
+            // Must be > 0 for gemini-3.x (see chatComplete); 0 now returns 400.
+            thinkingConfig: { thinkingBudget: 128 },
           },
         }),
         // Gemini occasionally accepts the connection but never sends a chunk;
