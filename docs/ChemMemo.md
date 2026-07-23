@@ -12,7 +12,7 @@ tags:
   - chememo
   - chememo/hub
   - moc
-next_action: "T0.1 + T0.2 + T0.3 shipped on dev 2026-07-23 — see [[ChemMemo_Product_Evolution_Plan]] Tier 0 (incl. a tunables callout for T0.3's rate/concurrency numbers) and [[ChemMemo_Implementation_Plan]] session history. T0.2 closed a real stored-XSS hole in file links. NOT yet promoted to master/prod. Next: T0.4 (strict lab-only Ask mode) — one Tier 0 item at a time, per the plan's guardrails; do not batch. Do NOT start Tiers 1–4 (the ELN evolution) without explicit direction."
+next_action: "T0.1–T0.4 shipped on dev 2026-07-23 — see [[ChemMemo_Product_Evolution_Plan]] Tier 0 (incl. a tunables callout for T0.3's rate/concurrency numbers) and [[ChemMemo_Implementation_Plan]] session history. T0.2 closed a real stored-XSS hole in file links; T0.4 closed a provenance risk (general-knowledge answers could look like lab conclusions). NOT yet promoted to master/prod. Next: T0.5 (durable indexing job queue) — this one is ⚠ spec-first (small), needs a short brainstorm on the worker mechanism given Railway's single-service model, per the plan's guardrail #2. One Tier 0 item at a time; do not batch. Do NOT start Tiers 1–4 without explicit direction."
 updated: 2026-07-23
 ---
 
@@ -55,7 +55,7 @@ This is the **hub note (Map of Content)**. Start here each session.
 - ✅ **Live in production**, feature-complete for daily lab use: auth, structured experiment CRUD, file upload/link + signed URLs, hybrid keyless + AI search, grounded cited Ask (streaming), AI summaries, paste-notes extraction, edit history, CSV export, mobile nav, user-managed projects.
 - ✅ **Last shipped (2026-07-21):** user-managed projects on dev + prod (`c47384d`); 4 seed projects removed from prod.
 - 🟡 **Known, non-blocking residuals** (see [[ChemMemo_Audit_Roadmap]] §3): CSV *import* never built (export only); "soft-delete orphans" (storage/`experiment_files` not cleaned on experiment delete); two a11y gaps (table sort headers, auth-toggle keyboard); a couple security-hardening items (validate `addFileLink` URL schemes, rate-limit AI actions). Re-verify Ask AI/summary once Gemini `gemini-flash-latest` 503s subside (external/transient).
-- 🟡 **In progress:** [[ChemMemo_Product_Evolution_Plan]] Tier 0 — T0.1 (shared Zod validation) + T0.2 (file/URL hardening, closed a real stored-XSS hole) + T0.3 (AI rate limits & telemetry, tunable numbers documented in the plan) shipped on **dev** 2026-07-23, not yet promoted to master/prod. Next: T0.4.
+- 🟡 **In progress:** [[ChemMemo_Product_Evolution_Plan]] Tier 0 — T0.1 (shared Zod validation) + T0.2 (file/URL hardening, closed a real stored-XSS hole) + T0.3 (AI rate limits & telemetry, tunable numbers documented in the plan) + T0.4 (strict lab-only Ask mode, closed a provenance risk) shipped on **dev** 2026-07-23, not yet promoted to master/prod. Next: T0.5 (⚠ spec-first).
 
 > Full dated history lives in [[ChemMemo_Implementation_Plan#Session history]] — not duplicated here.
 
