@@ -28,6 +28,10 @@ export type ExperimentFile = {
   label: string | null;
   storage_path: string | null;
   url: string | null;
+  mime_type: string | null;
+  byte_size: number | null;
+  sha256: string | null;
+  uploaded_by: string | null;
   created_at: string;
 };
 
