@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { METHOD_OPTIONS, type ActionResult, type Experiment, type Project } from "@/lib/types";
 
 type Props = {
@@ -93,15 +93,28 @@ function TagField({
 
 export function ExperimentForm({ projects, action, initial, submitLabel, vocab }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
-  const [state, formAction] = useActionState(action, null);
+  const [state, setState] = useState<ActionResult | null>(null);
+  const [pending, startTransition] = useTransition();
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
 
   function toggleMethod(m: string) {
     setMethods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
   }
 
+  // Deliberately not a plain <form action={fn}>: React resets uncontrolled
+  // fields after any action call (including a validation failure), which
+  // would wipe what the user just typed. Calling the action from onSubmit
+  // keeps the DOM inputs untouched when the result comes back ok: false.
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      setState(await action(state, formData));
+    });
+  }
+
   return (
-    <form action={formAction} className="form-shell">
+    <form onSubmit={handleSubmit} className="form-shell">
       <div className="form-sections">
         <section className="fsec glass">
           <h3>
@@ -243,8 +256,13 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
           <p className="sec-sub" style={{ margin: "0 0 14px" }}>
             The record is typed and searchable immediately. You can edit it later.
           </p>
-          <button type="submit" className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}>
-            {submitLabel}
+          <button
+            type="submit"
+            disabled={pending}
+            className="btn btn-primary"
+            style={{ width: "100%", justifyContent: "center" }}
+          >
+            {pending ? "Saving…" : submitLabel}
           </button>
         </div>
       </aside>
