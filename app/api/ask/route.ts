@@ -12,6 +12,7 @@ import type { Experiment } from "@/lib/types";
 
 type AskMeta = {
   mode: "keyless" | "ai";
+  askMode: "lab" | "context";
   grounded: boolean;
   streaming: boolean;
   interpretation: string[];
@@ -36,13 +37,16 @@ export async function POST(req: Request) {
   if (query.length > MAX_QUERY_CHARS) {
     return new Response("Question is too long.", { status: 413 });
   }
+  // Never trust the client blindly — anything but the literal "context" is
+  // treated as "lab" (the safe default that never emits general knowledge).
+  const askMode: "lab" | "context" = body?.mode === "context" ? "context" : "lab";
 
   const enc = new TextEncoder();
   const line = (meta: AskMeta) => enc.encode(JSON.stringify(meta) + "\n");
 
   if (!query) {
     return new Response(
-      line({ mode: "keyless", grounded: false, streaming: false, interpretation: [], results: [], emptyReason: null }),
+      line({ mode: "keyless", askMode, grounded: false, streaming: false, interpretation: [], results: [], emptyReason: null }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );
   }
@@ -53,6 +57,7 @@ export async function POST(req: Request) {
     return new Response(
       line({
         mode: "keyless",
+        askMode,
         grounded: false,
         streaming: false,
         interpretation: ks.interpretation,
@@ -68,11 +73,30 @@ export async function POST(req: Request) {
   const slot = acquireConcurrency(user.id);
   if (!slot.ok) return new Response(slot.error, { status: 429 });
 
-  // AI: retrieve first, then stream the answer.
-  const records = await retrieveRecords(query);
-  const grounded = records.length > 0;
+  // Lab mode: retrieve first. If nothing matches, say so explicitly — never
+  // fall back to general knowledge, which could read as a lab conclusion.
+  const records = askMode === "lab" ? await retrieveRecords(query) : [];
+  const grounded = askMode === "lab" && records.length > 0;
+
+  if (askMode === "lab" && !grounded) {
+    slot.release();
+    return new Response(
+      line({
+        mode: "ai",
+        askMode,
+        grounded: false,
+        streaming: false,
+        interpretation: [],
+        results: [],
+        emptyReason: "No matching experiments found in your lab.",
+      }),
+      { headers: { "content-type": "text/plain; charset=utf-8" } }
+    );
+  }
+
   const meta: AskMeta = {
     mode: "ai",
+    askMode,
     grounded,
     streaming: true,
     interpretation: [],

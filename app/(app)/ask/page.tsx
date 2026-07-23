@@ -14,9 +14,10 @@ const EXAMPLES = [
 export default async function AskPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; mode?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, mode } = await searchParams;
+  const initialAskMode = mode === "context" ? "context" : "lab";
 
   return (
     <div>
@@ -30,7 +31,7 @@ export default async function AskPage({
         knowledge (clearly marked as not from your data).
       </p>
 
-      <AskClient initialQuery={q?.trim() ?? ""} examples={EXAMPLES} />
+      <AskClient initialQuery={q?.trim() ?? ""} initialAskMode={initialAskMode} examples={EXAMPLES} />
     </div>
   );
 }

@@ -6,8 +6,11 @@ import type { Experiment } from "@/lib/types";
 import { GroupSummary } from "@/components/group-summary";
 import { generateGroupSummary } from "@/app/(app)/ask/actions";
 
+type AskMode = "lab" | "context";
+
 type AskMeta = {
   mode: "keyless" | "ai";
+  askMode: AskMode;
   grounded: boolean;
   streaming: boolean;
   interpretation: string[];
@@ -32,17 +35,28 @@ function renderCitations(text: string) {
 
 export function AskClient({
   initialQuery,
+  initialAskMode,
   examples,
 }: {
   initialQuery: string;
+  initialAskMode: AskMode;
   examples: string[];
 }) {
   const [q, setQ] = useState(initialQuery);
+  const [askMode, setAskMode] = useState<AskMode>(initialAskMode);
   const [phase, setPhase] = useState<Phase>("idle");
   const [meta, setMeta] = useState<AskMeta | null>(null);
   const [answer, setAnswer] = useState("");
   const [failed, setFailed] = useState(false);
   const busy = phase === "loading" || phase === "streaming";
+
+  function selectAskMode(next: AskMode) {
+    setAskMode(next);
+    const url = new URL(window.location.href);
+    if (next === "lab") url.searchParams.delete("mode");
+    else url.searchParams.set("mode", next);
+    window.history.replaceState(null, "", url);
+  }
 
   async function run(raw: string) {
     const query = raw.trim();
@@ -57,7 +71,7 @@ export function AskClient({
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, mode: askMode }),
       });
       if (!res.ok || !res.body) throw new Error(String(res.status));
 
@@ -133,6 +147,29 @@ export function AskClient({
         </div>
       </form>
 
+      <div className="filter-chips" style={{ marginBottom: 14 }} role="radiogroup" aria-label="Ask mode">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={askMode === "lab"}
+          className={`chip${askMode === "lab" ? " active" : ""}`}
+          disabled={busy}
+          onClick={() => selectAskMode("lab")}
+        >
+          Search my lab
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={askMode === "context"}
+          className={`chip${askMode === "context" ? " active" : ""}`}
+          disabled={busy}
+          onClick={() => selectAskMode("context")}
+        >
+          Scientific context
+        </button>
+      </div>
+
       <div className="filter-chips example-chips" style={{ marginBottom: 24 }}>
         {examples.map((ex) => (
           <button
@@ -179,13 +216,29 @@ export function AskClient({
       {meta?.mode === "ai" && (
         <div>
           {showAnswerCard && (
-            <div className="ai-summary-card" style={{ marginBottom: 18 }}>
+            <div
+              className="ai-summary-card"
+              style={
+                meta.askMode === "context"
+                  ? {
+                      marginBottom: 18,
+                      borderColor: "var(--amber)",
+                      background: "rgba(255,212,121,.08)",
+                    }
+                  : { marginBottom: 18 }
+              }
+            >
               <div className="ai-head">
-                <span className="eyebrow">{meta.grounded ? "Grounded answer" : "General answer"}</span>
+                <span
+                  className="eyebrow"
+                  style={meta.askMode === "context" ? { color: "var(--amber)" } : undefined}
+                >
+                  {meta.askMode === "context" ? "Scientific context" : "Grounded answer"}
+                </span>
               </div>
-              {!meta.grounded && (
-                <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
-                  General chemistry knowledge — not based on your lab&rsquo;s experiments.
+              {meta.askMode === "context" && (
+                <p style={{ fontSize: 12.5, marginTop: 8, color: "var(--amber)", fontWeight: 600 }}>
+                  General chemistry knowledge — not from your lab&rsquo;s experiments.
                 </p>
               )}
               <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
@@ -199,7 +252,7 @@ export function AskClient({
 
           {phase === "done" && !answer && !failed && (
             <div className="empty-state">
-              <div className="big">No matching experiments found.</div>
+              <div className="big">{meta.emptyReason ?? "No matching experiments found."}</div>
             </div>
           )}
 
