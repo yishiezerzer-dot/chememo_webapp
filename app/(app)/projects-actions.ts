@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
+import { projectLabelSchema } from "@/lib/schemas";
 
 function slugify(label: string): string {
   return (
@@ -22,8 +23,9 @@ export async function createProject(label: string, color: string): Promise<Actio
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const name = label.trim();
-  if (!name) return { ok: false, error: "Enter a project name." };
+  const parsed = projectLabelSchema.safeParse(label);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const name = parsed.data;
 
   const base = slugify(name);
   for (let attempt = 0; attempt < 10; attempt++) {

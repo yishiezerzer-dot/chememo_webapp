@@ -422,6 +422,7 @@ a { color: inherit; }
 }
 .field input::placeholder, .field textarea::placeholder { color: var(--ink-mute); }
 .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236d8a90' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+.field-error { color: var(--rose); font-size: 12.5px; margin: 6px 0 0; }
 .field textarea { resize: vertical; min-height: 88px; line-height: 1.55; }
 .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: var(--ink-dim); }
 .auth-toggle a { color: var(--teal); cursor: pointer; font-weight: 600; text-decoration: none; }

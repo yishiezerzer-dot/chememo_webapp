@@ -7,7 +7,9 @@ export type Project = {
 
 // Result shape for user-facing server actions so the client can toast a
 // friendly message instead of throwing to the error boundary.
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type ActionResult =
+  | { ok: true }
+  | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 // A prior state of an experiment, captured by the update trigger (audit #24).
 export type ExperimentRevision = {

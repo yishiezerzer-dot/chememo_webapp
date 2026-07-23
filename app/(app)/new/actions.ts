@@ -7,7 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { extractExperimentFields } from "@/lib/llm";
 import { nextExperimentId } from "@/lib/experiment-id";
 import { syncExperimentEmbedding } from "@/lib/sync-embedding";
-import { METHOD_OPTIONS, type ExperimentInput } from "@/lib/types";
+import { METHOD_OPTIONS, type ActionResult, type ExperimentInput } from "@/lib/types";
+import { experimentInputSchema, fieldErrorsFromZod } from "@/lib/schemas";
 
 // LLM-assisted entry: parse pasted notes into structured fields for the user to
 // confirm/edit. No-ops (null) until a key exists (Phase 10). Never saves.
@@ -23,7 +24,10 @@ export async function extractFromNotes(
   return extractExperimentFields(notes);
 }
 
-function parseForm(formData: FormData): ExperimentInput {
+// Candidate values straight off the form — numeric fields may be `NaN` when
+// the input was non-empty but not a valid number; the schema below is what
+// rejects that, not this parser (never silently coerce invalid input to null).
+function parseForm(formData: FormData) {
   const str = (k: string) => {
     const v = (formData.get(k) as string | null)?.trim();
     return v ? v : null;
@@ -33,15 +37,10 @@ function parseForm(formData: FormData): ExperimentInput {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-  const numList = (k: string) =>
-    list(k)
-      .map((s) => Number(s))
-      .filter((n) => Number.isFinite(n));
+  const numList = (k: string) => list(k).map((s) => Number(s));
   const num = (k: string) => {
     const v = str(k);
-    if (v === null) return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
+    return v === null ? null : Number(v);
   };
 
   const methods = METHOD_OPTIONS.filter((m) => formData.get(`method:${m}`) === "on");
@@ -65,15 +64,25 @@ function parseForm(formData: FormData): ExperimentInput {
   };
 }
 
-export async function createExperiment(formData: FormData) {
+export async function createExperiment(
+  _prevState: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const input = parseForm(formData);
-  if (!input.name) return; // name is required; the form enforces this too
+  const parsed = experimentInputSchema.safeParse(parseForm(formData));
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
+  }
+  const input: ExperimentInput = parsed.data;
 
   const id = await nextExperimentId();
   const { error } = await supabase
@@ -91,15 +100,26 @@ export async function createExperiment(formData: FormData) {
   redirect(`/experiments/${id}`);
 }
 
-export async function updateExperiment(id: string, formData: FormData) {
+export async function updateExperiment(
+  id: string,
+  _prevState: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const input = parseForm(formData);
-  if (!input.name) return;
+  const parsed = experimentInputSchema.safeParse(parseForm(formData));
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
+  }
+  const input: ExperimentInput = parsed.data;
 
   // RLS enforces ownership; this update no-ops for non-owners.
   const { error } = await supabase.from("experiments").update(input).eq("id", id);
