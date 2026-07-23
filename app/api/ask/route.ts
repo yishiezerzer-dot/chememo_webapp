@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { keylessSearch } from "@/lib/search";
 import { retrieveRecords } from "@/lib/rag";
-import { isLlmEnabled, streamAnswer, streamGeneralAnswer } from "@/lib/llm";
+import { isLlmEnabled, activeChatModel, streamAnswer, streamGeneralAnswer } from "@/lib/llm";
+import { acquireConcurrency, checkRate, MAX_BODY_BYTES, MAX_QUERY_CHARS } from "@/lib/rate-limit";
 import type { Experiment } from "@/lib/types";
 
 // POST { query }. Body is line-framed: the FIRST line is JSON metadata
@@ -24,8 +26,16 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
+  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  if (contentLength > MAX_BODY_BYTES) {
+    return new Response("Request too large.", { status: 413 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const query = typeof body?.query === "string" ? body.query.trim() : "";
+  if (query.length > MAX_QUERY_CHARS) {
+    return new Response("Question is too long.", { status: 413 });
+  }
 
   const enc = new TextEncoder();
   const line = (meta: AskMeta) => enc.encode(JSON.stringify(meta) + "\n");
@@ -53,6 +63,11 @@ export async function POST(req: Request) {
     );
   }
 
+  const rate = checkRate(user.id);
+  if (!rate.ok) return new Response(rate.error, { status: 429 });
+  const slot = acquireConcurrency(user.id);
+  if (!slot.ok) return new Response(slot.error, { status: 429 });
+
   // AI: retrieve first, then stream the answer.
   const records = await retrieveRecords(query);
   const grounded = records.length > 0;
@@ -65,15 +80,33 @@ export async function POST(req: Request) {
     emptyReason: null,
   };
 
+  const startedAt = Date.now();
+  let answerChars = 0;
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       controller.enqueue(line(meta));
+      let status: "ok" | "error" = "ok";
       try {
         const gen = grounded ? streamAnswer(query, records) : streamGeneralAnswer(query);
-        for await (const chunk of gen) controller.enqueue(enc.encode(chunk));
+        for await (const chunk of gen) {
+          answerChars += chunk.length;
+          controller.enqueue(enc.encode(chunk));
+        }
       } catch (e) {
+        status = "error";
         controller.enqueue(enc.encode(`\n[error generating answer]`));
         console.error("[api/ask] stream failed:", e);
+      } finally {
+        slot.release();
+        void logAiRequest({
+          userId: user.id,
+          endpoint: grounded ? "ask_grounded" : "ask_general",
+          status,
+          sourceCount: records.length,
+          latencyMs: Date.now() - startedAt,
+          estTokens: Math.ceil((query.length + answerChars) / 4),
+        });
       }
       controller.close();
     },
@@ -85,4 +118,24 @@ export async function POST(req: Request) {
       "cache-control": "no-store",
     },
   });
+}
+
+async function logAiRequest(row: {
+  userId: string;
+  endpoint: "ask_grounded" | "ask_general";
+  status: "ok" | "error";
+  sourceCount: number;
+  latencyMs: number;
+  estTokens: number;
+}) {
+  const { error } = await createAdminClient().from("ai_requests").insert({
+    user_id: row.userId,
+    endpoint: row.endpoint,
+    status: row.status,
+    source_count: row.sourceCount,
+    model: activeChatModel(),
+    est_tokens: row.estTokens,
+    latency_ms: row.latencyMs,
+  });
+  if (error) console.error("[api/ask] failed to log ai_requests row:", error);
 }
