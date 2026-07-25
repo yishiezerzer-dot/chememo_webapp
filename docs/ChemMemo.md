@@ -12,7 +12,7 @@ tags:
   - chememo
   - chememo/hub
   - moc
-next_action: "T0.1–T0.5 shipped on dev (T0.1–T0.4 on 2026-07-23, T0.5 on 2026-07-25) — see [[ChemMemo_Product_Evolution_Plan]] Tier 0 and [[ChemMemo_Implementation_Plan]] session history. T0.2 closed a real stored-XSS hole; T0.4 closed a provenance risk; T0.5 (design: [[ChemMemo_Feature_IndexJobs_Spec]]) replaced silent fire-and-forget embedding sync with a DB-trigger-backed durable job queue + in-process poller. NOT yet promoted to master/prod. Next: T0.6 (test + CI baseline) — highest-value remaining item per the plan's own §5 recommended order, and everything after it ships more safely once it exists. One Tier 0 item at a time; do not batch. Do NOT start Tiers 1–4 without explicit direction."
+next_action: "T0.1–T0.5 fully shipped on dev; T0.6 PARTIAL (phase 1+2 only: Vitest unit tests + minimal CI, confirmed running on GitHub Actions but currently red on 3 pre-existing unrelated lint issues). See [[ChemMemo_Product_Evolution_Plan]] Tier 0 and [[ChemMemo_Implementation_Plan]] session history (2026-07-25) for the full account, including why Docker's absence on this dev machine limits local RLS testing. NOT yet promoted to master/prod. Next: continue T0.6 (Playwright E2E, Supabase RLS tests, axe, remaining CI stages, branch protection on master) OR move to T0.7+ if the user prefers — check with them. One Tier 0 item at a time; do not batch. Do NOT start Tiers 1–4 without explicit direction."
 updated: 2026-07-25
 ---
 
@@ -56,7 +56,7 @@ This is the **hub note (Map of Content)**. Start here each session.
 - ✅ **Live in production**, feature-complete for daily lab use: auth, structured experiment CRUD, file upload/link + signed URLs, hybrid keyless + AI search, grounded cited Ask (streaming), AI summaries, paste-notes extraction, edit history, CSV export, mobile nav, user-managed projects.
 - ✅ **Last shipped (2026-07-21):** user-managed projects on dev + prod (`c47384d`); 4 seed projects removed from prod.
 - 🟡 **Known, non-blocking residuals** (see [[ChemMemo_Audit_Roadmap]] §3): CSV *import* never built (export only); "soft-delete orphans" (storage/`experiment_files` not cleaned on experiment delete); two a11y gaps (table sort headers, auth-toggle keyboard); a couple security-hardening items (validate `addFileLink` URL schemes, rate-limit AI actions). Re-verify Ask AI/summary once Gemini `gemini-flash-latest` 503s subside (external/transient).
-- 🟡 **In progress:** [[ChemMemo_Product_Evolution_Plan]] Tier 0 — T0.1 (shared Zod validation) + T0.2 (file/URL hardening, closed a real stored-XSS hole) + T0.3 (AI rate limits & telemetry) + T0.4 (strict lab-only Ask mode, closed a provenance risk) shipped on **dev** 2026-07-23; T0.5 (durable indexing job queue, spec-first — [[ChemMemo_Feature_IndexJobs_Spec]]) shipped on **dev** 2026-07-25. Not yet promoted to master/prod. Next: T0.6 (test + CI baseline).
+- 🟡 **In progress:** [[ChemMemo_Product_Evolution_Plan]] Tier 0 — T0.1–T0.5 fully shipped on **dev** (T0.1–T0.4 on 2026-07-23, T0.5 on 2026-07-25; T0.2 closed a real stored-XSS hole, T0.4 closed a provenance risk, T0.5 is spec-first — [[ChemMemo_Feature_IndexJobs_Spec]]). T0.6 (test + CI baseline) is **partial**: Vitest unit tests + a minimal GitHub Actions CI pipeline exist and are confirmed running, but Playwright/RLS tests/axe/branch-protection are not yet built. Not yet promoted to master/prod.
 
 > Full dated history lives in [[ChemMemo_Implementation_Plan#Session history]] — not duplicated here.
 
