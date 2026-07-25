@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractExperimentFields } from "@/lib/llm";
 import { nextExperimentId } from "@/lib/experiment-id";
-import { syncExperimentEmbedding } from "@/lib/sync-embedding";
+import { runIndexJob } from "@/lib/index-jobs";
 import { METHOD_OPTIONS, type ActionResult, type ExperimentInput } from "@/lib/types";
 import { experimentInputSchema, fieldErrorsFromZod } from "@/lib/schemas";
 
@@ -92,8 +92,12 @@ export async function createExperiment(
 
   // Keep semantic search current; fire-and-forget so a slow embed API can't
   // block the redirect (Railway's persistent server finishes it in the bg).
-  void syncExperimentEmbedding(id).catch((e) =>
-    console.error(`[sync-embedding] create ${id} failed:`, e)
+  // The DB trigger already durably enqueued this experiment's index_jobs
+  // row — runIndexJob is the fast-path attempt at that job; if it fails or
+  // the process dies before it finishes, the poller in lib/index-jobs.ts
+  // picks it up from the durable row instead of losing it silently (T0.5).
+  void runIndexJob(id).catch((e) =>
+    console.error(`[index-jobs] create ${id} failed:`, e)
   );
 
   revalidatePath("/experiments");
@@ -126,8 +130,8 @@ export async function updateExperiment(
   if (error) throw error;
 
   // Re-embed the edited record so semantic search reflects the changes.
-  void syncExperimentEmbedding(id).catch((e) =>
-    console.error(`[sync-embedding] update ${id} failed:`, e)
+  void runIndexJob(id).catch((e) =>
+    console.error(`[index-jobs] update ${id} failed:`, e)
   );
 
   // Edited fields make any cached AI summary stale — drop it so the detail page
@@ -160,8 +164,8 @@ export async function softDeleteExperiment(id: string) {
   if (error) throw error;
 
   // Drop the now-deleted experiment from semantic search.
-  void syncExperimentEmbedding(id).catch((e) =>
-    console.error(`[sync-embedding] delete ${id} failed:`, e)
+  void runIndexJob(id).catch((e) =>
+    console.error(`[index-jobs] delete ${id} failed:`, e)
   );
 
   revalidatePath("/experiments");

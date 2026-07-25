@@ -20,17 +20,19 @@ export async function syncExperimentEmbedding(experimentId: string): Promise<voi
 
   if (!e) {
     // Missing or soft-deleted → drop the embedding so it stops matching.
-    await admin.from("experiment_embeddings").delete().eq("experiment_id", experimentId);
+    const { error } = await admin.from("experiment_embeddings").delete().eq("experiment_id", experimentId);
+    if (error) throw error;
     return;
   }
 
   const payload = await embedExperiment(e);
   if (!payload) return;
 
-  await admin.from("experiment_embeddings").upsert({
+  const { error } = await admin.from("experiment_embeddings").upsert({
     experiment_id: experimentId,
     content: payload.content,
     embedding: payload.embedding,
     updated_at: new Date().toISOString(),
   });
+  if (error) throw error;
 }
