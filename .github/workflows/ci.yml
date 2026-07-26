@@ -75,6 +75,16 @@ jobs:
       # job is the only place these RLS tests actually run.
       - run: supabase start
 
+      # Hosted Supabase projects get default table GRANTs to anon/authenticated
+      # from the platform's own project bootstrap — that isn't part of any
+      # migration file, so a bare `supabase start` (CLI-migrations only) doesn't
+      # replicate it. Local-instance-only; never touches dev/prod schema.
+      - name: Grant table privileges (local instance only)
+        run: |
+          eval "$(supabase status -o env)"
+          psql "$DB_URL" -c "grant usage on schema public to anon, authenticated, service_role;"
+          psql "$DB_URL" -c "grant all on all tables in schema public to anon, authenticated, service_role;"
+
       - name: Run RLS integration tests
         run: |
           eval "$(supabase status -o env)"
