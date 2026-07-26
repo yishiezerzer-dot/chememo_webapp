@@ -5,6 +5,7 @@ import { isLlmEnabled, streamAnswer, streamGeneralAnswer } from "@/lib/llm";
 import { MAX_BODY_BYTES, MAX_QUERY_CHARS } from "@/lib/rate-limit";
 import { acquireAiSlot, logAiRequest } from "@/lib/ai/service";
 import { AppError, HTTP_STATUS_FOR_CODE } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 import type { Experiment } from "@/lib/types";
 
 // POST { query }. Body is line-framed: the FIRST line is JSON metadata
@@ -126,7 +127,7 @@ export async function POST(req: Request) {
       } catch (e) {
         status = "error";
         controller.enqueue(enc.encode(`\n[error generating answer]`));
-        console.error("[api/ask] stream failed:", e);
+        logError("api/ask", "stream failed", { error: e });
       } finally {
         slot.release();
         void logAiRequest({

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { nextExperimentId } from "@/lib/experiment-id";
 import { runIndexJob } from "@/lib/index-jobs";
 import { AppError } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 import type {
   Experiment,
   ExperimentFile,
@@ -151,7 +152,7 @@ export async function createExperiment(
   // the process dies before it finishes, the poller in lib/index-jobs.ts
   // picks it up from the durable row instead of losing it silently (T0.5).
   void runIndexJob(id).catch((e) =>
-    console.error(`[index-jobs] create ${id} failed:`, e)
+    logError("index-jobs", `create ${id} failed`, { error: e })
   );
 
   return id;
@@ -170,7 +171,7 @@ export async function updateExperiment(
 
   // Re-embed the edited record so semantic search reflects the changes.
   void runIndexJob(id).catch((e) =>
-    console.error(`[index-jobs] update ${id} failed:`, e)
+    logError("index-jobs", `update ${id} failed`, { error: e })
   );
 
   // Edited fields make any cached AI summary stale — drop it so the detail page
@@ -181,7 +182,7 @@ export async function updateExperiment(
     .eq("experiment_id", id)
     .eq("scope", "single")
     .then(({ error: delErr }) => {
-      if (delErr) console.error(`[summary-invalidate] update ${id} failed:`, delErr);
+      if (delErr) logError("summary-invalidate", `update ${id} failed`, { error: delErr });
     });
 }
 
@@ -196,6 +197,6 @@ export async function softDeleteExperiment(supabase: Supabase, id: string): Prom
 
   // Drop the now-deleted experiment from semantic search.
   void runIndexJob(id).catch((e) =>
-    console.error(`[index-jobs] delete ${id} failed:`, e)
+    logError("index-jobs", `delete ${id} failed`, { error: e })
   );
 }

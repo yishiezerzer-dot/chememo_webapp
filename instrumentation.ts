@@ -7,3 +7,21 @@ export async function register() {
     startIndexJobPoller();
   }
 }
+
+// T0.9 — Next.js's official catch-all for otherwise-unhandled server errors
+// (route handlers, Server Components, Server Actions) — the same integration
+// point a Sentry SDK would use. Logs a trace ID even for errors that never
+// passed through lib/errors.ts's AppError/toActionResult path.
+export async function onRequestError(
+  error: unknown,
+  request: { path: string; method: string },
+  context: { routeType: string }
+) {
+  const { logError } = await import("@/lib/logger");
+  const { AppError } = await import("@/lib/errors");
+  const traceId = error instanceof AppError ? error.traceId : crypto.randomUUID();
+  logError("unhandled", `${context.routeType} error on ${request.method} ${request.path}`, {
+    traceId,
+    error,
+  });
+}

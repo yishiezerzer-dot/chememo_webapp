@@ -1,3 +1,4 @@
+import { logError } from "@/lib/logger";
 import type { ActionResult } from "@/lib/types";
 
 export type AppErrorCode =
@@ -44,14 +45,11 @@ export class AppError extends Error {
 // so a support reference number would only add noise.
 export function toActionResult(context: string, error: unknown): ActionResult {
   if (error instanceof AppError) {
-    console.error(
-      `[${context}] ${error.code} (trace ${error.traceId}):`,
-      error.cause ?? error.message
-    );
+    logError(context, error.code, { traceId: error.traceId, error: error.cause ?? error });
     const suffix = error.code === "validation" ? "" : ` (ref ${error.traceId})`;
     return { ok: false, error: `${error.message}${suffix}`, fieldErrors: error.fieldErrors };
   }
   const traceId = crypto.randomUUID();
-  console.error(`[${context}] unexpected error (trace ${traceId}):`, error);
+  logError(context, "unexpected error", { traceId, error });
   return { ok: false, error: `Something went wrong. Please try again. (ref ${traceId})` };
 }

@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncExperimentEmbedding } from "@/lib/sync-embedding";
 import { embeddingModel, EMBEDDING_DIM, isEmbeddingEnabled } from "@/lib/embeddings";
+import { logError, logInfo } from "@/lib/logger";
 
 // T0.5 — durable indexing job queue. A DB trigger (see migration
 // 20260725120000_index_jobs.sql) upserts a pending index_jobs row in the
@@ -58,7 +59,7 @@ export async function runIndexJob(experimentId: string): Promise<void> {
         updated_at: new Date().toISOString(),
       })
       .eq("experiment_id", experimentId);
-    console.error(`[index-jobs] job ${experimentId} failed (attempt ${attempts}):`, e);
+    logError("index-jobs", `job ${experimentId} failed (attempt ${attempts})`, { error: e });
   }
 }
 
@@ -71,7 +72,7 @@ async function pollOnce(): Promise<void> {
     .lte("next_attempt_at", new Date().toISOString())
     .limit(20);
   if (error) {
-    console.error("[index-jobs] poll query failed:", error);
+    logError("index-jobs", "poll query failed", { error });
     return;
   }
   for (const job of jobs ?? []) {
@@ -91,8 +92,8 @@ let pollerStarted = false;
 export function startIndexJobPoller(): void {
   if (pollerStarted) return;
   pollerStarted = true;
-  console.log(`[index-jobs] poller started (interval: ${POLL_INTERVAL_MS}ms)`);
+  logInfo("index-jobs", "poller started", { intervalMs: POLL_INTERVAL_MS });
   setInterval(() => {
-    void pollOnce().catch((e) => console.error("[index-jobs] poll cycle failed:", e));
+    void pollOnce().catch((e) => logError("index-jobs", "poll cycle failed", { error: e }));
   }, POLL_INTERVAL_MS);
 }

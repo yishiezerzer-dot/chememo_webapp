@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { acquireConcurrency, checkRate } from "@/lib/rate-limit";
 import { activeChatModel, summarizeExperiment, summarizeGroup } from "@/lib/llm";
 import { AppError } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 import type { Experiment } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -38,7 +39,7 @@ export async function logAiRequest(row: {
     est_tokens: row.estTokens,
     latency_ms: row.latencyMs,
   });
-  if (error) console.error("[ai-service] failed to log ai_requests row:", error);
+  if (error) logError("ai-service", "failed to log ai_requests row", { error });
 }
 
 // Group summary of a set of experiments (Ask's grounded results). Reads via
