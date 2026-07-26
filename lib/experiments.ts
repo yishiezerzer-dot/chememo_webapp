@@ -18,7 +18,9 @@ export async function listExperiments(): Promise<Experiment[]> {
     .is("deleted_at", null)
     .order("date", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  // Array/timestamp columns are DB-nullable but every write path sets them
+  // (defaults + never written null) — see the narrowing note in lib/types.ts.
+  return (data ?? []) as Experiment[];
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -56,7 +58,9 @@ export async function listRevisions(
     .select("*")
     .eq("experiment_id", experimentId)
     .order("created_at", { ascending: false });
-  return data ?? [];
+  // experiment_id/created_at/snapshot are DB-nullable but the update trigger
+  // that inserts these rows always sets all three.
+  return (data ?? []) as ExperimentRevision[];
 }
 
 // Private bucket → generate short-lived signed URLs so uploaded files open
@@ -96,7 +100,9 @@ export async function getExperimentSummary(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data ?? null;
+  // summary/created_at are DB-nullable but always set on insert (see
+  // summary-actions.ts); narrowed to match that invariant.
+  return (data as StoredSummary | null) ?? null;
 }
 
 export async function getExperiment(
@@ -119,5 +125,9 @@ export async function getExperiment(
     .order("created_at");
   if (fErr) throw fErr;
 
-  return { experiment, files: files ?? [] };
+  // See the narrowing note in lib/types.ts for why these casts are safe.
+  return {
+    experiment: experiment as Experiment,
+    files: (files ?? []) as ExperimentFile[],
+  };
 }

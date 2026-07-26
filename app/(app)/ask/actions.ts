@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isLlmEnabled, activeChatModel, summarizeGroup } from "@/lib/llm";
 import { acquireConcurrency, checkRate } from "@/lib/rate-limit";
+import type { Experiment } from "@/lib/types";
 
 // Summarise a set of experiments (the grounded results of an Ask). Reads via
 // the user's session so RLS applies; returns null when AI is off, rate/
@@ -32,7 +33,8 @@ export async function generateGroupSummary(ids: string[]): Promise<string | null
       .is("deleted_at", null);
     if (!experiments?.length) return null;
 
-    const summary = await summarizeGroup(experiments);
+    // See the narrowing note in lib/types.ts for why this cast is safe.
+    const summary = await summarizeGroup(experiments as Experiment[]);
     await logAiRequest(user.id, summary ? "ok" : "error", experiments.length, startedAt, summary);
     return summary;
   } catch (e) {

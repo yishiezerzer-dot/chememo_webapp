@@ -241,7 +241,8 @@ export async function executeFilters(
 
   const { data, error } = await q;
   if (error) throw error;
-  return data ?? [];
+  // See the narrowing note in lib/types.ts for why this cast is safe.
+  return (data ?? []) as Experiment[];
 }
 
 export async function keylessSearch(query: string): Promise<SearchResult> {

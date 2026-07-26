@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:rls": "vitest run tests/rls",
-    "eval:retrieval": "node --env-file=.env.local scripts/eval-retrieval.ts"
+    "eval:retrieval": "node --env-file=.env.local scripts/eval-retrieval.ts",
+    "types:gen": "supabase gen types typescript --linked > lib/database.types.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",

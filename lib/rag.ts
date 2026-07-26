@@ -53,7 +53,10 @@ async function semanticSearch(semanticQuery: string, k = 8): Promise<Experiment[
     .is("deleted_at", null);
 
   const order = new Map(ids.map((id, i) => [id, i]));
-  return (rows ?? []).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  // See the narrowing note in lib/types.ts for why this cast is safe.
+  return ((rows ?? []) as Experiment[]).sort(
+    (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
+  );
 }
 
 // Retrieval only (no answer generation) — routes the query, runs filters and/or

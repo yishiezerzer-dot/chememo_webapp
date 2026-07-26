@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isLlmEnabled, summarizeExperiment, activeChatModel } from "@/lib/llm";
 import { acquireConcurrency, checkRate } from "@/lib/rate-limit";
+import type { Experiment } from "@/lib/types";
 
 // Generate + cache a grounded single-experiment summary. No-ops (inert) until
 // an ANTHROPIC key exists, or silently skips when rate/concurrency-limited
@@ -33,7 +34,8 @@ export async function generateSummary(experimentId: string) {
       .maybeSingle();
     if (!experiment) return;
 
-    const summary = await summarizeExperiment(experiment);
+    // See the narrowing note in lib/types.ts for why this cast is safe.
+    const summary = await summarizeExperiment(experiment as Experiment);
     const admin = createAdminClient();
     await admin.from("ai_requests").insert({
       user_id: user.id,

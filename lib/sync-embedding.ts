@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { embedExperiment, isEmbeddingEnabled } from "@/lib/embeddings";
+import type { Experiment } from "@/lib/types";
 
 // Sprint S2 — keep experiment_embeddings current on every save so semantic
 // search never goes stale between manual backfills. Service-role write (the
@@ -25,13 +26,17 @@ export async function syncExperimentEmbedding(experimentId: string): Promise<voi
     return;
   }
 
-  const payload = await embedExperiment(e);
+  // Array columns are DB-nullable but this select always returns them
+  // (defaults + never written null) — see the narrowing note in lib/types.ts.
+  const payload = await embedExperiment(e as Experiment);
   if (!payload) return;
 
   const { error } = await admin.from("experiment_embeddings").upsert({
     experiment_id: experimentId,
     content: payload.content,
-    embedding: payload.embedding,
+    // pgvector's wire format is the stringified vector, matching every other
+    // write site in this codebase (e.g. lib/rag.ts's query_embedding).
+    embedding: JSON.stringify(payload.embedding),
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
