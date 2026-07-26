@@ -11,7 +11,7 @@ export default function Loading() {
   });
 
   return (
-    <div aria-busy="true" aria-label="Loading">
+    <div role="status" aria-busy="true" aria-label="Loading">
       <style>{`@keyframes cm-load-pulse{0%,100%{opacity:.35}50%{opacity:.7}}`}</style>
       <div className="panel glass" style={{ marginBottom: 16 }}>
         <div style={{ ...bar("40%"), marginBottom: 14 }} />
