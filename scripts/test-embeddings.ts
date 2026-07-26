@@ -12,7 +12,8 @@ let pass = 0;
 let fail = 0;
 const ok = (name: string, cond: boolean) => {
   console.log((cond ? "OK   " : "FAIL ") + name);
-  cond ? pass++ : fail++;
+  if (cond) pass++;
+  else fail++;
 };
 
 const sample = {

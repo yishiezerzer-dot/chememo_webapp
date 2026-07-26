@@ -9,10 +9,14 @@ export function MobileNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  // Close the drawer whenever the route changes.
-  useEffect(() => {
+  // Close the drawer whenever the route changes. Adjusted during render
+  // (React's recommended pattern for resetting state from a tracked value)
+  // rather than in an effect, which avoids an extra render pass.
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     const sidebar = document.getElementById("sidebar");

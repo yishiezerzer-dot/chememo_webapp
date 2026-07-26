@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Experiment, Project } from "@/lib/types";
 
@@ -53,8 +53,18 @@ export function ExperimentsTable({
 
   // Re-sync from the URL when navigation changes the params (e.g. clicking a
   // sidebar project link, or a global search, while already on this page).
-  useEffect(() => setProject(initialProject), [initialProject]);
-  useEffect(() => setQ(initialQuery), [initialQuery]);
+  // Adjusted during render (React's recommended pattern for resetting state
+  // from a tracked value) rather than in an effect.
+  const [prevInitialProject, setPrevInitialProject] = useState(initialProject);
+  if (initialProject !== prevInitialProject) {
+    setPrevInitialProject(initialProject);
+    setProject(initialProject);
+  }
+  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
+  if (initialQuery !== prevInitialQuery) {
+    setPrevInitialQuery(initialQuery);
+    setQ(initialQuery);
+  }
 
   const projectLabel = useMemo(
     () => Object.fromEntries(projects.map((p) => [p.id, p.label])),
