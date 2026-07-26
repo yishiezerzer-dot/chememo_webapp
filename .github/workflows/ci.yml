@@ -39,3 +39,46 @@ jobs:
           name: playwright-report
           path: test-results/
           retention-days: 7
+
+      # Visibility, not a hard gate: the app currently carries pre-existing
+      # high-severity findings that trace to next/eslint-config-next's own
+      # dependency trees (would need a Next.js major bump to clear) — see
+      # this in logs without blocking every otherwise-green run on it.
+      - name: Dependency audit (non-blocking)
+        run: npm audit --audit-level=high || true
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  rls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # `supabase start` applies every file in supabase/migrations/ to a
+      # fresh local Postgres via Docker — a SQL error in any migration fails
+      # this step, so a green `supabase start` doubles as migration
+      # validation. Needs Docker, which this dev machine doesn't have; this
+      # job is the only place these RLS tests actually run.
+      - run: supabase start
+
+      - name: Run RLS integration tests
+        run: |
+          eval "$(supabase status -o env)"
+          export SUPABASE_LOCAL_URL="$API_URL"
+          export SUPABASE_LOCAL_ANON_KEY="$ANON_KEY"
+          export SUPABASE_LOCAL_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          npm run test:rls
