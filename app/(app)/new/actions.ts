@@ -2,11 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireUser } from "@/lib/authorization/policies";
 import { extractExperimentFields } from "@/lib/llm";
-import { nextExperimentId } from "@/lib/experiment-id";
-import { runIndexJob } from "@/lib/index-jobs";
+import * as experimentsService from "@/lib/experiments/service";
+import { toActionResult } from "@/lib/errors";
 import { METHOD_OPTIONS, type ActionResult, type ExperimentInput } from "@/lib/types";
 import { experimentInputSchema, fieldErrorsFromZod } from "@/lib/schemas";
 
@@ -15,11 +14,7 @@ import { experimentInputSchema, fieldErrorsFromZod } from "@/lib/schemas";
 export async function extractFromNotes(
   notes: string
 ): Promise<Partial<ExperimentInput> | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  await requireUser();
   if (!notes.trim()) return null;
   return extractExperimentFields(notes);
 }
@@ -68,11 +63,7 @@ export async function createExperiment(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const parsed = experimentInputSchema.safeParse(parseForm(formData));
   if (!parsed.success) {
@@ -82,23 +73,13 @@ export async function createExperiment(
       fieldErrors: fieldErrorsFromZod(parsed.error),
     };
   }
-  const input: ExperimentInput = parsed.data;
 
-  const id = await nextExperimentId();
-  const { error } = await supabase
-    .from("experiments")
-    .insert({ id, owner_id: user.id, ...input });
-  if (error) throw error;
-
-  // Keep semantic search current; fire-and-forget so a slow embed API can't
-  // block the redirect (Railway's persistent server finishes it in the bg).
-  // The DB trigger already durably enqueued this experiment's index_jobs
-  // row — runIndexJob is the fast-path attempt at that job; if it fails or
-  // the process dies before it finishes, the poller in lib/index-jobs.ts
-  // picks it up from the durable row instead of losing it silently (T0.5).
-  void runIndexJob(id).catch((e) =>
-    console.error(`[index-jobs] create ${id} failed:`, e)
-  );
+  let id: string;
+  try {
+    id = await experimentsService.createExperiment(supabase, user.id, parsed.data);
+  } catch (e) {
+    return toActionResult("createExperiment", e);
+  }
 
   revalidatePath("/experiments");
   redirect(`/experiments/${id}`);
@@ -109,11 +90,7 @@ export async function updateExperiment(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase } = await requireUser();
 
   const parsed = experimentInputSchema.safeParse(parseForm(formData));
   if (!parsed.success) {
@@ -123,27 +100,12 @@ export async function updateExperiment(
       fieldErrors: fieldErrorsFromZod(parsed.error),
     };
   }
-  const input: ExperimentInput = parsed.data;
 
-  // RLS enforces ownership; this update no-ops for non-owners.
-  const { error } = await supabase.from("experiments").update(input).eq("id", id);
-  if (error) throw error;
-
-  // Re-embed the edited record so semantic search reflects the changes.
-  void runIndexJob(id).catch((e) =>
-    console.error(`[index-jobs] update ${id} failed:`, e)
-  );
-
-  // Edited fields make any cached AI summary stale — drop it so the detail page
-  // shows "regenerate" instead of an out-of-date summary. Best-effort.
-  void createAdminClient()
-    .from("ai_summaries")
-    .delete()
-    .eq("experiment_id", id)
-    .eq("scope", "single")
-    .then(({ error }) => {
-      if (error) console.error(`[summary-invalidate] update ${id} failed:`, error);
-    });
+  try {
+    await experimentsService.updateExperiment(supabase, id, parsed.data);
+  } catch (e) {
+    return toActionResult("updateExperiment", e);
+  }
 
   revalidatePath(`/experiments/${id}`);
   revalidatePath("/experiments");
@@ -151,23 +113,8 @@ export async function updateExperiment(
 }
 
 export async function softDeleteExperiment(id: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { error } = await supabase
-    .from("experiments")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
-
-  // Drop the now-deleted experiment from semantic search.
-  void runIndexJob(id).catch((e) =>
-    console.error(`[index-jobs] delete ${id} failed:`, e)
-  );
-
+  const { supabase } = await requireUser();
+  await experimentsService.softDeleteExperiment(supabase, id);
   revalidatePath("/experiments");
   redirect("/experiments");
 }

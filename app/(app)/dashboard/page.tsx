@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { listExperiments, listProjects } from "@/lib/experiments";
+import { listExperiments } from "@/lib/experiments/service";
+import { listProjects } from "@/lib/projects/service";
 
 // Compact "3h ago" / "2d ago" relative time for the activity feed.
 function timeAgo(iso: string): string {

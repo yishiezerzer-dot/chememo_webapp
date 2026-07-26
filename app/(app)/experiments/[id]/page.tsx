@@ -4,10 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getExperiment,
   getExperimentSummary,
-  listProjects,
   listRevisions,
   signedUrlsFor,
-} from "@/lib/experiments";
+} from "@/lib/experiments/service";
+import { listProjects } from "@/lib/projects/service";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";

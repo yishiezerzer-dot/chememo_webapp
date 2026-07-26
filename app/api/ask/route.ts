@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { keylessSearch } from "@/lib/search";
 import { retrieveRecords } from "@/lib/rag";
-import { isLlmEnabled, activeChatModel, streamAnswer, streamGeneralAnswer } from "@/lib/llm";
-import { acquireConcurrency, checkRate, MAX_BODY_BYTES, MAX_QUERY_CHARS } from "@/lib/rate-limit";
+import { isLlmEnabled, streamAnswer, streamGeneralAnswer } from "@/lib/llm";
+import { MAX_BODY_BYTES, MAX_QUERY_CHARS } from "@/lib/rate-limit";
+import { acquireAiSlot, logAiRequest } from "@/lib/ai/service";
+import { AppError, HTTP_STATUS_FOR_CODE } from "@/lib/errors";
 import type { Experiment } from "@/lib/types";
 
 // POST { query }. Body is line-framed: the FIRST line is JSON metadata
@@ -68,10 +69,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const rate = checkRate(user.id);
-  if (!rate.ok) return new Response(rate.error, { status: 429 });
-  const slot = acquireConcurrency(user.id);
-  if (!slot.ok) return new Response(slot.error, { status: 429 });
+  let slot: { release: () => void };
+  try {
+    slot = await acquireAiSlot(user.id);
+  } catch (e) {
+    if (e instanceof AppError) {
+      return new Response(e.message, { status: HTTP_STATUS_FOR_CODE[e.code] });
+    }
+    throw e;
+  }
 
   // Lab mode: retrieve first. If nothing matches, say so explicitly — never
   // fall back to general knowledge, which could read as a lab conclusion.
@@ -142,24 +148,4 @@ export async function POST(req: Request) {
       "cache-control": "no-store",
     },
   });
-}
-
-async function logAiRequest(row: {
-  userId: string;
-  endpoint: "ask_grounded" | "ask_general";
-  status: "ok" | "error";
-  sourceCount: number;
-  latencyMs: number;
-  estTokens: number;
-}) {
-  const { error } = await createAdminClient().from("ai_requests").insert({
-    user_id: row.userId,
-    endpoint: row.endpoint,
-    status: row.status,
-    source_count: row.sourceCount,
-    model: activeChatModel(),
-    est_tokens: row.estTokens,
-    latency_ms: row.latencyMs,
-  });
-  if (error) console.error("[api/ask] failed to log ai_requests row:", error);
 }

@@ -1,11 +1,17 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { nextExperimentId } from "@/lib/experiment-id";
+import { runIndexJob } from "@/lib/index-jobs";
+import { AppError } from "@/lib/errors";
 import type {
   Experiment,
   ExperimentFile,
+  ExperimentInput,
   ExperimentRevision,
-  Project,
 } from "@/lib/types";
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 // RLS already hides other users' soft-deleted rows; we also filter deleted_at
 // so an owner's own trash stays out of normal list/detail views.
@@ -21,13 +27,6 @@ export async function listExperiments(): Promise<Experiment[]> {
   // Array/timestamp columns are DB-nullable but every write path sets them
   // (defaults + never written null) — see the narrowing note in lib/types.ts.
   return (data ?? []) as Experiment[];
-}
-
-export async function listProjects(): Promise<Project[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("projects").select("*").order("label");
-  if (error) throw error;
-  return data ?? [];
 }
 
 // Distinct compound/metal values across live experiments — powers the
@@ -101,7 +100,7 @@ export async function getExperimentSummary(
     .limit(1)
     .maybeSingle();
   // summary/created_at are DB-nullable but always set on insert (see
-  // summary-actions.ts); narrowed to match that invariant.
+  // lib/ai/service.ts's generateSummary); narrowed to match that invariant.
   return (data as StoredSummary | null) ?? null;
 }
 
@@ -130,4 +129,73 @@ export async function getExperiment(
     experiment: experiment as Experiment,
     files: (files ?? []) as ExperimentFile[],
   };
+}
+
+export async function createExperiment(
+  supabase: Supabase,
+  userId: string,
+  input: ExperimentInput
+): Promise<string> {
+  const id = await nextExperimentId();
+  const { error } = await supabase
+    .from("experiments")
+    .insert({ id, owner_id: userId, ...input });
+  if (error) {
+    throw new AppError("conflict", "Could not create the experiment.", { cause: error });
+  }
+
+  // Keep semantic search current; fire-and-forget so a slow embed API can't
+  // block the redirect (Railway's persistent server finishes it in the bg).
+  // The DB trigger already durably enqueued this experiment's index_jobs
+  // row — runIndexJob is the fast-path attempt at that job; if it fails or
+  // the process dies before it finishes, the poller in lib/index-jobs.ts
+  // picks it up from the durable row instead of losing it silently (T0.5).
+  void runIndexJob(id).catch((e) =>
+    console.error(`[index-jobs] create ${id} failed:`, e)
+  );
+
+  return id;
+}
+
+export async function updateExperiment(
+  supabase: Supabase,
+  id: string,
+  input: ExperimentInput
+): Promise<void> {
+  // RLS enforces ownership; this update no-ops for non-owners.
+  const { error } = await supabase.from("experiments").update(input).eq("id", id);
+  if (error) {
+    throw new AppError("conflict", "Could not update the experiment.", { cause: error });
+  }
+
+  // Re-embed the edited record so semantic search reflects the changes.
+  void runIndexJob(id).catch((e) =>
+    console.error(`[index-jobs] update ${id} failed:`, e)
+  );
+
+  // Edited fields make any cached AI summary stale — drop it so the detail page
+  // shows "regenerate" instead of an out-of-date summary. Best-effort.
+  void createAdminClient()
+    .from("ai_summaries")
+    .delete()
+    .eq("experiment_id", id)
+    .eq("scope", "single")
+    .then(({ error: delErr }) => {
+      if (delErr) console.error(`[summary-invalidate] update ${id} failed:`, delErr);
+    });
+}
+
+export async function softDeleteExperiment(supabase: Supabase, id: string): Promise<void> {
+  const { error } = await supabase
+    .from("experiments")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    throw new AppError("conflict", "Could not delete the experiment.", { cause: error });
+  }
+
+  // Drop the now-deleted experiment from semantic search.
+  void runIndexJob(id).catch((e) =>
+    console.error(`[index-jobs] delete ${id} failed:`, e)
+  );
 }

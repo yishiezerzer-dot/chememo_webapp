@@ -1,4 +1,5 @@
-import { listProjects, listVocab } from "@/lib/experiments";
+import { listProjects } from "@/lib/projects/service";
+import { listVocab } from "@/lib/experiments/service";
 import { isLlmEnabled } from "@/lib/llm";
 import { NewExperimentClient } from "@/components/new-experiment-client";
 import { createExperiment, extractFromNotes } from "./actions";

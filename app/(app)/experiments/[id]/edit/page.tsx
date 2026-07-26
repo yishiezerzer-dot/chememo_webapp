@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getExperiment, listProjects, listVocab } from "@/lib/experiments";
+import { getExperiment, listVocab } from "@/lib/experiments/service";
+import { listProjects } from "@/lib/projects/service";
 import { updateExperiment } from "@/app/(app)/new/actions";
 import { ExperimentForm } from "@/components/experiment-form";
 

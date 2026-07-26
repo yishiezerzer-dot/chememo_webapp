@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { listExperiments, listProjects } from "@/lib/experiments";
+import { listExperiments } from "@/lib/experiments/service";
+import { listProjects } from "@/lib/projects/service";
 import { ExperimentsTable } from "@/components/experiments-table";
 
 export default async function ExperimentsPage({
