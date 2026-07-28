@@ -181,7 +181,7 @@ graph TD
 - **Maps to:** audit §15.1, §16.6.
 
 ### T0.10 — Production health & index-health screen `P1`
-- [~] **T0.10 code shipped on dev (2026-07-27), live browser verification PENDING** — blocked on the university network currently blocking the `*.up.railway.app` domain (external, temporary, confirmed by Yishi — not a code or Railway issue). CI (`ci`+`rls`, including a full Playwright E2E run) green at commit `fdc89a7`; `railway status`/`railway logs` confirm correct deploy + clean boot. Resume the live check once the domain is reachable again; not yet promoted to master.
+- [x] **T0.10 shipped and live-verified on dev (2026-07-28)** — network block from 2026-07-27 resolved; live browser click-through of `/health` confirmed OK status, 0 pending/failed jobs, 0% AI error rate. **Live verification caught three real bugs in the already-shipped health-metrics code**, fixed same session: (1) `getIndexVersionStatus`'s "latest done job" pick had no filter for an actual recorded model, so a soft-deleted experiment's job (marked `done` without ever setting `embedding_model`/`embedding_dimensions`) could win and show blank "Model: — · Dimensions: —"; (2) `indexedCount` counted `index_jobs` rows regardless of whether their experiment was later soft-deleted, so it could exceed `totalExperiments` (showed "19/14"); (3) deeper issue found while fixing #2: `index_jobs` only tracks experiments that passed through the T0.5 job queue (added 2026-07-25) — the 13 pre-existing seed experiments never edited since then have real embeddings but no job row at all, so even the corrected `index_jobs`-sourced count read "1/14" when actual coverage was 14/14. Switched `indexedCount` to query `experiment_embeddings` directly (the real coverage signal) instead of `index_jobs`. All three fixes verified live: reloaded `/health` after each deploy, confirmed `Model: gemini-embedding-001 · Dimensions: 1536` and `14/14 experiments indexed` matching ground truth (cross-checked via direct SQL). Commits `614a13e`, `0db6c1d`. Backup-restore-test remains **known, tracked debt** (blocked on a Supabase paid-plan upgrade, not fixed here — an explicit prior user decision, not an oversight). Not yet promoted to master.
 - **Why:** operational readiness lacks evidence (audit §2.1, §12.5); index status from T0.5 needs a home.
 - **Do:** a minimal admin-only screen: indexing queue depth/failures, embedding index version/status, recent AI errors, backup-restore-test status (manual entry ok initially). Confirm/document the production migration + **backup restoration test** (audit Phase 0 line 1 — the one un-evidenced production-safety item).
 - **Acceptance:** an authorized user can see index/queue/AI health; a backup restore test has been run and recorded.
@@ -428,7 +428,7 @@ graph TD
 
 | Tier | Items | Done | Gate status |
 |---|---|---|---|
-| 🛡️ Tier 0 | 11 | 10 | **In progress** (T0.1–T0.9 + T0.11 done on dev; T0.10 code shipped, live verification paused — university network block) |
+| 🛡️ Tier 0 | 11 | 11 | **✅ Fully shipped on dev** (T0.1–T0.11 all done, 2026-07-28). Not yet promoted to master. |
 | 📓 Tier 1 | 10 | 0 | Awaiting go-ahead |
 | 🕸️ Tier 2 | 9 | 0 | Awaiting go-ahead + specs |
 | 🤖 Tier 3 | 6 | 0 | Blocked on Tier 1–2 |
