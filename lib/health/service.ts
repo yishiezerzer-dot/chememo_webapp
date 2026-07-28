@@ -77,6 +77,9 @@ export type IndexVersionStatus = {
 
 // "Version" here means the embedding model/dims of the most recently
 // completed job — good enough signal until T3.1 formally versions the index.
+// indexedCount comes from experiment_embeddings directly (the real coverage
+// signal), not index_jobs — older experiments that predate the T0.5 job
+// queue and haven't been re-saved since have a real embedding but no job row.
 export async function getIndexVersionStatus(): Promise<IndexVersionStatus> {
   const admin = createAdminClient();
   const [{ data: latest }, { count: indexedCount }, { count: totalExperiments }] = await Promise.all([
@@ -89,9 +92,8 @@ export async function getIndexVersionStatus(): Promise<IndexVersionStatus> {
       .limit(1)
       .maybeSingle(),
     admin
-      .from("index_jobs")
+      .from("experiment_embeddings")
       .select("experiment_id, experiments!inner(deleted_at)", { count: "exact", head: true })
-      .eq("status", "done")
       .is("experiments.deleted_at", null),
     admin.from("experiments").select("id", { count: "exact", head: true }).is("deleted_at", null),
   ]);
