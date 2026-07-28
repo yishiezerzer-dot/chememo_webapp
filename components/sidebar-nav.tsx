@@ -128,7 +128,7 @@ export function SidebarNav({
       </div>
 
       {projects.map((p) => {
-        const canDelete = p.owner_id === currentUserId || p.owner_id === null;
+        const canDelete = p.owner_id === currentUserId;
         return (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Link

@@ -160,40 +160,40 @@ graph TD
 - **Maps to:** audit §16.1, §16.2, §17.10, GitHub issue #15. **Note:** RLS isolation tests here are also the harness for [[#T2.1 — Workspace & role model|T2.1]].
 
 ### T0.7 — Generate DB types from Supabase schema `P1`
-- [ ] **T0.7 shipped**
+- [x] **T0.7 shipped** (2026-07-26, dev only — not yet promoted to master)
 - **Why:** handwritten types in `lib/types.ts` drift from migrations (audit §16.3). This session already hit one drift (adding `owner_id` by hand).
 - **Do:** add `supabase gen types typescript` to a script; commit generated types; use them in data-access queries. Keep small hand-authored view/DTO types where helpful, but source table shapes from generated types.
 - **Acceptance:** a `types:gen` script exists; queries use generated row types; a schema change surfaces as a type error until regenerated.
 - **Maps to:** audit §16.3.
 
 ### T0.8 — Domain service layer + typed error model `P1`
-- [ ] **T0.8 shipped**
+- [x] **T0.8 shipped** (2026-07-26, dev only — not yet promoted to master)
 - **Why:** business logic lives directly in server actions; there's no typed error taxonomy (audit §16.4, §16.5). This is refactor-for-leverage before Tier 1 piles on more logic.
 - **Do:** extract `lib/experiments/service.ts`, `lib/files/service.ts`, `lib/projects/service.ts`, `lib/search/service.ts`, `lib/ai/service.ts`, `lib/authorization/policies.ts`. Server actions become thin: authenticate → validate (T0.1) → call service → map to `ActionResult`. Add a typed error union (validation, permission-denied, not-found, conflict, rate-limited, provider-unavailable, index-pending) mapped to user-safe messages + a logged trace ID. **Surgical:** move logic, don't rewrite behavior; tests (T0.6) must stay green.
 - **Acceptance:** actions delegate to services; typed errors map to friendly messages + trace IDs; behavior unchanged (tests prove it).
 - **Maps to:** audit §16.4, §16.5.
 
 ### T0.9 — Observability: error monitoring + structured logs `P1`
-- [ ] **T0.9 shipped**
+- [x] **T0.9 shipped** (2026-07-26, dev only — not yet promoted to master)
 - **Why:** no error monitoring, structured logs, or health metrics (audit §16.6, §15.1).
 - **Do:** add Sentry (or equivalent) for error monitoring; structured application logs with trace IDs (from T0.8); `/api/health` + an index-health signal; sanitize logs so no secrets/keys/prompt text leak. Add DB/storage capacity + AI provider latency/error metrics where cheap.
 - **Acceptance:** unhandled errors reach the monitor with a trace ID; health endpoint returns readiness; logs contain no secrets.
 - **Maps to:** audit §15.1, §16.6.
 
 ### T0.10 — Production health & index-health screen `P1`
-- [ ] **T0.10 shipped**
+- [~] **T0.10 code shipped on dev (2026-07-27), live browser verification PENDING** — blocked on the university network currently blocking the `*.up.railway.app` domain (external, temporary, confirmed by Yishi — not a code or Railway issue). CI (`ci`+`rls`, including a full Playwright E2E run) green at commit `fdc89a7`; `railway status`/`railway logs` confirm correct deploy + clean boot. Resume the live check once the domain is reachable again; not yet promoted to master.
 - **Why:** operational readiness lacks evidence (audit §2.1, §12.5); index status from T0.5 needs a home.
 - **Do:** a minimal admin-only screen: indexing queue depth/failures, embedding index version/status, recent AI errors, backup-restore-test status (manual entry ok initially). Confirm/document the production migration + **backup restoration test** (audit Phase 0 line 1 — the one un-evidenced production-safety item).
 - **Acceptance:** an authorized user can see index/queue/AI health; a backup restore test has been run and recorded.
 - **Maps to:** audit §12.5, §15.1 (#9), §19 Phase 0.
 
 ### T0.11 — Protect seed/reference project deletion `P2`
-- [ ] **T0.11 shipped**
-- **Why:** [[ChemMemo_Feature_ProjectManagement_Spec]] intentionally let *any* member delete ownerless projects to clean up the 4 seeds. That cleanup is now done (0 seed rows on prod), but the audit (15.3, 17.15) flags the standing rule as too broad for shared reference data going forward.
-- **Do:** now that seeds are gone, tighten `projects_delete_own` to owner-only (drop the `or owner_id is null` clause), **or** — once workspaces exist (T2.1) — make reference projects workspace-admin-only. Until then, owner-only is the safe default.
-- **Files:** `supabase/migrations/*_tighten_project_delete.sql`, `components/sidebar-nav.tsx` (delete affordance now only for `owner_id === currentUserId`).
-- **Acceptance:** a member can't delete a project they don't own; no ownerless projects remain to strand.
-- **Maps to:** audit §15.3, §17.15. Depends on: seed cleanup (done 2026-07-21).
+- [x] **T0.11 shipped** (2026-07-28, dev only — not yet promoted to master)
+- **Why:** [[ChemMemo_Feature_ProjectManagement_Spec]] intentionally let *any* member delete ownerless projects to clean up the 4 seeds. That cleanup was done on **prod** (0 seed rows), but **dev still had all 4** (`wet-dry`, `depsi`, `lcms`, `micro`, still referenced by EXP-001..013) — discovered as part of this item's precondition check.
+- **Do:** tightened `projects_delete_own` to owner-only (dropped the `or owner_id is null` clause). Per Yishi's decision, backfilled the 4 dev seed projects' `owner_id` to `yishieze@gmail.com` (`cd102d14-5624-49e6-9e1f-ab5c7a2d8022`) in the same migration first, so tightening the policy didn't strand them ownerless.
+- **Files:** `supabase/migrations/20260728120000_tighten_project_delete.sql` (backfill + policy), `components/sidebar-nav.tsx:131` (`canDelete = p.owner_id === currentUserId`).
+- **Acceptance:** ✅ verified via direct RLS test (not just UI): created a disposable project owned by a second real user, confirmed that user could delete their own project (200, row removed) and could **not** delete `wet-dry` owned by another user (200, 0 rows affected, row unchanged). No ownerless projects remain (`select * from projects where owner_id is null` → 0 rows on dev).
+- **Maps to:** audit §15.3, §17.15. Depends on: seed cleanup (done 2026-07-21 on prod; dev cleanup folded into this item 2026-07-28).
 
 ---
 
@@ -428,7 +428,7 @@ graph TD
 
 | Tier | Items | Done | Gate status |
 |---|---|---|---|
-| 🛡️ Tier 0 | 11 | 6 | **In progress** (T0.1–T0.6 done on dev) |
+| 🛡️ Tier 0 | 11 | 10 | **In progress** (T0.1–T0.9 + T0.11 done on dev; T0.10 code shipped, live verification paused — university network block) |
 | 📓 Tier 1 | 10 | 0 | Awaiting go-ahead |
 | 🕸️ Tier 2 | 9 | 0 | Awaiting go-ahead + specs |
 | 🤖 Tier 3 | 6 | 0 | Blocked on Tier 1–2 |
