@@ -84,10 +84,15 @@ export async function getIndexVersionStatus(): Promise<IndexVersionStatus> {
       .from("index_jobs")
       .select("embedding_model, embedding_dimensions")
       .eq("status", "done")
+      .not("embedding_model", "is", null)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    admin.from("index_jobs").select("experiment_id", { count: "exact", head: true }).eq("status", "done"),
+    admin
+      .from("index_jobs")
+      .select("experiment_id, experiments!inner(deleted_at)", { count: "exact", head: true })
+      .eq("status", "done")
+      .is("experiments.deleted_at", null),
     admin.from("experiments").select("id", { count: "exact", head: true }).is("deleted_at", null),
   ]);
   return {
