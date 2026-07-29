@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getExperiment,
   getExperimentSummary,
+  listLockEvents,
   listRevisions,
   signedUrlsFor,
 } from "@/lib/experiments/service";
@@ -11,12 +12,17 @@ import { listProjects } from "@/lib/projects/service";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";
+import { setStatus, completeExperiment, reviewExperiment, archiveExperiment } from "./lifecycle-actions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
 import { FileManager } from "@/components/file-manager";
 import { SummaryCard } from "@/components/summary-card";
 import { HistoryPanel } from "@/components/history-panel";
+import { StatusBadge } from "@/components/status-badge";
+import { LifecycleControls } from "@/components/lifecycle-controls";
+
+const fmtDateTime = (iso: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "—");
 
 export default async function ExperimentDetailPage({
   params,
@@ -24,11 +30,12 @@ export default async function ExperimentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects, summary, revisions] = await Promise.all([
+  const [result, projects, summary, revisions, lockEvents] = await Promise.all([
     getExperiment(id),
     listProjects(),
     getExperimentSummary(id),
     listRevisions(id),
+    listLockEvents(id),
   ]);
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
@@ -72,6 +79,9 @@ export default async function ExperimentDetailPage({
         <div>
           <div className="id">{e.id}</div>
           <h2>{e.name}</h2>
+          <div className="detail-meta" style={{ marginBottom: 8 }}>
+            <StatusBadge status={e.status} />
+          </div>
           <div className="detail-meta">
             {projectLabel && <span className="chip">{projectLabel}</span>}
             {e.reaction_type && <span className="chip">{e.reaction_type}</span>}
@@ -87,10 +97,25 @@ export default async function ExperimentDetailPage({
             <Link href={`/experiments/${e.id}/edit`} className="btn btn-ghost btn-sm">
               Edit
             </Link>
-            <DeleteExperimentButton action={softDeleteExperiment.bind(null, e.id)} />
+            <DeleteExperimentButton
+              status={e.status}
+              hasConclusion={!!e.conclusion?.trim()}
+              deleteAction={softDeleteExperiment.bind(null, e.id)}
+              archiveAction={archiveExperiment.bind(null, e.id)}
+            />
           </div>
         )}
       </div>
+
+      {isOwner && (
+        <LifecycleControls
+          status={e.status}
+          hasConclusion={!!e.conclusion?.trim()}
+          setStatusAction={setStatus.bind(null, e.id)}
+          completeAction={completeExperiment.bind(null, e.id)}
+          reviewAction={reviewExperiment.bind(null, e.id)}
+        />
+      )}
 
       <div className="detail-grid">
         <div>
@@ -102,6 +127,65 @@ export default async function ExperimentDetailPage({
               </div>
             ))}
           </div>
+
+          <div className="obs-box glass">
+            <h4>Lifecycle</h4>
+            <div className="spec-grid">
+              <div className="spec">
+                <div className="k">Planned start</div>
+                <div className="v">{fmtDateTime(e.planned_start_at)}</div>
+              </div>
+              <div className="spec">
+                <div className="k">Started</div>
+                <div className="v">{fmtDateTime(e.started_at)}</div>
+              </div>
+              <div className="spec">
+                <div className="k">Planned end</div>
+                <div className="v">{fmtDateTime(e.planned_end_at)}</div>
+              </div>
+              <div className="spec">
+                <div className="k">Completed</div>
+                <div className="v">{fmtDateTime(e.completed_at)}</div>
+              </div>
+            </div>
+            {e.locked_at && (
+              <p className="muted" style={{ fontSize: 13, margin: "12px 0 0" }}>
+                Locked{e.completed_by === user?.id ? " — completed by you" : ""}
+                {e.completed_at ? ` on ${fmtDateTime(e.completed_at)}` : ""}. Reopen it from the Edit page with a
+                documented reason to change it (standard §18.5).
+              </p>
+            )}
+          </div>
+
+          {(e.scientific_question || e.conclusion) && (
+            <div className="obs-box glass">
+              <h4>Planning &amp; conclusions</h4>
+              {e.scientific_question && (
+                <>
+                  <h4 style={{ marginTop: 0, fontSize: 12.5, color: "var(--ink-mute)" }}>Scientific question</h4>
+                  <p>{e.scientific_question}</p>
+                </>
+              )}
+              {e.hypothesis && (
+                <>
+                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>Hypothesis</h4>
+                  <p>{e.hypothesis}</p>
+                </>
+              )}
+              {e.conclusion && (
+                <>
+                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>Conclusion</h4>
+                  <p>{e.conclusion}</p>
+                </>
+              )}
+              {e.next_steps && (
+                <>
+                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>Next steps</h4>
+                  <p>{e.next_steps}</p>
+                </>
+              )}
+            </div>
+          )}
 
           {e.compounds.length > 0 && (
             <div className="obs-box glass">
@@ -166,6 +250,34 @@ export default async function ExperimentDetailPage({
             summary={summary}
             action={generateSummary.bind(null, e.id)}
           />
+
+          {lockEvents.length > 0 && (
+            <div className="panel glass" style={{ marginTop: 16 }}>
+              <h4 style={{ fontFamily: "var(--display)", margin: "0 0 12px" }}>Lock history</h4>
+              <div className="activity">
+                {lockEvents.map((ev) => (
+                  <div key={ev.id} className="act-row">
+                    <span className="act-dot"></span>
+                    <span style={{ fontSize: 13 }}>
+                      {ev.event === "reopen" ? "Reopened" : "Locked"} — {ev.reason}
+                    </span>
+                    <time
+                      style={{
+                        marginLeft: "auto",
+                        fontFamily: "var(--mono)",
+                        fontSize: 11,
+                        color: "var(--ink-mute)",
+                        whiteSpace: "nowrap",
+                        flex: "none",
+                      }}
+                    >
+                      {fmtDateTime(ev.created_at)}
+                    </time>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <HistoryPanel current={e} revisions={revisions} />
         </aside>

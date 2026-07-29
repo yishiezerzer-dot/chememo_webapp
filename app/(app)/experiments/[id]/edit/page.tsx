@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getExperiment, listVocab } from "@/lib/experiments/service";
 import { listProjects } from "@/lib/projects/service";
 import { updateExperiment } from "@/app/(app)/new/actions";
+import { reopenExperiment } from "../lifecycle-actions";
 import { ExperimentForm } from "@/components/experiment-form";
+import { StatusBadge } from "@/components/status-badge";
+import { ReopenExperimentButton } from "@/components/reopen-experiment-button";
 
 export default async function EditExperimentPage({
   params,
@@ -27,6 +31,30 @@ export default async function EditExperimentPage({
     redirect(`/experiments/${id}`);
   }
 
+  const { experiment } = result;
+
+  // T1.1/D4 — a locked record's scientific fields are DB-enforced immutable;
+  // don't even render the form. Reopening (§18.5) is the only way back in.
+  if (experiment.locked_at) {
+    return (
+      <div>
+        <span className="eyebrow">Edit · {id}</span>
+        <h2 style={{ fontFamily: "var(--display)", fontSize: 28, margin: "8px 0 12px" }}>
+          {experiment.name}
+        </h2>
+        <div style={{ marginBottom: 16 }}>
+          <StatusBadge status={experiment.status} />
+        </div>
+        <p className="muted" style={{ maxWidth: 560 }}>
+          This experiment is locked (standard §18.5) — its scientific fields cannot be edited.
+          Reopen it with a documented reason to make changes, or{" "}
+          <Link href={`/experiments/${id}`}>view the full record</Link>.
+        </p>
+        <ReopenExperimentButton action={reopenExperiment.bind(null, id)} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <span className="eyebrow">Edit · {id}</span>
@@ -36,7 +64,7 @@ export default async function EditExperimentPage({
       <ExperimentForm
         projects={projects}
         action={updateExperiment.bind(null, id)}
-        initial={result.experiment}
+        initial={experiment}
         submitLabel="Save changes"
         vocab={vocab}
       />

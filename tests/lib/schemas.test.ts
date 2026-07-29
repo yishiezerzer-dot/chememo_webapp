@@ -17,6 +17,18 @@ const validInput = {
   mz: [297, 595],
   observations: "Yellowing after dry-down.",
   notes: null,
+  scientific_question: null,
+  rationale: null,
+  hypothesis: null,
+  primary_outcome: null,
+  secondary_outcomes: null,
+  data_analysis_plan: null,
+  risks_failure_modes: null,
+  conclusion: null,
+  next_steps: null,
+  acceptance_criteria: null,
+  planned_start_at: null,
+  planned_end_at: null,
 };
 
 describe("experimentInputSchema", () => {

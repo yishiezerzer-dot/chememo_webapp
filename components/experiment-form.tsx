@@ -91,11 +91,19 @@ function TagField({
   );
 }
 
+// HTML <input type="datetime-local"> only accepts "YYYY-MM-DDTHH:mm" (no
+// seconds, no offset); the first 16 characters of any ISO timestamptz string
+// are always exactly that, so a slice is all the conversion this needs.
+function toDatetimeLocal(v?: string | null): string {
+  return v ? v.slice(0, 16) : "";
+}
+
 export function ExperimentForm({ projects, action, initial, submitLabel, vocab }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [state, setState] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
+  const criteriaLocked = !!initial?.acceptance_criteria_locked_at;
 
   function toggleMethod(m: string) {
     setMethods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
@@ -116,9 +124,98 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
   return (
     <form onSubmit={handleSubmit} className="form-shell">
       <div className="form-sections">
+        <details className="fsec glass" open>
+          <summary>
+            <h3 style={{ display: "inline-flex" }}>
+              <span className="sec-num">01</span>Planning
+            </h3>
+          </summary>
+          <p className="sec-sub">
+            The §8.1 pre-registration — write this before the bench work starts.
+          </p>
+          <div className="field">
+            <label>Scientific question</label>
+            <textarea name="scientific_question" rows={2} defaultValue={initial?.scientific_question ?? ""} />
+            <FieldError message={fieldErrors?.scientific_question} />
+          </div>
+          <div className="field">
+            <label>Rationale</label>
+            <textarea name="rationale" rows={2} defaultValue={initial?.rationale ?? ""} />
+            <FieldError message={fieldErrors?.rationale} />
+          </div>
+          <div className="field">
+            <label>Hypothesis</label>
+            <textarea name="hypothesis" rows={2} defaultValue={initial?.hypothesis ?? ""} />
+            <FieldError message={fieldErrors?.hypothesis} />
+          </div>
+          <div className="field">
+            <label>Primary outcome</label>
+            <textarea name="primary_outcome" rows={2} defaultValue={initial?.primary_outcome ?? ""} />
+            <FieldError message={fieldErrors?.primary_outcome} />
+          </div>
+          <div className="field">
+            <label>Secondary outcomes</label>
+            <textarea name="secondary_outcomes" rows={2} defaultValue={initial?.secondary_outcomes ?? ""} />
+            <FieldError message={fieldErrors?.secondary_outcomes} />
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label>Planned start</label>
+              <input
+                type="datetime-local"
+                name="planned_start_at"
+                defaultValue={toDatetimeLocal(initial?.planned_start_at)}
+              />
+              <FieldError message={fieldErrors?.planned_start_at} />
+            </div>
+            <div className="field">
+              <label>Planned end</label>
+              <input
+                type="datetime-local"
+                name="planned_end_at"
+                defaultValue={toDatetimeLocal(initial?.planned_end_at)}
+              />
+              <FieldError message={fieldErrors?.planned_end_at} />
+            </div>
+          </div>
+          <div className="field">
+            <label>Data-analysis plan</label>
+            <textarea name="data_analysis_plan" rows={2} defaultValue={initial?.data_analysis_plan ?? ""} />
+            <FieldError message={fieldErrors?.data_analysis_plan} />
+          </div>
+          <div className="field">
+            <label>Risks and likely failure modes</label>
+            <textarea name="risks_failure_modes" rows={2} defaultValue={initial?.risks_failure_modes ?? ""} />
+            <FieldError message={fieldErrors?.risks_failure_modes} />
+          </div>
+          <div className="field">
+            <label>Acceptance criteria</label>
+            {criteriaLocked ? (
+              <>
+                <input type="hidden" name="acceptance_criteria" value={initial?.acceptance_criteria ?? ""} />
+                <p className="obs-box glass" style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14" style={{ flexShrink: 0, marginTop: 2 }}>
+                    <rect x="4" y="10" width="16" height="10" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                  </svg>
+                  {initial?.acceptance_criteria || "None recorded."}
+                </p>
+              </>
+            ) : (
+              <textarea name="acceptance_criteria" rows={2} defaultValue={initial?.acceptance_criteria ?? ""} placeholder="None — exploratory, no pre-specified criteria" />
+            )}
+            <p className="sec-sub" style={{ margin: "6px 0 0" }}>
+              {criteriaLocked
+                ? "Locked when the experiment started (standard §8.6) — cannot be edited, including after a reopen."
+                : "Locks when the experiment starts and cannot be edited afterwards (standard §8.6)."}
+            </p>
+            <FieldError message={fieldErrors?.acceptance_criteria} />
+          </div>
+        </details>
+
         <section className="fsec glass">
           <h3>
-            <span className="sec-num">01</span>Identity
+            <span className="sec-num">02</span>Identity
           </h3>
           <p className="sec-sub">What the experiment is and who ran it.</p>
           <div className="field">
@@ -161,7 +258,7 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
 
         <section className="fsec glass">
           <h3>
-            <span className="sec-num">02</span>Chemistry
+            <span className="sec-num">03</span>Chemistry
           </h3>
           <p className="sec-sub">Compounds, metals and conditions.</p>
           <TagField name="compounds" label="Compounds" initial={initial?.compounds ?? []} suggestions={vocab?.compounds} />
@@ -194,7 +291,7 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
 
         <section className="fsec glass">
           <h3>
-            <span className="sec-num">03</span>Analysis
+            <span className="sec-num">04</span>Analysis
           </h3>
           <p className="sec-sub">Methods used and notable m/z peaks.</p>
           <div className="field">
@@ -229,7 +326,7 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
 
         <section className="fsec glass">
           <h3>
-            <span className="sec-num">04</span>Observations
+            <span className="sec-num">05</span>Observations
           </h3>
           <p className="sec-sub">What you saw. This is what semantic search reads later.</p>
           <div className="field">
@@ -241,6 +338,25 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
             <label>Notes</label>
             <textarea name="notes" rows={2} defaultValue={initial?.notes ?? ""} placeholder="Anything else worth recording." />
             <FieldError message={fieldErrors?.notes} />
+          </div>
+        </section>
+
+        <section className="fsec glass">
+          <h3>
+            <span className="sec-num">06</span>Conclusions
+          </h3>
+          <p className="sec-sub">
+            A conclusion is required before the experiment can be marked complete (standard §15.2).
+          </p>
+          <div className="field">
+            <label>Conclusion</label>
+            <textarea name="conclusion" rows={3} defaultValue={initial?.conclusion ?? ""} />
+            <FieldError message={fieldErrors?.conclusion} />
+          </div>
+          <div className="field">
+            <label>Next steps</label>
+            <textarea name="next_steps" rows={2} defaultValue={initial?.next_steps ?? ""} />
+            <FieldError message={fieldErrors?.next_steps} />
           </div>
         </section>
       </div>

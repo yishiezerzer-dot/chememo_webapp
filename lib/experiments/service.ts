@@ -9,6 +9,7 @@ import type {
   Experiment,
   ExperimentFile,
   ExperimentInput,
+  ExperimentLockEvent,
   ExperimentRevision,
 } from "@/lib/types";
 
@@ -61,6 +62,20 @@ export async function listRevisions(
   // experiment_id/created_at/snapshot are DB-nullable but the update trigger
   // that inserts these rows always sets all three.
   return (data ?? []) as ExperimentRevision[];
+}
+
+// Lock/reopen history (newest first) — T1.1, §10.2 append-only log.
+export async function listLockEvents(experimentId: string): Promise<ExperimentLockEvent[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("experiment_lock_events")
+    .select("*")
+    .eq("experiment_id", experimentId)
+    .order("created_at", { ascending: false });
+  // event/experiment_id/reason/created_at are DB-nullable-looking in the
+  // generated type only where the columns are actually NOT NULL — the insert
+  // paths (lifecycle-actions.ts, reopen_experiment()) always set them.
+  return (data ?? []) as ExperimentLockEvent[];
 }
 
 // Private bucket → generate short-lived signed URLs so uploaded files open
@@ -138,9 +153,12 @@ export async function createExperiment(
   input: ExperimentInput
 ): Promise<string> {
   const id = await nextExperimentId();
+  // D2 — status has no DB default (a legacy row stays null); a *new* row is
+  // explicitly stamped 'draft' here so the distinction is real: null really
+  // does mean "predates the lifecycle field," not "just uninitialized."
   const { error } = await supabase
     .from("experiments")
-    .insert({ id, owner_id: userId, ...input });
+    .insert({ id, owner_id: userId, status: "draft", ...input });
   if (error) {
     throw new AppError("conflict", "Could not create the experiment.", { cause: error });
   }

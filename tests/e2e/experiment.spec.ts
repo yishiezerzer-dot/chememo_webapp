@@ -15,7 +15,7 @@ test("create and delete an experiment", async ({ page }) => {
   await page.waitForURL(/\/experiments\/EXP-\d+/);
   await expect(page.getByText(name)).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Delete draft", exact: true }).click();
   await page.getByRole("button", { name: "Confirm delete" }).click();
   await page.waitForURL(/\/experiments$/);
   await expect(page.getByText(name)).not.toBeVisible();

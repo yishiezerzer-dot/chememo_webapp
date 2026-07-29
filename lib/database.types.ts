@@ -113,6 +113,30 @@ export type Database = {
           },
         ]
       }
+      controlled_vocabularies: {
+        Row: {
+          active: boolean
+          sort_order: number
+          standard_section: string
+          value: string
+          vocabulary: string
+        }
+        Insert: {
+          active?: boolean
+          sort_order: number
+          standard_section: string
+          value: string
+          vocabulary: string
+        }
+        Update: {
+          active?: boolean
+          sort_order?: number
+          standard_section?: string
+          value?: string
+          vocabulary?: string
+        }
+        Relationships: []
+      }
       experiment_embeddings: {
         Row: {
           content: string | null
@@ -195,6 +219,41 @@ export type Database = {
           },
         ]
       }
+      experiment_lock_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event: string
+          experiment_id: string
+          id: string
+          reason: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event: string
+          experiment_id: string
+          id?: string
+          reason: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event?: string
+          experiment_id?: string
+          id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_lock_events_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experiment_revisions: {
         Row: {
           created_at: string | null
@@ -229,68 +288,129 @@ export type Database = {
       }
       experiments: {
         Row: {
+          acceptance_criteria: string | null
+          acceptance_criteria_locked_at: string | null
+          completed_at: string | null
+          completed_by: string | null
           compounds: string[] | null
           concentration: string | null
+          conclusion: string | null
           created_at: string | null
           cycles: number | null
+          data_analysis_plan: string | null
           date: string | null
           deleted_at: string | null
+          hypothesis: string | null
           id: string
+          locked_at: string | null
           metals: string[] | null
           methods: string[] | null
           mz: number[] | null
           name: string
+          next_steps: string | null
           notes: string | null
           observations: string | null
           owner_id: string | null
           ph: number | null
+          planned_end_at: string | null
+          planned_start_at: string | null
+          primary_outcome: string | null
           project: string | null
+          rationale: string | null
           reaction_type: string | null
           researcher: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          risks_failure_modes: string | null
+          scientific_question: string | null
+          secondary_outcomes: string | null
+          short_code: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["experiment_status"] | null
           temperature: string | null
           updated_at: string | null
         }
         Insert: {
+          acceptance_criteria?: string | null
+          acceptance_criteria_locked_at?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           compounds?: string[] | null
           concentration?: string | null
+          conclusion?: string | null
           created_at?: string | null
           cycles?: number | null
+          data_analysis_plan?: string | null
           date?: string | null
           deleted_at?: string | null
+          hypothesis?: string | null
           id: string
+          locked_at?: string | null
           metals?: string[] | null
           methods?: string[] | null
           mz?: number[] | null
           name: string
+          next_steps?: string | null
           notes?: string | null
           observations?: string | null
           owner_id?: string | null
           ph?: number | null
+          planned_end_at?: string | null
+          planned_start_at?: string | null
+          primary_outcome?: string | null
           project?: string | null
+          rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risks_failure_modes?: string | null
+          scientific_question?: string | null
+          secondary_outcomes?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["experiment_status"] | null
           temperature?: string | null
           updated_at?: string | null
         }
         Update: {
+          acceptance_criteria?: string | null
+          acceptance_criteria_locked_at?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           compounds?: string[] | null
           concentration?: string | null
+          conclusion?: string | null
           created_at?: string | null
           cycles?: number | null
+          data_analysis_plan?: string | null
           date?: string | null
           deleted_at?: string | null
+          hypothesis?: string | null
           id?: string
+          locked_at?: string | null
           metals?: string[] | null
           methods?: string[] | null
           mz?: number[] | null
           name?: string
+          next_steps?: string | null
           notes?: string | null
           observations?: string | null
           owner_id?: string | null
           ph?: number | null
+          planned_end_at?: string | null
+          planned_start_at?: string | null
+          primary_outcome?: string | null
           project?: string | null
+          rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risks_failure_modes?: string | null
+          scientific_question?: string | null
+          secondary_outcomes?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["experiment_status"] | null
           temperature?: string | null
           updated_at?: string | null
         }
@@ -392,6 +512,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      archive_experiment: {
+        Args: { p_ended_as?: string; p_id: string }
+        Returns: undefined
+      }
       match_experiments: {
         Args: { match_count?: number; query_embedding: string }
         Returns: {
@@ -401,9 +525,22 @@ export type Database = {
         }[]
       }
       next_experiment_id: { Args: never; Returns: string }
+      reopen_experiment: {
+        Args: { p_id: string; p_reason: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      experiment_status:
+        | "draft"
+        | "planned"
+        | "in_progress"
+        | "paused"
+        | "completed"
+        | "reviewed"
+        | "archived"
+        | "failed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -533,6 +670,18 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      experiment_status: [
+        "draft",
+        "planned",
+        "in_progress",
+        "paused",
+        "completed",
+        "reviewed",
+        "archived",
+        "failed",
+        "cancelled",
+      ],
+    },
   },
 } as const

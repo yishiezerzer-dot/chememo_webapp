@@ -56,6 +56,18 @@ function parseForm(formData: FormData) {
     mz: numList("mz"),
     observations: str("observations"),
     notes: str("notes"),
+    scientific_question: str("scientific_question"),
+    rationale: str("rationale"),
+    hypothesis: str("hypothesis"),
+    primary_outcome: str("primary_outcome"),
+    secondary_outcomes: str("secondary_outcomes"),
+    data_analysis_plan: str("data_analysis_plan"),
+    risks_failure_modes: str("risks_failure_modes"),
+    conclusion: str("conclusion"),
+    next_steps: str("next_steps"),
+    acceptance_criteria: str("acceptance_criteria"),
+    planned_start_at: str("planned_start_at"),
+    planned_end_at: str("planned_end_at"),
   };
 }
 

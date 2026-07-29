@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { StatusBadge } from "@/components/status-badge";
 import type { Experiment, Project } from "@/lib/types";
 
 type SortKey = "id" | "name" | "date" | "project" | "ph" | "cycles";
@@ -48,6 +49,8 @@ export function ExperimentsTable({
   const [q, setQ] = useState(initialQuery);
   const [project, setProject] = useState<string>(initialProject);
   const [ph, setPh] = useState<PhFilter>("all");
+  // D12 — archived leaves the default "active work" view and nothing else.
+  const [showArchived, setShowArchived] = useState(false);
   const [sort, setSort] = useState<SortKey>("date");
   const [asc, setAsc] = useState(false);
 
@@ -74,6 +77,7 @@ export function ExperimentsTable({
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let out = experiments.filter((e) => {
+      if (!showArchived && e.status === "archived") return false;
       if (project !== "all" && e.project !== project) return false;
       if (ph === "lt7" && !(e.ph !== null && e.ph < 7)) return false;
       if (ph === "eq7" && e.ph !== 7) return false;
@@ -120,7 +124,7 @@ export function ExperimentsTable({
       return 0;
     });
     return out;
-  }, [experiments, q, project, ph, sort, asc]);
+  }, [experiments, q, project, ph, showArchived, sort, asc]);
 
   function toggleSort(key: SortKey) {
     if (sort === key) setAsc((a) => !a);
@@ -197,6 +201,15 @@ export function ExperimentsTable({
             </button>
           ))}
         </div>
+        <div className="filter-chips">
+          <button
+            type="button"
+            className={`chip${showArchived ? " active" : ""}`}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? "Hide archived" : "Show archived"}
+          </button>
+        </div>
         <span className="count-pill" style={{ marginLeft: "auto" }}>
           {rows.length} / {experiments.length}
         </span>
@@ -226,6 +239,7 @@ export function ExperimentsTable({
                 <th className="col-date" onClick={() => toggleSort("date")}>
                   Date {arrow("date")}
                 </th>
+                <th className="col-status">Status</th>
                 <th className="col-proj" onClick={() => toggleSort("project")}>
                   Project {arrow("project")}
                 </th>
@@ -248,6 +262,9 @@ export function ExperimentsTable({
                     {e.researcher && <small>{e.researcher}</small>}
                   </td>
                   <td className="muted">{e.date ?? "—"}</td>
+                  <td>
+                    <StatusBadge status={e.status} />
+                  </td>
                   <td>{e.project ? projectLabel[e.project] ?? e.project : "—"}</td>
                   <td className="td-ph">{e.ph ?? "—"}</td>
                   <td className="td-center muted">{e.cycles ?? "—"}</td>

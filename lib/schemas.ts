@@ -33,6 +33,27 @@ export const experimentInputSchema = z.object({
     .max(200, "Too many m/z values."),
   observations: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   notes: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+
+  // T1.1 §8.1 narrative sections (C2) and §8.6 acceptance criteria. Status
+  // itself is never in this schema (D10) — it moves only through lifecycle-actions.ts.
+  scientific_question: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  rationale: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  hypothesis: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  primary_outcome: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  secondary_outcomes: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  data_analysis_plan: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  risks_failure_modes: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  conclusion: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  next_steps: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  acceptance_criteria: z.string().trim().max(4000, "Too long (max 4000 characters).").nullable(),
+  planned_start_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/, "Enter a valid date and time.")
+    .nullable(),
+  planned_end_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/, "Enter a valid date and time.")
+    .nullable(),
 });
 
 export type ExperimentInputParsed = z.infer<typeof experimentInputSchema>;

@@ -221,6 +221,33 @@ a { color: inherit; }
 [data-theme="light"] .chip { background: rgba(10,50,40,.03); }
 [data-theme="light"] .chip:hover { background: rgba(10,50,40,.07); }
 
+/* T1.1 — experiment lifecycle status. Colour + icon + text together (never
+   colour alone, audit §10.4): the modifier class sets colour, the svg icon
+   and label text carry the same meaning independently. */
+.status-badge {
+  font-family: var(--ui); font-size: 12.5px; font-weight: 600;
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--ink-mute);
+  background: rgba(255,255,255,.02);
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.status-badge svg { flex-shrink: 0; }
+.status-badge.s-draft, .status-badge.s-unknown { color: var(--ink-mute); }
+.status-badge.s-planned { color: var(--cyan); border-color: rgba(111,227,255,.3); }
+.status-badge.s-in-progress { color: var(--amber); border-color: rgba(255,212,121,.35); }
+.status-badge.s-paused { color: var(--violet); border-color: rgba(183,155,255,.3); }
+.status-badge.s-completed { color: var(--emerald); border-color: rgba(52,211,153,.32); }
+.status-badge.s-reviewed { color: var(--teal); border-color: rgba(62,224,196,.32); }
+.status-badge.s-archived { color: var(--ink-dim); }
+.status-badge.s-failed { color: var(--rose); border-color: rgba(255,143,163,.32); }
+.status-badge.s-cancelled { color: var(--ink-mute); }
+.status-badge.s-unknown { font-style: italic; }
+
+/* T1.1 Planning section — a collapsible <details> reusing the .fsec card. */
+.fsec > summary { cursor: pointer; }
+.fsec > summary::marker { color: var(--ink-mute); }
+
 .tag {
   font-family: var(--mono); font-size: 11.5px;
   padding: 3px 9px; border-radius: 7px;
