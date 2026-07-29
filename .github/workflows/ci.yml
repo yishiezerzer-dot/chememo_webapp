@@ -16,7 +16,15 @@ jobs:
       E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
       E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
     steps:
+      # fetch-depth: 0 (full history) so gitleaks-action below can resolve its
+      # commit-range diff. actions/checkout@v4 defaults to a depth-1 shallow
+      # clone, which only ever worked here by accident because every push to
+      # this repo so far happened to add exactly one commit; a push carrying
+      # two or more new commits needs the older commit's parent, which a
+      # depth-1 clone doesn't have (broke CI on 2026-07-29's multi-commit push).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
