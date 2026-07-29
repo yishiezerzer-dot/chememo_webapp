@@ -177,10 +177,16 @@ declare
   scientific_changed boolean;
   allowed boolean;
 begin
+  -- short_code is excluded too: it's a GENERATED ALWAYS ... STORED column,
+  -- and Postgres shows generated columns as not-yet-recomputed in NEW inside
+  -- a BEFORE trigger (they're only materialized after the trigger returns),
+  -- while OLD already has the real value -- so without this exclusion every
+  -- update to an already-locked record would spuriously look like a
+  -- scientific change and get rejected, breaking review/reopen/archive.
   scientific_changed :=
-    (to_jsonb(new) - 'status' - 'locked_at' - 'updated_at' - 'reviewed_at' - 'reviewed_by')
+    (to_jsonb(new) - 'status' - 'locked_at' - 'updated_at' - 'reviewed_at' - 'reviewed_by' - 'short_code')
     is distinct from
-    (to_jsonb(old) - 'status' - 'locked_at' - 'updated_at' - 'reviewed_at' - 'reviewed_by');
+    (to_jsonb(old) - 'status' - 'locked_at' - 'updated_at' - 'reviewed_at' - 'reviewed_by' - 'short_code');
 
   -- (a) A locked record accepts no scientific change, including soft delete.
   if old.locked_at is not null and scientific_changed then
