@@ -20,7 +20,10 @@ export async function setStatus(id: string, next: ExperimentStatus): Promise<Act
   const { error } = await supabase.from("experiments").update({ status: next }).eq("id", id);
   if (error) return lifecycleError("setStatus", error);
 
+  // Every action can flip locked_at, which changes whether /edit renders the
+  // form or the read-only view -- revalidate it too, not just the detail page.
   revalidatePath(`/experiments/${id}`);
+  revalidatePath(`/experiments/${id}/edit`);
   revalidatePath("/experiments");
   return { ok: true };
 }
@@ -37,7 +40,10 @@ export async function completeExperiment(id: string): Promise<ActionResult> {
     .insert({ experiment_id: id, event: "lock", reason: "Completed.", actor_id: user.id });
   if (logErr) logError("completeExperiment", "lock event insert failed", { error: logErr });
 
+  // Every action can flip locked_at, which changes whether /edit renders the
+  // form or the read-only view -- revalidate it too, not just the detail page.
   revalidatePath(`/experiments/${id}`);
+  revalidatePath(`/experiments/${id}/edit`);
   revalidatePath("/experiments");
   return { ok: true };
 }
@@ -49,7 +55,10 @@ export async function reviewExperiment(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("experiments").update({ status: "reviewed" }).eq("id", id);
   if (error) return lifecycleError("reviewExperiment", error);
 
+  // Every action can flip locked_at, which changes whether /edit renders the
+  // form or the read-only view -- revalidate it too, not just the detail page.
   revalidatePath(`/experiments/${id}`);
+  revalidatePath(`/experiments/${id}/edit`);
   revalidatePath("/experiments");
   return { ok: true };
 }
@@ -69,7 +78,10 @@ export async function archiveExperiment(
   });
   if (error) return lifecycleError("archiveExperiment", error);
 
+  // Every action can flip locked_at, which changes whether /edit renders the
+  // form or the read-only view -- revalidate it too, not just the detail page.
   revalidatePath(`/experiments/${id}`);
+  revalidatePath(`/experiments/${id}/edit`);
   revalidatePath("/experiments");
   return { ok: true };
 }
@@ -92,7 +104,10 @@ export async function reopenExperiment(id: string, reason: string): Promise<Acti
   const { error } = await supabase.rpc("reopen_experiment", { p_id: id, p_reason: trimmed });
   if (error) return lifecycleError("reopenExperiment", error);
 
+  // Every action can flip locked_at, which changes whether /edit renders the
+  // form or the read-only view -- revalidate it too, not just the detail page.
   revalidatePath(`/experiments/${id}`);
+  revalidatePath(`/experiments/${id}/edit`);
   revalidatePath("/experiments");
   return { ok: true };
 }
