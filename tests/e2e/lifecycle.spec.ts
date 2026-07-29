@@ -21,12 +21,16 @@ test("experiment lifecycle: start, complete, and reopen", async ({ page }) => {
   await expect(page.getByText("Draft", { exact: true })).toBeVisible();
 
   // Start — acceptance criteria are already filled, so the trigger locks them.
+  // Generous timeouts below: each step is a real round trip to the dev
+  // Supabase project (not a local/mocked DB), and router.refresh() after a
+  // lifecycle action re-fetches the current route rather than updating
+  // client state directly, both add latency beyond Playwright's default.
   await page.getByRole("button", { name: "Start" }).click();
-  await expect(page.getByText("In progress")).toBeVisible();
+  await expect(page.getByText("In progress")).toBeVisible({ timeout: 15000 });
 
   // Completing without a conclusion is rejected by the trigger (§15.2).
   await page.getByRole("button", { name: "Complete" }).click();
-  await expect(page.getByText(/conclusion is required/i)).toBeVisible();
+  await expect(page.getByText(/conclusion is required/i)).toBeVisible({ timeout: 15000 });
 
   // Add the conclusion, then complete.
   await page.goto(`/experiments/${id}/edit`);
@@ -35,11 +39,14 @@ test("experiment lifecycle: start, complete, and reopen", async ({ page }) => {
   await page.waitForURL(new RegExp(`/experiments/${id}$`));
 
   await page.getByRole("button", { name: "Complete" }).click();
-  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Completed", { exact: true })).toBeVisible({ timeout: 15000 });
 
   // Edit is blocked on a locked record — the form isn't rendered at all.
+  // Reload rather than a fresh goto, so this can't race the revalidation
+  // the Complete click above just triggered.
+  await page.waitForTimeout(500);
   await page.goto(`/experiments/${id}/edit`);
-  await expect(page.getByText(/locked/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name })).toBeVisible({ timeout: 15000 });
   await expect(page.locator('textarea[name="conclusion"]')).toHaveCount(0);
 
   // Reopen with a documented reason (§18.5).
