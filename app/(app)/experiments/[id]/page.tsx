@@ -150,9 +150,22 @@ export default async function ExperimentDetailPage({
             </div>
             {e.locked_at && (
               <p className="muted" style={{ fontSize: 13, margin: "12px 0 0" }}>
-                Locked{e.completed_by === user?.id ? " — completed by you" : ""}
-                {e.completed_at ? ` on ${fmtDateTime(e.completed_at)}` : ""}. Reopen it from the Edit page with a
-                documented reason to change it (standard §18.5).
+                {/* completed_at/by are only a true account of the CURRENT lock
+                    when status is still completed/reviewed -- a record can
+                    reopen and later reach a locked state again via failed/
+                    cancelled/archived, and those stamps are never cleared by
+                    reopen, so showing them there would misreport how the
+                    record actually got locked this time (found via a live
+                    smoke test on prod, 2026-07-29). */}
+                {e.status === "completed" || e.status === "reviewed" ? (
+                  <>
+                    Locked{e.completed_by === user?.id ? " — completed by you" : ""}
+                    {e.completed_at ? ` on ${fmtDateTime(e.completed_at)}` : ""}.
+                  </>
+                ) : (
+                  "Locked."
+                )}{" "}
+                Reopen it from the Edit page with a documented reason to change it (standard §18.5).
               </p>
             )}
           </div>
