@@ -226,7 +226,10 @@ export function ExperimentsTable({
       </div>
 
       <div className="table-scroll">
-        <div className="table-scroll-inner">
+        {/* The status column widened this table enough to overflow on
+            narrower viewports; a horizontally scrollable region must be
+            keyboard-reachable (axe scrollable-region-focusable, WCAG 2.1.1). */}
+        <div className="table-scroll-inner" tabIndex={0} role="region" aria-label="Experiments table, scrollable">
           <table className="exp-table">
             <thead>
               <tr>
