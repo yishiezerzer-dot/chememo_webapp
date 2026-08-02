@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/authorization/policies";
 import { extractExperimentFields } from "@/lib/llm";
 import * as experimentsService from "@/lib/experiments/service";
+import { getTemplateVersion } from "@/lib/templates/service";
 import { toActionResult } from "@/lib/errors";
-import { METHOD_OPTIONS, type ActionResult, type ExperimentInput } from "@/lib/types";
-import { experimentInputSchema, fieldErrorsFromZod } from "@/lib/schemas";
+import { parseExperimentForm, isEmptyValue } from "@/lib/experiment-form-parse";
+import { type ActionResult, type ExperimentInput } from "@/lib/types";
+import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab } from "@/lib/schemas";
 
 // LLM-assisted entry: parse pasted notes into structured fields for the user to
 // confirm/edit. No-ops (null) until a key exists (Phase 10). Never saves.
@@ -19,56 +21,12 @@ export async function extractFromNotes(
   return extractExperimentFields(notes);
 }
 
-// Candidate values straight off the form — numeric fields may be `NaN` when
-// the input was non-empty but not a valid number; the schema below is what
-// rejects that, not this parser (never silently coerce invalid input to null).
-function parseForm(formData: FormData) {
-  const str = (k: string) => {
-    const v = (formData.get(k) as string | null)?.trim();
-    return v ? v : null;
-  };
-  const list = (k: string) =>
-    (formData.get(k) as string | null || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  const numList = (k: string) => list(k).map((s) => Number(s));
-  const num = (k: string) => {
-    const v = str(k);
-    return v === null ? null : Number(v);
-  };
-
-  const methods = METHOD_OPTIONS.filter((m) => formData.get(`method:${m}`) === "on");
-
-  return {
-    name: str("name") ?? "",
-    date: str("date"),
-    researcher: str("researcher"),
-    project: str("project"),
-    reaction_type: str("reaction_type"),
-    compounds: list("compounds"),
-    metals: list("metals"),
-    ph: num("ph"),
-    concentration: str("concentration"),
-    temperature: str("temperature"),
-    cycles: num("cycles"),
-    methods,
-    mz: numList("mz"),
-    observations: str("observations"),
-    notes: str("notes"),
-    scientific_question: str("scientific_question"),
-    rationale: str("rationale"),
-    hypothesis: str("hypothesis"),
-    primary_outcome: str("primary_outcome"),
-    secondary_outcomes: str("secondary_outcomes"),
-    data_analysis_plan: str("data_analysis_plan"),
-    risks_failure_modes: str("risks_failure_modes"),
-    conclusion: str("conclusion"),
-    next_steps: str("next_steps"),
-    acceptance_criteria: str("acceptance_criteria"),
-    planned_start_at: str("planned_start_at"),
-    planned_end_at: str("planned_end_at"),
-  };
+// T1.2 D2 — shared by create and update, since both write sample_matrix
+// through the same schema and the vocabulary constraint applies either way.
+async function checkSampleMatrixVocab(
+  rows: ExperimentInput["sample_matrix"]
+): Promise<string | null> {
+  return validateSampleMatrixVocab(rows, await experimentsService.listSampleVocab());
 }
 
 export async function createExperiment(
@@ -77,7 +35,7 @@ export async function createExperiment(
 ): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
 
-  const parsed = experimentInputSchema.safeParse(parseForm(formData));
+  const parsed = experimentInputSchema.safeParse(parseExperimentForm(formData));
   if (!parsed.success) {
     return {
       ok: false,
@@ -86,9 +44,32 @@ export async function createExperiment(
     };
   }
 
+  const vocabError = await checkSampleMatrixVocab(parsed.data.sample_matrix);
+  if (vocabError) return { ok: false, error: vocabError };
+
+  // Provenance (T1.2 D6/D10) — never part of the schema; set by the
+  // instantiate/clone pages as hidden fields, read directly here.
+  const templateVersionId = (formData.get("template_version_id") as string | null) || null;
+  const basedOnExperimentId = (formData.get("based_on_experiment_id") as string | null) || null;
+
+  if (templateVersionId) {
+    const version = await getTemplateVersion(templateVersionId);
+    const missing = (version?.required_fields ?? []).filter((key) =>
+      isEmptyValue((parsed.data as Record<string, unknown>)[key])
+    );
+    if (missing.length > 0) {
+      const fieldErrors: Record<string, string> = {};
+      for (const key of missing) fieldErrors[key] = "Required by this template.";
+      return { ok: false, error: "Please fill in the fields required by this template.", fieldErrors };
+    }
+  }
+
   let id: string;
   try {
-    id = await experimentsService.createExperiment(supabase, user.id, parsed.data);
+    id = await experimentsService.createExperiment(supabase, user.id, parsed.data, {
+      templateVersionId,
+      basedOnExperimentId,
+    });
   } catch (e) {
     return toActionResult("createExperiment", e);
   }
@@ -104,7 +85,7 @@ export async function updateExperiment(
 ): Promise<ActionResult> {
   const { supabase } = await requireUser();
 
-  const parsed = experimentInputSchema.safeParse(parseForm(formData));
+  const parsed = experimentInputSchema.safeParse(parseExperimentForm(formData));
   if (!parsed.success) {
     return {
       ok: false,
@@ -112,6 +93,9 @@ export async function updateExperiment(
       fieldErrors: fieldErrorsFromZod(parsed.error),
     };
   }
+
+  const vocabError = await checkSampleMatrixVocab(parsed.data.sample_matrix);
+  if (vocabError) return { ok: false, error: vocabError };
 
   try {
     await experimentsService.updateExperiment(supabase, id, parsed.data);

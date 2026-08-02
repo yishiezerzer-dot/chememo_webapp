@@ -10,6 +10,10 @@ type ExperimentRevisionRow =
   Database["public"]["Tables"]["experiment_revisions"]["Row"];
 type ExperimentLockEventRow =
   Database["public"]["Tables"]["experiment_lock_events"]["Row"];
+type ExperimentTemplateRow =
+  Database["public"]["Tables"]["experiment_templates"]["Row"];
+type ExperimentTemplateVersionRow =
+  Database["public"]["Tables"]["experiment_template_versions"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -19,15 +23,60 @@ export type ActionResult =
   | { ok: true }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
+// T1.2, §8.2: the 19 required sample-matrix columns, one row per sample.
+// sample_id is blank on a template default and on a fresh clone (D2/D6 in
+// the spec) — it's filled in only once the record is actually created, since
+// it implies a real, ID-consuming row and §8.3 forbids reserving-then-
+// abandoning an ID. sample_type/reaction_mode/status hold
+// controlled_vocabularies values but are typed as plain string here — the
+// allow-list is runtime data, not a literal union, so the constraint is
+// enforced in lib/schemas.ts at write time (T1.2 D2), not by the type system.
+export type SampleMatrixRow = {
+  sample_id: string;
+  vial_label: string;
+  legacy_code: string;
+  batch: string;
+  replicate: string;
+  sample_type: string;
+  component_1: string;
+  amount_1: string;
+  component_2: string;
+  amount_2: string;
+  ratio: string;
+  initial_volume: string;
+  reaction_mode: string;
+  temperature: string;
+  duration: string;
+  atmosphere: string;
+  treatment: string;
+  planned_analysis: string;
+  status: string;
+};
+
+// T1.2, §8.5: a control checklist item. Kept as a checklist, not a
+// paragraph, so it renders as checkboxes and stays exportable to Markdown
+// checklist syntax later (T1.11) with no translation (T1.2 D3).
+export type ControlItem = { label: string; checked: boolean };
+
 // experiments.compounds/metals/methods/mz and created_at/updated_at are
 // nullable at the DB level (no NOT NULL constraint) but every write path sets
 // them (`default '{}'` / `now()`, never written null) — narrowed here to match
 // that real invariant instead of forcing null-checks the app never needs.
 // short_code is a generated column derived from id (never null: id is the
 // primary key) — narrowed the same way (T1.1, standard §6.2).
+// sample_matrix/controls are stored as jsonb (generic `Json`) but every write
+// path sends the typed array shape above (T1.2, D2/D3) — narrowed the same way.
 export type Experiment = Omit<
   ExperimentRow,
-  "compounds" | "metals" | "methods" | "mz" | "created_at" | "updated_at" | "short_code"
+  | "compounds"
+  | "metals"
+  | "methods"
+  | "mz"
+  | "created_at"
+  | "updated_at"
+  | "short_code"
+  | "sample_matrix"
+  | "controls"
 > & {
   compounds: string[];
   metals: string[];
@@ -36,6 +85,8 @@ export type Experiment = Omit<
   created_at: string;
   updated_at: string;
   short_code: string;
+  sample_matrix: SampleMatrixRow[];
+  controls: ControlItem[];
 };
 
 // A prior state of an experiment, captured by the update trigger (audit #24).
@@ -71,6 +122,10 @@ export type ExperimentLockEvent = Omit<ExperimentLockEventRow, "event"> & {
 // Lifecycle columns (status, locked_at, completed_at/by, reviewed_at/by,
 // acceptance_criteria_locked_at) are deliberately absent (T1.1, D10) — status
 // moves only through the dedicated lifecycle-actions.ts gates.
+// template_version_id/based_on_experiment_id are also absent (T1.2, D6 —
+// provenance is never a plain form field): the instantiate/clone actions set
+// them explicitly before the first save, the same way status never moves
+// through a plain form submit.
 export type ExperimentInput = {
   name: string;
   date: string | null;
@@ -99,6 +154,13 @@ export type ExperimentInput = {
   acceptance_criteria: string | null;
   planned_start_at: string | null;
   planned_end_at: string | null;
+  independent_variables: string | null;
+  controlled_variables: string | null;
+  sample_matrix: SampleMatrixRow[];
+  controls: ControlItem[];
+  protocol_version: string | null;
+  planned_analyses: string | null;
+  sample_storage_plan: string | null;
 };
 
 export type ExperimentStatus = Database["public"]["Enums"]["experiment_status"];
@@ -108,6 +170,28 @@ export type ExperimentStatus = Database["public"]["Enums"]["experiment_status"];
 //   sample status   -> T2.3  (standard 23.3)
 //   analysis status -> T2.5  (standard 23.4)
 // Values for all three are already seeded in controlled_vocabularies (G11).
+
+// T1.2, D4/D5 — a shared template library. created_by is always stamped
+// even though any authenticated user can create/edit (no role model until
+// T2.1), so that model can attribute authorship without a backfill later.
+export type ExperimentTemplate = Omit<ExperimentTemplateRow, "created_at"> & {
+  created_at: string;
+};
+
+// A version's `defaults` is a jsonb blob shaped like Partial<ExperimentInput>
+// (T1.2, D4) — not a parallel schema, so instantiating a template is
+// mechanically the same "produce a Partial<Experiment>, pass it as
+// ExperimentForm's `initial`" prefill PasteNotes already established.
+// `frozen_at` is set the first time any experiment references this version
+// (the experiments_freeze_template_version trigger) and is never cleared.
+export type ExperimentTemplateVersion = Omit<
+  ExperimentTemplateVersionRow,
+  "created_at" | "defaults" | "required_fields"
+> & {
+  created_at: string;
+  defaults: Partial<ExperimentInput>;
+  required_fields: (keyof ExperimentInput)[];
+};
 
 export const METHOD_OPTIONS = [
   "LC-MS/MS (neg)",

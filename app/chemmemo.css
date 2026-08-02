@@ -840,6 +840,22 @@ table.exp-table {
 .obs-box h4 { font-family: var(--display); font-size: 16px; margin: 0 0 10px; font-weight: 600; }
 .obs-box p { line-height: 1.7; color: var(--ink-dim); margin: 0; font-size: 14px; }
 
+/* T1.2 — new-experiment entry menu (Template / Clone / Blank) and the
+   templates list, sharing one card layout. */
+.entry-menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.entry-menu-card { display: block; text-decoration: none; color: inherit; transition: border-color .15s; }
+.entry-menu-card:hover { border-color: var(--border-strong); }
+
+/* T1.2 — §8.2 sample matrix. 19 columns, so a small monospace-ish density
+   and a forced horizontal scroll (a11y region already applied in the
+   component, matching the a11y fix already shipped for experiments-table). */
+table.sample-matrix-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1400px; }
+.sample-matrix-table th { text-align: left; padding: 6px 8px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-mute); white-space: nowrap; }
+.sample-matrix-table td { padding: 4px 6px; }
+.sample-matrix-table input, .sample-matrix-table select { width: 100%; min-width: 70px; font-size: 12px; padding: 5px 6px; }
+
+.controls-checklist { display: flex; flex-wrap: wrap; gap: 8px; }
+
 .mz-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .mz {
   font-family: var(--mono); font-size: 13px; padding: 7px 12px; border-radius: 9px;

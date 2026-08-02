@@ -8,7 +8,7 @@ import { signIn } from "./helpers";
 test("experiment lifecycle: start, complete, and reopen", async ({ page }) => {
   await signIn(page);
 
-  await page.goto("/new");
+  await page.goto("/new/blank");
   const name = `E2E lifecycle test ${Date.now()}`;
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(name);
   await page.locator('textarea[name="scientific_question"]').fill("Does Zn accelerate condensation?");

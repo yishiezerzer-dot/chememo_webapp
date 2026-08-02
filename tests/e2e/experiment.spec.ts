@@ -7,7 +7,7 @@ import { signIn } from "./helpers";
 test("create and delete an experiment", async ({ page }) => {
   await signIn(page);
 
-  await page.goto("/new");
+  await page.goto("/new/blank");
   const name = `E2E create test ${Date.now()}`;
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(name);
   await page.getByRole("button", { name: "Save experiment" }).click();

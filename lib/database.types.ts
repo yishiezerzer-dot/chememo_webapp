@@ -290,11 +290,14 @@ export type Database = {
         Row: {
           acceptance_criteria: string | null
           acceptance_criteria_locked_at: string | null
+          based_on_experiment_id: string | null
           completed_at: string | null
           completed_by: string | null
           compounds: string[] | null
           concentration: string | null
           conclusion: string | null
+          controlled_variables: string | null
+          controls: Json
           created_at: string | null
           cycles: number | null
           data_analysis_plan: string | null
@@ -302,6 +305,7 @@ export type Database = {
           deleted_at: string | null
           hypothesis: string | null
           id: string
+          independent_variables: string | null
           locked_at: string | null
           metals: string[] | null
           methods: string[] | null
@@ -312,32 +316,40 @@ export type Database = {
           observations: string | null
           owner_id: string | null
           ph: number | null
+          planned_analyses: string | null
           planned_end_at: string | null
           planned_start_at: string | null
           primary_outcome: string | null
           project: string | null
+          protocol_version: string | null
           rationale: string | null
           reaction_type: string | null
           researcher: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           risks_failure_modes: string | null
+          sample_matrix: Json
+          sample_storage_plan: string | null
           scientific_question: string | null
           secondary_outcomes: string | null
           short_code: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["experiment_status"] | null
+          template_version_id: string | null
           temperature: string | null
           updated_at: string | null
         }
         Insert: {
           acceptance_criteria?: string | null
           acceptance_criteria_locked_at?: string | null
+          based_on_experiment_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           compounds?: string[] | null
           concentration?: string | null
           conclusion?: string | null
+          controlled_variables?: string | null
+          controls?: Json
           created_at?: string | null
           cycles?: number | null
           data_analysis_plan?: string | null
@@ -345,6 +357,7 @@ export type Database = {
           deleted_at?: string | null
           hypothesis?: string | null
           id: string
+          independent_variables?: string | null
           locked_at?: string | null
           metals?: string[] | null
           methods?: string[] | null
@@ -355,31 +368,39 @@ export type Database = {
           observations?: string | null
           owner_id?: string | null
           ph?: number | null
+          planned_analyses?: string | null
           planned_end_at?: string | null
           planned_start_at?: string | null
           primary_outcome?: string | null
           project?: string | null
+          protocol_version?: string | null
           rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           risks_failure_modes?: string | null
+          sample_matrix?: Json
+          sample_storage_plan?: string | null
           scientific_question?: string | null
           secondary_outcomes?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["experiment_status"] | null
+          template_version_id?: string | null
           temperature?: string | null
           updated_at?: string | null
         }
         Update: {
           acceptance_criteria?: string | null
           acceptance_criteria_locked_at?: string | null
+          based_on_experiment_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           compounds?: string[] | null
           concentration?: string | null
           conclusion?: string | null
+          controlled_variables?: string | null
+          controls?: Json
           created_at?: string | null
           cycles?: number | null
           data_analysis_plan?: string | null
@@ -387,6 +408,7 @@ export type Database = {
           deleted_at?: string | null
           hypothesis?: string | null
           id?: string
+          independent_variables?: string | null
           locked_at?: string | null
           metals?: string[] | null
           methods?: string[] | null
@@ -397,20 +419,25 @@ export type Database = {
           observations?: string | null
           owner_id?: string | null
           ph?: number | null
+          planned_analyses?: string | null
           planned_end_at?: string | null
           planned_start_at?: string | null
           primary_outcome?: string | null
           project?: string | null
+          protocol_version?: string | null
           rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           risks_failure_modes?: string | null
+          sample_matrix?: Json
+          sample_storage_plan?: string | null
           scientific_question?: string | null
           secondary_outcomes?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["experiment_status"] | null
+          template_version_id?: string | null
           temperature?: string | null
           updated_at?: string | null
         }
@@ -420,6 +447,88 @@ export type Database = {
             columns: ["project"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiments_based_on_experiment_id_fkey"
+            columns: ["based_on_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiments_template_version_fk"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_templates: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      experiment_template_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          defaults: Json
+          frozen_at: string | null
+          id: string
+          required_fields: string[]
+          template_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          defaults?: Json
+          frozen_at?: string | null
+          id?: string
+          required_fields?: string[]
+          template_id: string
+          version: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          defaults?: Json
+          frozen_at?: string | null
+          id?: string
+          required_fields?: string[]
+          template_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_templates"
             referencedColumns: ["id"]
           },
         ]

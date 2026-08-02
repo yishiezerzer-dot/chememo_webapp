@@ -2,15 +2,28 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { METHOD_OPTIONS, type ActionResult, type Experiment, type Project } from "@/lib/types";
+import { SampleMatrixEditor } from "@/components/sample-matrix-editor";
+import { ControlsChecklist } from "@/components/controls-checklist";
 
 type Props = {
   projects: Project[];
   action: (prevState: ActionResult | null, formData: FormData) => Promise<ActionResult>;
-  // Partial so LLM-extracted fields (Phase 9) can pre-fill the form.
+  // Partial so LLM-extracted fields (Phase 9), template defaults, and clone
+  // selections (T1.2) can all pre-fill the form the same way.
   initial?: Partial<Experiment>;
   submitLabel: string;
   // Distinct compound/metal values for autocomplete (optional).
   vocab?: { compounds: string[]; metals: string[] };
+  // controlled_vocabularies rows for the sample-matrix editor (T1.2 D2).
+  sampleVocab?: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] };
+  // Provenance stamps (T1.2 D6) — set by the instantiate/clone pages, never
+  // user-editable, carried through as hidden fields to createExperiment.
+  templateVersionId?: string | null;
+  basedOnExperimentId?: string | null;
+  // Lets an input rendered outside this component (e.g. the templates
+  // editor's "required fields" input) associate via the HTML `form`
+  // attribute and still land in this form's submitted FormData.
+  formId?: string;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -98,7 +111,17 @@ function toDatetimeLocal(v?: string | null): string {
   return v ? v.slice(0, 16) : "";
 }
 
-export function ExperimentForm({ projects, action, initial, submitLabel, vocab }: Props) {
+export function ExperimentForm({
+  projects,
+  action,
+  initial,
+  submitLabel,
+  vocab,
+  sampleVocab,
+  templateVersionId,
+  basedOnExperimentId,
+  formId,
+}: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [state, setState] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -122,7 +145,9 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-shell">
+    <form id={formId} onSubmit={handleSubmit} className="form-shell">
+      {templateVersionId && <input type="hidden" name="template_version_id" value={templateVersionId} />}
+      {basedOnExperimentId && <input type="hidden" name="based_on_experiment_id" value={basedOnExperimentId} />}
       <div className="form-sections">
         <details className="fsec glass" open>
           <summary>
@@ -160,6 +185,42 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
           </div>
           <div className="grid-2">
             <div className="field">
+              <label>Independent variables</label>
+              <textarea name="independent_variables" rows={2} defaultValue={initial?.independent_variables ?? ""} />
+              <FieldError message={fieldErrors?.independent_variables} />
+            </div>
+            <div className="field">
+              <label>Controlled variables</label>
+              <textarea name="controlled_variables" rows={2} defaultValue={initial?.controlled_variables ?? ""} />
+              <FieldError message={fieldErrors?.controlled_variables} />
+            </div>
+          </div>
+          <div className="field">
+            <label>Sample matrix</label>
+            <SampleMatrixEditor
+              name="sample_matrix"
+              initial={initial?.sample_matrix ?? []}
+              sampleTypes={sampleVocab?.sampleTypes ?? []}
+              reactionModes={sampleVocab?.reactionModes ?? []}
+              sampleStatuses={sampleVocab?.sampleStatuses ?? []}
+            />
+          </div>
+          <div className="field">
+            <label>Controls</label>
+            <ControlsChecklist name="controls" initial={initial?.controls ?? []} />
+          </div>
+          <div className="field">
+            <label>Protocol version</label>
+            <input name="protocol_version" defaultValue={initial?.protocol_version ?? ""} placeholder="PROT-TBD-v1.0" />
+            <FieldError message={fieldErrors?.protocol_version} />
+          </div>
+          <div className="field">
+            <label>Planned analyses</label>
+            <textarea name="planned_analyses" rows={2} defaultValue={initial?.planned_analyses ?? ""} />
+            <FieldError message={fieldErrors?.planned_analyses} />
+          </div>
+          <div className="grid-2">
+            <div className="field">
               <label>Planned start</label>
               <input
                 type="datetime-local"
@@ -187,6 +248,11 @@ export function ExperimentForm({ projects, action, initial, submitLabel, vocab }
             <label>Risks and likely failure modes</label>
             <textarea name="risks_failure_modes" rows={2} defaultValue={initial?.risks_failure_modes ?? ""} />
             <FieldError message={fieldErrors?.risks_failure_modes} />
+          </div>
+          <div className="field">
+            <label>Sample-storage plan</label>
+            <textarea name="sample_storage_plan" rows={2} defaultValue={initial?.sample_storage_plan ?? ""} />
+            <FieldError message={fieldErrors?.sample_storage_plan} />
           </div>
           <div className="field">
             <label>Acceptance criteria</label>

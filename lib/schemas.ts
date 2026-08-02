@@ -1,5 +1,36 @@
 import { z } from "zod";
-import { METHOD_OPTIONS } from "@/lib/types";
+import { METHOD_OPTIONS, type SampleMatrixRow } from "@/lib/types";
+
+// T1.2 §8.2 sample-matrix row and §8.5 control checklist item. All 19
+// columns are free-text strings (no unit typing yet — T1.4); sample_id is
+// allowed blank because a template default or a fresh clone has none yet
+// (T1.2 D2/D6) — it's filled in only once the record is actually created.
+const sampleMatrixRowSchema = z.object({
+  sample_id: z.string().trim().max(60),
+  vial_label: z.string().trim().max(60),
+  legacy_code: z.string().trim().max(60),
+  batch: z.string().trim().max(60),
+  replicate: z.string().trim().max(60),
+  sample_type: z.string().trim().max(100),
+  component_1: z.string().trim().max(200),
+  amount_1: z.string().trim().max(60),
+  component_2: z.string().trim().max(200),
+  amount_2: z.string().trim().max(60),
+  ratio: z.string().trim().max(60),
+  initial_volume: z.string().trim().max(60),
+  reaction_mode: z.string().trim().max(100),
+  temperature: z.string().trim().max(60),
+  duration: z.string().trim().max(60),
+  atmosphere: z.string().trim().max(100),
+  treatment: z.string().trim().max(300),
+  planned_analysis: z.string().trim().max(300),
+  status: z.string().trim().max(100),
+});
+
+const controlItemSchema = z.object({
+  label: z.string().trim().min(1).max(300),
+  checked: z.boolean(),
+});
 
 // Shared client/server validation for the experiment form (T0.1). Keep
 // concentration/temperature as free text for now — structured units land in
@@ -54,9 +85,49 @@ export const experimentInputSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/, "Enter a valid date and time.")
     .nullable(),
+
+  // T1.2 §8.1 sections deferred by T1.1's C2. Structured units aren't built
+  // yet (T1.4), so every field here is free text (T1.2 D1).
+  independent_variables: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  controlled_variables: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  protocol_version: z.string().trim().max(300, "Too long (max 300 characters).").nullable(),
+  planned_analyses: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  sample_storage_plan: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
+  // §8.2's 19-column sample matrix (T1.2 D2). sample_type/reaction_mode/status
+  // are meant to hold controlled_vocabularies values, but that allow-list is
+  // runtime data fetched per-request, not something a static schema object
+  // can check — see validateSampleMatrixVocab below, called separately by the
+  // action after this schema parses successfully.
+  sample_matrix: z.array(sampleMatrixRowSchema).max(500, "Too many sample rows."),
+  // §8.5 control checklist (T1.2 D3).
+  controls: z.array(controlItemSchema).max(100, "Too many control items."),
 });
 
 export type ExperimentInputParsed = z.infer<typeof experimentInputSchema>;
+
+// T1.2 D2 — sample_type/reaction_mode/status should each be a
+// controlled_vocabularies value (§23.1/§23.2/§23.3), checked against the
+// live seed-table rows rather than a hardcoded literal union (G11: the
+// vocabulary is meant to change via an UPDATE, not a code deploy). Returns
+// the first field error found, or null if every row is valid; empty strings
+// pass (an unset cell isn't a wrong vocabulary value, just an unfilled one).
+export function validateSampleMatrixVocab(
+  rows: SampleMatrixRow[],
+  allowed: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] }
+): string | null {
+  for (const row of rows) {
+    if (row.sample_type && !allowed.sampleTypes.includes(row.sample_type)) {
+      return `"${row.sample_type}" is not a recognized sample type.`;
+    }
+    if (row.reaction_mode && !allowed.reactionModes.includes(row.reaction_mode)) {
+      return `"${row.reaction_mode}" is not a recognized reaction mode.`;
+    }
+    if (row.status && !allowed.sampleStatuses.includes(row.status)) {
+      return `"${row.status}" is not a recognized sample status.`;
+    }
+  }
+  return null;
+}
 
 export const projectLabelSchema = z
   .string()

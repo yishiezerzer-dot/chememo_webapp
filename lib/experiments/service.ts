@@ -49,6 +49,36 @@ export async function listVocab(): Promise<{ compounds: string[]; metals: string
   return { compounds: [...compounds].sort(), metals: [...metals].sort() };
 }
 
+// T1.2 D2 — the read side of T1.1's G11 seed table. Powers the sample-type/
+// reaction-mode/status dropdowns in the sample-matrix editor and the
+// server-side allow-list check in validateSampleMatrixVocab.
+export async function listControlledVocab(vocabulary: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("controlled_vocabularies")
+    .select("value")
+    .eq("vocabulary", vocabulary)
+    .eq("active", true)
+    .order("sort_order");
+  return (data ?? []).map((row) => row.value);
+}
+
+// Convenience wrapper for the three vocabularies the sample-matrix editor
+// needs at once (T1.2 D2) — one Promise.all instead of three call sites
+// each re-fetching individually.
+export async function listSampleVocab(): Promise<{
+  sampleTypes: string[];
+  reactionModes: string[];
+  sampleStatuses: string[];
+}> {
+  const [sampleTypes, reactionModes, sampleStatuses] = await Promise.all([
+    listControlledVocab("sample_type"),
+    listControlledVocab("reaction_mode"),
+    listControlledVocab("sample_status"),
+  ]);
+  return { sampleTypes, reactionModes, sampleStatuses };
+}
+
 // Prior states of an experiment (newest first), captured by the update trigger.
 export async function listRevisions(
   experimentId: string
@@ -150,15 +180,25 @@ export async function getExperiment(
 export async function createExperiment(
   supabase: Supabase,
   userId: string,
-  input: ExperimentInput
+  input: ExperimentInput,
+  // T1.2 D6 — provenance is never part of ExperimentInput/the plain form
+  // (D10's rule extended): the instantiate/clone actions set these
+  // explicitly. template_version_id freezes that version via the
+  // experiments_freeze_template_version trigger the moment this insert lands.
+  provenance?: { templateVersionId?: string | null; basedOnExperimentId?: string | null }
 ): Promise<string> {
   const id = await nextExperimentId();
   // D2 — status has no DB default (a legacy row stays null); a *new* row is
   // explicitly stamped 'draft' here so the distinction is real: null really
   // does mean "predates the lifecycle field," not "just uninitialized."
-  const { error } = await supabase
-    .from("experiments")
-    .insert({ id, owner_id: userId, status: "draft", ...input });
+  const { error } = await supabase.from("experiments").insert({
+    id,
+    owner_id: userId,
+    status: "draft",
+    template_version_id: provenance?.templateVersionId ?? null,
+    based_on_experiment_id: provenance?.basedOnExperimentId ?? null,
+    ...input,
+  });
   if (error) {
     throw new AppError("conflict", "Could not create the experiment.", { cause: error });
   }

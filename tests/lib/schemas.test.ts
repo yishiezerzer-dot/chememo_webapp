@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { experimentInputSchema, fieldErrorsFromZod, projectLabelSchema } from "@/lib/schemas";
+import {
+  experimentInputSchema,
+  fieldErrorsFromZod,
+  projectLabelSchema,
+  validateSampleMatrixVocab,
+} from "@/lib/schemas";
 
 const validInput = {
   name: "His + TGA + Zn — wet-dry cycling",
@@ -29,6 +34,35 @@ const validInput = {
   acceptance_criteria: null,
   planned_start_at: null,
   planned_end_at: null,
+  independent_variables: null,
+  controlled_variables: null,
+  protocol_version: null,
+  planned_analyses: null,
+  sample_storage_plan: null,
+  sample_matrix: [] as const,
+  controls: [] as const,
+};
+
+const sampleRow = {
+  sample_id: "",
+  vial_label: "",
+  legacy_code: "",
+  batch: "B01",
+  replicate: "R1",
+  sample_type: "sample",
+  component_1: "",
+  amount_1: "",
+  component_2: "",
+  amount_2: "",
+  ratio: "",
+  initial_volume: "",
+  reaction_mode: "",
+  temperature: "",
+  duration: "",
+  atmosphere: "",
+  treatment: "",
+  planned_analysis: "",
+  status: "",
 };
 
 describe("experimentInputSchema", () => {
@@ -72,6 +106,37 @@ describe("experimentInputSchema", () => {
   it("rejects a name over 300 characters", () => {
     const result = experimentInputSchema.safeParse({ ...validInput, name: "x".repeat(301) });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts a well-formed sample-matrix row", () => {
+    const result = experimentInputSchema.safeParse({ ...validInput, sample_matrix: [sampleRow] });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a well-formed controls checklist", () => {
+    const result = experimentInputSchema.safeParse({
+      ...validInput,
+      controls: [{ label: "Fresh mixture control", checked: false }],
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("validateSampleMatrixVocab", () => {
+  const allowed = { sampleTypes: ["sample", "control"], reactionModes: ["dry-down"], sampleStatuses: ["planned"] };
+
+  it("passes when every non-empty value is in the allow-list", () => {
+    const rows = [{ ...sampleRow, sample_type: "control", reaction_mode: "dry-down", status: "planned" }];
+    expect(validateSampleMatrixVocab(rows, allowed)).toBeNull();
+  });
+
+  it("passes when the vocabulary cells are left blank", () => {
+    expect(validateSampleMatrixVocab([sampleRow], allowed)).toBeNull();
+  });
+
+  it("rejects a sample_type not in the allow-list", () => {
+    const rows = [{ ...sampleRow, sample_type: "made-up type" }];
+    expect(validateSampleMatrixVocab(rows, allowed)).toMatch(/made-up type/);
   });
 });
 
