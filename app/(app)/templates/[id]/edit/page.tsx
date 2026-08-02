@@ -54,6 +54,7 @@ export default async function EditTemplatePage({
       </div>
       <ExperimentForm
         formId={FORM_ID}
+        nameRequired={false}
         projects={projects}
         action={saveTemplateVersion.bind(null, id)}
         initial={(latest?.defaults ?? {}) as Partial<Experiment>}

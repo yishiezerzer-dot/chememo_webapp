@@ -24,6 +24,9 @@ type Props = {
   // editor's "required fields" input) associate via the HTML `form`
   // attribute and still land in this form's submitted FormData.
   formId?: string;
+  // A template's defaults have no fixed experiment name to require (T1.2) —
+  // the templates editor sets this false. Defaults true for every other caller.
+  nameRequired?: boolean;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -121,6 +124,7 @@ export function ExperimentForm({
   templateVersionId,
   basedOnExperimentId,
   formId,
+  nameRequired = true,
 }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [state, setState] = useState<ActionResult | null>(null);
@@ -285,8 +289,13 @@ export function ExperimentForm({
           </h3>
           <p className="sec-sub">What the experiment is and who ran it.</p>
           <div className="field">
-            <label>Name *</label>
-            <input name="name" required defaultValue={initial?.name ?? ""} placeholder="His + TGA + Zn — wet–dry cycling" />
+            <label>Name{nameRequired ? " *" : ""}</label>
+            <input
+              name="name"
+              required={nameRequired}
+              defaultValue={initial?.name ?? ""}
+              placeholder="His + TGA + Zn — wet–dry cycling"
+            />
             <FieldError message={fieldErrors?.name} />
           </div>
           <div className="grid-2">

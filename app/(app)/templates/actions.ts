@@ -9,6 +9,7 @@ import { toActionResult } from "@/lib/errors";
 import { parseExperimentForm } from "@/lib/experiment-form-parse";
 import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab } from "@/lib/schemas";
 import type { ActionResult, ExperimentInput } from "@/lib/types";
+import { z } from "zod";
 
 export async function createNewTemplate(
   _prevState: ActionResult | null,
@@ -35,8 +36,13 @@ export async function createNewTemplate(
 // A template's defaults are a Partial<ExperimentInput> (T1.2 D4) — every
 // field optional, since a template only pre-fills the sections its author
 // chose to. .partial() reuses the same per-field rules (max lengths, the
-// sample-matrix row shape) without a parallel schema.
-const templateDefaultsSchema = experimentInputSchema.partial();
+// sample-matrix row shape) without a parallel schema — except `name`, whose
+// base rule (min 1 char) still applies to an empty string even under
+// .partial() (that only makes the key omittable, not the value optional),
+// and a template has no fixed experiment name to require at all.
+const templateDefaultsSchema = experimentInputSchema.partial().extend({
+  name: z.string().trim().max(300, "Too long (max 300 characters)."),
+});
 
 export async function saveTemplateVersion(
   templateId: string,

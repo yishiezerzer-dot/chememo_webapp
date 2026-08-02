@@ -36,8 +36,8 @@ test("template with a required field blocks instantiation until filled", async (
   await expect(page.getByText(expName)).toBeVisible();
 
   // Cleanup: draft records delete cleanly; the template is archived.
-  await page.getByRole("button", { name: "Delete draft" }).click();
-  await page.getByRole("button", { name: "Delete draft" }).click();
+  await page.getByRole("button", { name: "Delete draft", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm delete" }).click();
   await page.waitForURL(/\/experiments$/);
 });
 
@@ -68,12 +68,12 @@ test("clone copies only the sections left checked", async ({ page }) => {
   await page.waitForURL(/\/experiments\/EXP-\d+/);
   await expect(page.getByText(cloneName)).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete draft" }).click();
-  await page.getByRole("button", { name: "Delete draft" }).click();
+  await page.getByRole("button", { name: "Delete draft", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm delete" }).click();
   await page.waitForURL(/\/experiments$/);
 
   await page.goto(`/experiments/${sourceId}`);
-  await page.getByRole("button", { name: "Delete draft" }).click();
-  await page.getByRole("button", { name: "Delete draft" }).click();
+  await page.getByRole("button", { name: "Delete draft", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm delete" }).click();
   await page.waitForURL(/\/experiments$/);
 });
