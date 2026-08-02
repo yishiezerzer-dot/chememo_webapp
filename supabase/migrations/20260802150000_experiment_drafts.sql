@@ -20,12 +20,16 @@ create table experiment_drafts (
 );
 
 -- One draft per (user, target) — an upsert target, not a growing log.
+-- Deliberately NOT a partial index (no `where ... is not null`): Postgres's
+-- ON CONFLICT (columns) inference can't target a partial index without also
+-- repeating its exact predicate, which upsert() has no way to express. A
+-- plain unique index gets the identical real-world behavior for free anyway
+-- — Postgres already treats NULL as distinct from NULL in unique indexes, so
+-- rows with a null target_experiment_id/client_draft_id never collide.
 create unique index experiment_drafts_owner_target_uidx
-  on experiment_drafts (owner_id, target_experiment_id)
-  where target_experiment_id is not null;
+  on experiment_drafts (owner_id, target_experiment_id);
 create unique index experiment_drafts_owner_client_uidx
-  on experiment_drafts (owner_id, client_draft_id)
-  where client_draft_id is not null;
+  on experiment_drafts (owner_id, client_draft_id);
 
 alter table experiment_drafts enable row level security;
 
