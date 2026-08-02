@@ -66,7 +66,9 @@ export function parseExperimentForm(formData: FormData) {
     planned_end_at: str("planned_end_at"),
     independent_variables: str("independent_variables"),
     controlled_variables: str("controlled_variables"),
-    protocol_version: str("protocol_version"),
+    // T1.5 D4 — protocol_version (the old free-text field) is likewise not
+    // parsed here anymore; protocol_version_id (a picker, not free text) is.
+    protocol_version_id: str("protocol_version_id"),
     planned_analyses: str("planned_analyses"),
     sample_storage_plan: str("sample_storage_plan"),
     sample_matrix: jsonList("sample_matrix"),

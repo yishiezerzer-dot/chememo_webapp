@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getExperiment, listVocab, listSampleVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
+import { listVersionOptions } from "@/lib/protocols/service";
 import { listProjects } from "@/lib/projects/service";
 import { getDraft } from "@/lib/drafts/service";
 import { updateExperiment } from "@/app/(app)/new/actions";
@@ -18,12 +19,13 @@ export default async function EditExperimentPage({
 }) {
   const { id } = await params;
   const draftKey = { targetExperimentId: id } as const;
-  const [result, projects, vocab, sampleVocab, quantityKinds, recoveredDraft] = await Promise.all([
+  const [result, projects, vocab, sampleVocab, quantityKinds, protocolVersions, recoveredDraft] = await Promise.all([
     getExperiment(id),
     listProjects(),
     listVocab(),
     listSampleVocab(),
     listQuantityKinds(),
+    listVersionOptions(),
     getDraft(draftKey),
   ]);
   if (!result) notFound();
@@ -75,6 +77,7 @@ export default async function EditExperimentPage({
         vocab={vocab}
         sampleVocab={sampleVocab}
         quantityKinds={quantityKinds}
+        protocolVersions={protocolVersions}
         draftKey={draftKey}
         recoveredDraft={recoveredDraft}
       />

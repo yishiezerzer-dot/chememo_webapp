@@ -16,6 +16,12 @@ type ExperimentTemplateVersionRow =
   Database["public"]["Tables"]["experiment_template_versions"]["Row"];
 type ExperimentDraftRow = Database["public"]["Tables"]["experiment_drafts"]["Row"];
 type QuantityKindRow = Database["public"]["Tables"]["quantity_kinds"]["Row"];
+type ProtocolRow = Database["public"]["Tables"]["protocols"]["Row"];
+type ProtocolVersionRow = Database["public"]["Tables"]["protocol_versions"]["Row"];
+type ProtocolStepRow = Database["public"]["Tables"]["protocol_steps"]["Row"];
+type ExperimentStepRow = Database["public"]["Tables"]["experiment_steps"]["Row"];
+type StepObservationRow = Database["public"]["Tables"]["step_observations"]["Row"];
+type StepDeviationRow = Database["public"]["Tables"]["step_deviations"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -72,6 +78,42 @@ export type Quantity = { value: number; unit_code: string; uncertainty?: number;
 // pattern: reference data as rows, not an enum, so a standard revision is
 // an UPDATE not a migration).
 export type QuantityKind = QuantityKindRow;
+
+// T1.5 D2 — a lab document identity (mutable name); everything the standard
+// actually versions (purpose, steps, safety, etc.) lives on ProtocolVersion.
+export type Protocol = ProtocolRow;
+
+// T1.5 §9.1's "critical parameters"/"known failure modes" tables, stored as
+// jsonb arrays on the version (same convention as ControlItem/SampleMatrixRow).
+export type CriticalParameter = { parameter: string; target: string; acceptable_range: string; action_if_outside: string };
+export type KnownFailureMode = { failure_mode: string; evidence: string; likely_cause: string; corrective_action: string };
+
+// T1.5 D2 — freeze-on-first-use, same shape as ExperimentTemplateVersion.
+// critical_parameters/known_failure_modes are jsonb (generic `Json`) but
+// every write path sends the typed array shape above — narrowed here.
+export type ProtocolVersion = Omit<ProtocolVersionRow, "critical_parameters" | "known_failure_modes"> & {
+  critical_parameters: CriticalParameter[];
+  known_failure_modes: KnownFailureMode[];
+};
+
+// T1.5 D3 — target_quantities is jsonb shaped Record<"temperature"|"duration", Quantity>,
+// reusing T1.4's quantity_kinds registry instead of bespoke numeric columns.
+export type ProtocolStep = Omit<ProtocolStepRow, "target_quantities"> & {
+  target_quantities: Record<string, Quantity>;
+};
+
+// T1.5 D5 — references protocol_steps directly; nothing is copied at
+// instantiation time since the parent version is already frozen by then.
+export type ExperimentStep = Omit<ExperimentStepRow, "actual_quantities"> & {
+  actual_quantities: Record<string, Quantity>;
+};
+
+// T1.5 D6 — append-only (no update/delete path exists at the RLS level).
+export type StepObservation = StepObservationRow;
+
+// T1.5 D7 — category is a controlled_vocabularies value ("deviation_category"),
+// checked against the live seed rows the same way sample_type/quantities are.
+export type StepDeviation = StepDeviationRow;
 
 // experiments.compounds/metals/methods/mz and created_at/updated_at are
 // nullable at the DB level (no NOT NULL constraint) but every write path sets
@@ -179,7 +221,10 @@ export type ExperimentInput = {
   controlled_variables: string | null;
   sample_matrix: SampleMatrixRow[];
   controls: ControlItem[];
-  protocol_version: string | null;
+  // T1.5 D4 — protocol_version (free text, pre-T1.5) is absent here for the
+  // same reason concentration/temperature are: it's legacy/display-only now,
+  // read straight from Experiment, never written again by a form save.
+  protocol_version_id: string | null;
   planned_analyses: string | null;
   sample_storage_plan: string | null;
   // T1.4 D1/D4 — new structured values only; the legacy temperature/

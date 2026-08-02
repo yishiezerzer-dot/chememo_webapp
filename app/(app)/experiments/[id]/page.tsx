@@ -9,10 +9,20 @@ import {
   signedUrlsFor,
 } from "@/lib/experiments/service";
 import { listProjects } from "@/lib/projects/service";
+import { listControlledVocab } from "@/lib/experiments/service";
+import { listQuantityKinds } from "@/lib/quantities/service";
+import { listVersionOptions } from "@/lib/protocols/service";
+import { listStepDetails } from "@/lib/experiment-steps/service";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";
 import { setStatus, completeExperiment, reviewExperiment, archiveExperiment } from "./lifecycle-actions";
+import {
+  instantiateStepsAction,
+  updateStepStatusAction,
+  recordObservationAction,
+  recordDeviationAction,
+} from "./steps-actions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
@@ -21,6 +31,7 @@ import { SummaryCard } from "@/components/summary-card";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { LifecycleControls } from "@/components/lifecycle-controls";
+import { StepRunner } from "@/components/step-runner";
 
 const fmtDateTime = (iso: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "—");
 
@@ -30,16 +41,22 @@ export default async function ExperimentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects, summary, revisions, lockEvents] = await Promise.all([
-    getExperiment(id),
-    listProjects(),
-    getExperimentSummary(id),
-    listRevisions(id),
-    listLockEvents(id),
-  ]);
+  const [result, projects, summary, revisions, lockEvents, quantityKinds, deviationCategories, protocolVersions] =
+    await Promise.all([
+      getExperiment(id),
+      listProjects(),
+      getExperimentSummary(id),
+      listRevisions(id),
+      listLockEvents(id),
+      listQuantityKinds(),
+      listControlledVocab("deviation_category"),
+      listVersionOptions(),
+    ]);
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
+  const stepDetails = e.protocol_version_id ? await listStepDetails(e.id) : [];
+  const protocolVersionLabel = protocolVersions.find((v) => v.id === e.protocol_version_id)?.label;
 
   const supabase = await createClient();
   const {
@@ -182,6 +199,48 @@ export default async function ExperimentDetailPage({
               </p>
             )}
           </div>
+
+          {e.protocol_version_id && (
+            <div className="obs-box glass">
+              <h4>Protocol &amp; steps</h4>
+              {protocolVersionLabel && (
+                <p className="sec-sub" style={{ margin: "0 0 12px" }}>
+                  {protocolVersionLabel}
+                </p>
+              )}
+              {isOwner ? (
+                <StepRunner
+                  steps={stepDetails}
+                  quantityKinds={quantityKinds}
+                  deviationCategories={deviationCategories}
+                  instantiate={
+                    stepDetails.length === 0
+                      ? instantiateStepsAction.bind(null, e.id, e.protocol_version_id)
+                      : undefined
+                  }
+                  updateStatus={updateStepStatusAction.bind(null, e.id)}
+                  recordObservation={recordObservationAction.bind(null, e.id)}
+                  recordDeviation={recordDeviationAction.bind(null, e.id)}
+                />
+              ) : (
+                stepDetails.length > 0 && (
+                  <div className="activity">
+                    {stepDetails.map(({ step, protocolStep }) => (
+                      <div key={step.id} className="act-row">
+                        <span className="act-dot"></span>
+                        <span style={{ fontSize: 13 }}>
+                          Step {protocolStep.step_number}: {protocolStep.instruction}
+                        </span>
+                        <span className="chip" style={{ marginLeft: "auto" }}>
+                          {step.status.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
 
           {(e.scientific_question || e.conclusion) && (
             <div className="obs-box glass">

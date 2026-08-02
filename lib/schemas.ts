@@ -99,7 +99,9 @@ export const experimentInputSchema = z.object({
   // yet (T1.4), so every field here is free text (T1.2 D1).
   independent_variables: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   controlled_variables: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  protocol_version: z.string().trim().max(300, "Too long (max 300 characters).").nullable(),
+  // T1.5 D4 — protocol_version (free text) is superseded by a real FK;
+  // legacy/display-only now, same reasoning as concentration/temperature (T1.4 D4).
+  protocol_version_id: z.string().trim().min(1).nullable(),
   planned_analyses: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   sample_storage_plan: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   // §8.2's 19-column sample matrix (T1.2 D2). sample_type/reaction_mode/status
@@ -159,6 +161,16 @@ export function validateQuantityUnits(
     if (!kind.compatible_units.includes(q.unit_code)) {
       return `"${q.unit_code}" is not a valid unit for ${kind.label}.`;
     }
+  }
+  return null;
+}
+
+// T1.5 D7 — a deviation's category must be one of the 20 §11.1 values, seeded
+// as controlled_vocabularies rows (vocabulary "deviation_category") rather
+// than a new table or enum — same live-registry check as validateQuantityUnits.
+export function validateDeviationCategory(category: string, allowed: string[]): string | null {
+  if (!allowed.includes(category)) {
+    return `"${category}" is not a recognized deviation category.`;
   }
   return null;
 }

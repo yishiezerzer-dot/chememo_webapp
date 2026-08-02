@@ -5,6 +5,7 @@ import {
   projectLabelSchema,
   validateSampleMatrixVocab,
   validateQuantityUnits,
+  validateDeviationCategory,
 } from "@/lib/schemas";
 
 const validInput = {
@@ -35,7 +36,7 @@ const validInput = {
   planned_end_at: null,
   independent_variables: null,
   controlled_variables: null,
-  protocol_version: null,
+  protocol_version_id: null,
   planned_analyses: null,
   sample_storage_plan: null,
   sample_matrix: [] as const,
@@ -153,6 +154,23 @@ describe("validateQuantityUnits", () => {
 
   it("rejects a unit not compatible with the kind", () => {
     expect(validateQuantityUnits({ temperature: { value: 60, unit_code: "mM" } }, kinds)).toMatch(/mM/);
+  });
+
+  it("also validates a protocol step's target_quantities shape (T1.5 D3 reuse)", () => {
+    expect(validateQuantityUnits({ temperature: { value: 80, unit_code: "Cel" } }, kinds)).toBeNull();
+    expect(validateQuantityUnits({ temperature: { value: 80, unit_code: "mM" } }, kinds)).toMatch(/mM/);
+  });
+});
+
+describe("validateDeviationCategory", () => {
+  const allowed = ["calculation_error", "wrong_solvent", "instrument_failure"];
+
+  it("passes for a recognized category", () => {
+    expect(validateDeviationCategory("wrong_solvent", allowed)).toBeNull();
+  });
+
+  it("rejects an unrecognized category", () => {
+    expect(validateDeviationCategory("made_up_category", allowed)).toMatch(/made_up_category/);
   });
 });
 

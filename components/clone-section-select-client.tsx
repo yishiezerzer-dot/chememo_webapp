@@ -38,7 +38,7 @@ const GROUPS = [
     key: "protocol",
     label: "Protocol & analyses",
     fields: [
-      "protocol_version",
+      "protocol_version_id",
       "planned_analyses",
       "sample_storage_plan",
       "independent_variables",
@@ -56,6 +56,7 @@ export function CloneSectionSelectClient({
   vocab,
   sampleVocab,
   quantityKinds,
+  protocolVersions,
   draftKey,
   recoveredDraft,
 }: {
@@ -67,6 +68,7 @@ export function CloneSectionSelectClient({
   vocab?: { compounds: string[]; metals: string[] };
   sampleVocab?: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] };
   quantityKinds?: QuantityKind[];
+  protocolVersions?: { id: string; label: string }[];
   draftKey: DraftKey;
   recoveredDraft?: ExperimentDraft | null;
 }) {
@@ -97,6 +99,7 @@ export function CloneSectionSelectClient({
         vocab={vocab}
         sampleVocab={sampleVocab}
         quantityKinds={quantityKinds}
+        protocolVersions={protocolVersions}
         initialFields={initialFields}
         basedOnExperimentId={source.id}
         draftKey={draftKey}

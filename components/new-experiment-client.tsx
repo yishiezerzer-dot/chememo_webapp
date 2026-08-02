@@ -13,6 +13,7 @@ export function NewExperimentClient({
   vocab,
   sampleVocab,
   quantityKinds,
+  protocolVersions,
   initialFields,
   templateVersionId,
   basedOnExperimentId,
@@ -26,6 +27,7 @@ export function NewExperimentClient({
   vocab?: { compounds: string[]; metals: string[] };
   sampleVocab?: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] };
   quantityKinds?: QuantityKind[];
+  protocolVersions?: { id: string; label: string }[];
   // T1.2 D6 — pre-fill from a template's defaults or a clone's selected
   // sections. Distinct from PasteNotes' onExtract below (Phase 9's LLM
   // path), which still overrides it if the user pastes notes afterward.
@@ -62,6 +64,7 @@ export function NewExperimentClient({
         vocab={vocab}
         sampleVocab={sampleVocab}
         quantityKinds={quantityKinds}
+        protocolVersions={protocolVersions}
         templateVersionId={templateVersionId}
         basedOnExperimentId={basedOnExperimentId}
         draftKey={draftKey}

@@ -1,6 +1,7 @@
 import { listProjects } from "@/lib/projects/service";
 import { listVocab, listSampleVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
+import { listVersionOptions } from "@/lib/protocols/service";
 import { isLlmEnabled } from "@/lib/llm";
 import { getDraft } from "@/lib/drafts/service";
 import { NewExperimentClient } from "@/components/new-experiment-client";
@@ -9,11 +10,12 @@ import { createExperiment, extractFromNotes } from "../actions";
 const DRAFT_KEY = { clientDraftId: "new:blank" } as const;
 
 export default async function BlankExperimentPage() {
-  const [projects, vocab, sampleVocab, quantityKinds, recoveredDraft] = await Promise.all([
+  const [projects, vocab, sampleVocab, quantityKinds, protocolVersions, recoveredDraft] = await Promise.all([
     listProjects(),
     listVocab(),
     listSampleVocab(),
     listQuantityKinds(),
+    listVersionOptions(),
     getDraft(DRAFT_KEY),
   ]);
 
@@ -31,6 +33,7 @@ export default async function BlankExperimentPage() {
         vocab={vocab}
         sampleVocab={sampleVocab}
         quantityKinds={quantityKinds}
+        protocolVersions={protocolVersions}
         draftKey={DRAFT_KEY}
         recoveredDraft={recoveredDraft}
       />

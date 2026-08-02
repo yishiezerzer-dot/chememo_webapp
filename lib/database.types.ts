@@ -170,6 +170,278 @@ export type Database = {
         }
         Relationships: []
       }
+      protocols: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      protocol_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          critical_parameters: Json
+          equipment: string | null
+          frozen_at: string | null
+          id: string
+          known_failure_modes: Json
+          protocol_id: string
+          purpose: string | null
+          qc_checks: string | null
+          required_materials: string | null
+          safety_notes: string | null
+          scope: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          critical_parameters?: Json
+          equipment?: string | null
+          frozen_at?: string | null
+          id?: string
+          known_failure_modes?: Json
+          protocol_id: string
+          purpose?: string | null
+          qc_checks?: string | null
+          required_materials?: string | null
+          safety_notes?: string | null
+          scope?: string | null
+          version: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          critical_parameters?: Json
+          equipment?: string | null
+          frozen_at?: string | null
+          id?: string
+          known_failure_modes?: Json
+          protocol_id?: string
+          purpose?: string | null
+          qc_checks?: string | null
+          required_materials?: string | null
+          safety_notes?: string | null
+          scope?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_versions_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_steps: {
+        Row: {
+          id: string
+          instruction: string
+          protocol_version_id: string
+          required_material: string | null
+          safety_note: string | null
+          step_number: number
+          target_atmosphere: string | null
+          target_ph: number | null
+          target_quantities: Json
+        }
+        Insert: {
+          id?: string
+          instruction: string
+          protocol_version_id: string
+          required_material?: string | null
+          safety_note?: string | null
+          step_number: number
+          target_atmosphere?: string | null
+          target_ph?: number | null
+          target_quantities?: Json
+        }
+        Update: {
+          id?: string
+          instruction?: string
+          protocol_version_id?: string
+          required_material?: string | null
+          safety_note?: string | null
+          step_number?: number
+          target_atmosphere?: string | null
+          target_ph?: number | null
+          target_quantities?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_steps_protocol_version_id_fkey"
+            columns: ["protocol_version_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_steps: {
+        Row: {
+          actual_atmosphere: string | null
+          actual_ph: number | null
+          actual_quantities: Json
+          completed_at: string | null
+          completed_by: string | null
+          experiment_id: string
+          id: string
+          protocol_step_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          actual_atmosphere?: string | null
+          actual_ph?: number | null
+          actual_quantities?: Json
+          completed_at?: string | null
+          completed_by?: string | null
+          experiment_id: string
+          id?: string
+          protocol_step_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          actual_atmosphere?: string | null
+          actual_ph?: number | null
+          actual_quantities?: Json
+          completed_at?: string | null
+          completed_by?: string | null
+          experiment_id?: string
+          id?: string
+          protocol_step_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_steps_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_steps_protocol_step_id_fkey"
+            columns: ["protocol_step_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_observations: {
+        Row: {
+          experiment_step_id: string
+          id: string
+          note: string
+          observed_at: string
+          observed_by: string | null
+        }
+        Insert: {
+          experiment_step_id: string
+          id?: string
+          note: string
+          observed_at?: string
+          observed_by?: string | null
+        }
+        Update: {
+          experiment_step_id?: string
+          id?: string
+          note?: string
+          observed_at?: string
+          observed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_observations_experiment_step_id_fkey"
+            columns: ["experiment_step_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_deviations: {
+        Row: {
+          affected_samples: string | null
+          category: string
+          corrective_action: string | null
+          decision_owner: string | null
+          experiment_step_id: string
+          how_discovered: string | null
+          id: string
+          likely_impact: string | null
+          linked_replacement_sample: string | null
+          preventive_action: string | null
+          reported_at: string
+          reported_by: string | null
+          sample_still_usable: boolean | null
+          what_happened: string
+        }
+        Insert: {
+          affected_samples?: string | null
+          category: string
+          corrective_action?: string | null
+          decision_owner?: string | null
+          experiment_step_id: string
+          how_discovered?: string | null
+          id?: string
+          likely_impact?: string | null
+          linked_replacement_sample?: string | null
+          preventive_action?: string | null
+          reported_at?: string
+          reported_by?: string | null
+          sample_still_usable?: boolean | null
+          what_happened: string
+        }
+        Update: {
+          affected_samples?: string | null
+          category?: string
+          corrective_action?: string | null
+          decision_owner?: string | null
+          experiment_step_id?: string
+          how_discovered?: string | null
+          id?: string
+          likely_impact?: string | null
+          linked_replacement_sample?: string | null
+          preventive_action?: string | null
+          reported_at?: string
+          reported_by?: string | null
+          sample_still_usable?: boolean | null
+          what_happened?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_deviations_experiment_step_id_fkey"
+            columns: ["experiment_step_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experiment_embeddings: {
         Row: {
           content: string | null
@@ -204,6 +476,7 @@ export type Database = {
           byte_size: number | null
           created_at: string | null
           experiment_id: string | null
+          experiment_step_id: string | null
           file_type: string | null
           id: string
           kind: string | null
@@ -218,6 +491,7 @@ export type Database = {
           byte_size?: number | null
           created_at?: string | null
           experiment_id?: string | null
+          experiment_step_id?: string | null
           file_type?: string | null
           id?: string
           kind?: string | null
@@ -232,6 +506,7 @@ export type Database = {
           byte_size?: number | null
           created_at?: string | null
           experiment_id?: string | null
+          experiment_step_id?: string | null
           file_type?: string | null
           id?: string
           kind?: string | null
@@ -248,6 +523,13 @@ export type Database = {
             columns: ["experiment_id"]
             isOneToOne: false
             referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_files_experiment_step_id_fkey"
+            columns: ["experiment_step_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_steps"
             referencedColumns: ["id"]
           },
         ]
@@ -399,6 +681,7 @@ export type Database = {
           primary_outcome: string | null
           project: string | null
           protocol_version: string | null
+          protocol_version_id: string | null
           quantities: Json
           rationale: string | null
           reaction_type: string | null
@@ -452,6 +735,7 @@ export type Database = {
           primary_outcome?: string | null
           project?: string | null
           protocol_version?: string | null
+          protocol_version_id?: string | null
           quantities?: Json
           rationale?: string | null
           reaction_type?: string | null
@@ -504,6 +788,7 @@ export type Database = {
           primary_outcome?: string | null
           project?: string | null
           protocol_version?: string | null
+          protocol_version_id?: string | null
           quantities?: Json
           rationale?: string | null
           reaction_type?: string | null
@@ -541,6 +826,13 @@ export type Database = {
             columns: ["template_version_id"]
             isOneToOne: false
             referencedRelation: "experiment_template_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiments_protocol_version_fk"
+            columns: ["protocol_version_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_versions"
             referencedColumns: ["id"]
           },
         ]

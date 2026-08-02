@@ -30,6 +30,9 @@ type Props = {
   sampleVocab?: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] };
   // quantity_kinds registry rows for QuantitiesEditor (T1.4 D2).
   quantityKinds?: QuantityKind[];
+  // protocol_versions options for the picker (T1.5 D4) — replaces the old
+  // free-text protocol_version input.
+  protocolVersions?: { id: string; label: string }[];
   // Provenance stamps (T1.2 D6) — set by the instantiate/clone pages, never
   // user-editable, carried through as hidden fields to createExperiment.
   templateVersionId?: string | null;
@@ -233,6 +236,7 @@ function ExperimentFormBody({
   vocab,
   sampleVocab,
   quantityKinds,
+  protocolVersions,
   templateVersionId,
   basedOnExperimentId,
   formId,
@@ -349,8 +353,20 @@ function ExperimentFormBody({
           </div>
           <div className="field">
             <label>Protocol version</label>
-            <input name="protocol_version" defaultValue={initial?.protocol_version ?? ""} placeholder="PROT-TBD-v1.0" />
-            <FieldError message={fieldErrors?.protocol_version} />
+            <select name="protocol_version_id" defaultValue={initial?.protocol_version_id ?? ""}>
+              <option value="">—</option>
+              {(protocolVersions ?? []).map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+            {initial?.protocol_version && (
+              <p className="muted" style={{ fontSize: 13, margin: "6px 0 0" }}>
+                Recorded as free text (pre-T1.5): {initial.protocol_version}
+              </p>
+            )}
+            <FieldError message={fieldErrors?.protocol_version_id} />
           </div>
           <div className="field">
             <label>Planned analyses</label>
