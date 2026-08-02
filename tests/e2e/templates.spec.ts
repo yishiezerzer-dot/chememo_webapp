@@ -28,7 +28,7 @@ test("template with a required field blocks instantiation until filled", async (
   const expName = `E2E from template ${Date.now()}`;
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(expName);
   await page.getByRole("button", { name: "Save experiment" }).click();
-  await expect(page.getByText(/required by this template/i)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/required by this template/i).first()).toBeVisible({ timeout: 15000 });
 
   await page.locator('textarea[name="hypothesis"]').fill("Zn accelerates condensation, refilled.");
   await page.getByRole("button", { name: "Save experiment" }).click();
