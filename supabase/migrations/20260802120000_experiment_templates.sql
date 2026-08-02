@@ -80,7 +80,12 @@ create policy experiment_template_versions_read on experiment_template_versions
   for select to authenticated using (true);
 create policy experiment_template_versions_insert on experiment_template_versions
   for insert to authenticated with check (true);
--- Update only while unfrozen; the trigger above is what actually flips
--- frozen_at, this policy just stops any further write once it has.
+-- Update only while unfrozen; USING gates which rows can be targeted at all
+-- (only currently-unfrozen ones), but WITH CHECK deliberately does NOT also
+-- require frozen_at is null on the resulting row — the whole point of
+-- freeze_template_version()'s trigger is to flip frozen_at to now() on
+-- exactly such a row, and requiring it to still be null afterward would
+-- reject the very update the trigger performs (caught by CI's rls job: the
+-- freeze always failed with a 42501 RLS violation until this was corrected).
 create policy experiment_template_versions_update on experiment_template_versions
-  for update to authenticated using (frozen_at is null) with check (frozen_at is null);
+  for update to authenticated using (frozen_at is null) with check (true);
