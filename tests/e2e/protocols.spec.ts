@@ -44,7 +44,9 @@ test("versioned protocol steps: create, link, run, and freeze", async ({ page })
   await expect(protocolSection.getByText("Completed", { exact: true })).toBeVisible();
 
   await protocolSection.getByPlaceholder("Add an observation…").fill("Solution stayed clear.");
-  await protocolSection.getByRole("button", { name: "Add" }).click();
+  // exact: true -- "+ Add deviation" also contains "Add" as a substring, and
+  // Playwright's default string name matching is substring-based.
+  await protocolSection.getByRole("button", { name: "Add", exact: true }).click();
   await expect(protocolSection.getByText("Solution stayed clear.")).toBeVisible();
 
   await protocolSection.getByRole("button", { name: "+ Add deviation" }).click();
