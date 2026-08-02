@@ -355,8 +355,6 @@ Fields:
   "compounds": string[],     // full names, e.g. "Zinc chloride"
   "metals": string[],        // element symbols, e.g. "Zn"
   "ph": number,
-  "concentration": string,
-  "temperature": string,
   "cycles": number,
   "methods": string[],       // only from: ${METHOD_OPTIONS.join(", ")}
   "mz": number[],
@@ -383,8 +381,6 @@ Fields:
   if (arr(j.compounds)) out.compounds = arr(j.compounds);
   if (arr(j.metals)) out.metals = arr(j.metals);
   if (num(j.ph) !== undefined) out.ph = num(j.ph) ?? null;
-  if (str(j.concentration)) out.concentration = str(j.concentration) ?? null;
-  if (str(j.temperature)) out.temperature = str(j.temperature) ?? null;
   if (num(j.cycles) !== undefined) out.cycles = num(j.cycles) ?? null;
   if (arr(j.methods))
     out.methods = arr(j.methods)!.filter((m) => (METHOD_OPTIONS as readonly string[]).includes(m));

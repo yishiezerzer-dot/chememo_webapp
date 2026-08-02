@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { METHOD_OPTIONS, type SampleMatrixRow } from "@/lib/types";
+import { METHOD_OPTIONS, type QuantityKind, type SampleMatrixRow } from "@/lib/types";
 
 // T1.2 §8.2 sample-matrix row and §8.5 control checklist item. All 19
 // columns are free-text strings (no unit typing yet — T1.4); sample_id is
@@ -32,9 +32,20 @@ const controlItemSchema = z.object({
   checked: z.boolean(),
 });
 
-// Shared client/server validation for the experiment form (T0.1). Keep
-// concentration/temperature as free text for now — structured units land in
-// Tier 1 (T1.4); this only stops garbage from reaching the DB silently.
+// T1.4 D1 — one structured physical/concentration value. unit_code is
+// checked against its kind's compatible_units by validateQuantityUnits
+// below, not here — same reason sample_type isn't checked inline in
+// sampleMatrixRowSchema (the allow-list is runtime, per-request data).
+const quantitySchema = z.object({
+  value: z.number({ invalid_type_error: "Value must be a number." }),
+  unit_code: z.string().trim().min(1).max(30),
+  uncertainty: z.number().optional(),
+  qualifier: z.string().trim().max(200).optional(),
+});
+
+// Shared client/server validation for the experiment form (T0.1).
+// concentration/temperature are deliberately absent (T1.4 D4) — they're
+// legacy/display-only now; new structured values go in `quantities` instead.
 export const experimentInputSchema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(300, "Name is too long (max 300 characters)."),
   date: z
@@ -51,8 +62,6 @@ export const experimentInputSchema = z.object({
     .min(-2, "pH must be between -2 and 16.")
     .max(16, "pH must be between -2 and 16.")
     .nullable(),
-  concentration: z.string().trim().max(300, "Too long (max 300 characters).").nullable(),
-  temperature: z.string().trim().max(300, "Too long (max 300 characters).").nullable(),
   cycles: z
     .number({ invalid_type_error: "Cycles must be a number." })
     .int("Cycles must be a whole number.")
@@ -101,6 +110,11 @@ export const experimentInputSchema = z.object({
   sample_matrix: z.array(sampleMatrixRowSchema).max(500, "Too many sample rows."),
   // §8.5 control checklist (T1.2 D3).
   controls: z.array(controlItemSchema).max(100, "Too many control items."),
+  // T1.4 D1 — a map of quantity_kind key -> Quantity. Legacy temperature/
+  // concentration text fields above are untouched (D4); this is new
+  // structured data only. Kind/unit membership checked by
+  // validateQuantityUnits below (runtime allow-list, not a static schema).
+  quantities: z.record(z.string(), quantitySchema),
 });
 
 export type ExperimentInputParsed = z.infer<typeof experimentInputSchema>;
@@ -124,6 +138,26 @@ export function validateSampleMatrixVocab(
     }
     if (row.status && !allowed.sampleStatuses.includes(row.status)) {
       return `"${row.status}" is not a recognized sample status.`;
+    }
+  }
+  return null;
+}
+
+// T1.4 D2/D7 — each quantity's key must be a real, active quantity_kind, and
+// its unit_code must be one of that kind's compatible_units. Checked against
+// the live registry rather than a hardcoded literal union, matching T1.2
+// D2's validateSampleMatrixVocab precedent (the registry is meant to change
+// via an UPDATE, not a code deploy). Returns the first error found, or null.
+export function validateQuantityUnits(
+  quantities: Record<string, { value: number; unit_code: string }>,
+  kinds: QuantityKind[]
+): string | null {
+  const byKey = new Map(kinds.map((k) => [k.key, k]));
+  for (const [key, q] of Object.entries(quantities)) {
+    const kind = byKey.get(key);
+    if (!kind) return `"${key}" is not a recognized quantity.`;
+    if (!kind.compatible_units.includes(q.unit_code)) {
+      return `"${q.unit_code}" is not a valid unit for ${kind.label}.`;
     }
   }
   return null;

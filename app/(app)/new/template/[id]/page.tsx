@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listProjects } from "@/lib/projects/service";
 import { listVocab, listSampleVocab } from "@/lib/experiments/service";
+import { listQuantityKinds } from "@/lib/quantities/service";
 import { listVersions, getLatestVersion } from "@/lib/templates/service";
 import { isLlmEnabled } from "@/lib/llm";
 import { getDraft } from "@/lib/drafts/service";
@@ -19,11 +20,12 @@ export default async function InstantiateTemplatePage({
   const { id } = await params;
   const { v } = await searchParams;
 
-  const [versions, projects, vocab, sampleVocab] = await Promise.all([
+  const [versions, projects, vocab, sampleVocab, quantityKinds] = await Promise.all([
     listVersions(id),
     listProjects(),
     listVocab(),
     listSampleVocab(),
+    listQuantityKinds(),
   ]);
   const version = (v ? versions.find((x) => x.id === v) : null) ?? (await getLatestVersion(id));
   if (!version) notFound();
@@ -56,6 +58,7 @@ export default async function InstantiateTemplatePage({
         extractAction={extractFromNotes}
         vocab={vocab}
         sampleVocab={sampleVocab}
+        quantityKinds={quantityKinds}
         initialFields={version.defaults as Partial<Experiment>}
         templateVersionId={version.id}
         draftKey={draftKey}

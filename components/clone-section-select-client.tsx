@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionResult, DraftKey, Experiment, ExperimentDraft, Project } from "@/lib/types";
+import type { ActionResult, DraftKey, Experiment, ExperimentDraft, Project, QuantityKind } from "@/lib/types";
 import { NewExperimentClient } from "@/components/new-experiment-client";
 
 // T1.2 D6 — groups the copyable §8.1 sections. Files, results/analyses, and
@@ -12,7 +12,10 @@ const GROUPS = [
   {
     key: "chemistry",
     label: "Chemistry",
-    fields: ["compounds", "metals", "ph", "concentration", "temperature", "cycles"] as const,
+    // T1.4 — quantities carries the structured temperature/concentration
+    // data forward; the legacy free-text columns are no longer offered
+    // since the form has no input for them post-T1.4 (D4).
+    fields: ["compounds", "metals", "ph", "quantities", "cycles"] as const,
   },
   { key: "analysis", label: "Analysis methods", fields: ["methods", "mz"] as const },
   {
@@ -52,6 +55,7 @@ export function CloneSectionSelectClient({
   extractAction,
   vocab,
   sampleVocab,
+  quantityKinds,
   draftKey,
   recoveredDraft,
 }: {
@@ -62,6 +66,7 @@ export function CloneSectionSelectClient({
   extractAction: (notes: string) => Promise<Partial<Experiment> | null>;
   vocab?: { compounds: string[]; metals: string[] };
   sampleVocab?: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] };
+  quantityKinds?: QuantityKind[];
   draftKey: DraftKey;
   recoveredDraft?: ExperimentDraft | null;
 }) {
@@ -91,6 +96,7 @@ export function CloneSectionSelectClient({
         extractAction={extractAction}
         vocab={vocab}
         sampleVocab={sampleVocab}
+        quantityKinds={quantityKinds}
         initialFields={initialFields}
         basedOnExperimentId={source.id}
         draftKey={draftKey}

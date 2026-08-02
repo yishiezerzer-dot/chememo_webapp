@@ -9,9 +9,11 @@ import {
   type ExperimentDraft,
   type ExperimentInput,
   type Project,
+  type QuantityKind,
 } from "@/lib/types";
 import { SampleMatrixEditor } from "@/components/sample-matrix-editor";
 import { ControlsChecklist } from "@/components/controls-checklist";
+import { QuantitiesEditor } from "@/components/quantities-editor";
 import { useAutosave, readLocalDraft, type AutosaveState } from "@/lib/use-autosave";
 import { discardDraftAction } from "@/app/(app)/drafts-actions";
 
@@ -26,6 +28,8 @@ type Props = {
   vocab?: { compounds: string[]; metals: string[] };
   // controlled_vocabularies rows for the sample-matrix editor (T1.2 D2).
   sampleVocab?: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] };
+  // quantity_kinds registry rows for QuantitiesEditor (T1.4 D2).
+  quantityKinds?: QuantityKind[];
   // Provenance stamps (T1.2 D6) — set by the instantiate/clone pages, never
   // user-editable, carried through as hidden fields to createExperiment.
   templateVersionId?: string | null;
@@ -228,6 +232,7 @@ function ExperimentFormBody({
   submitLabel,
   vocab,
   sampleVocab,
+  quantityKinds,
   templateVersionId,
   basedOnExperimentId,
   formId,
@@ -469,7 +474,7 @@ function ExperimentFormBody({
           <FieldError message={fieldErrors?.compounds} />
           <TagField name="metals" label="Metals" metal initial={initial?.metals ?? []} suggestions={vocab?.metals} />
           <FieldError message={fieldErrors?.metals} />
-          <div className="grid-3">
+          <div className="grid-2">
             <div className="field">
               <label>pH</label>
               <input name="ph" type="number" step="0.1" defaultValue={initial?.ph ?? ""} placeholder="7.0" />
@@ -480,17 +485,15 @@ function ExperimentFormBody({
               <input name="cycles" type="number" defaultValue={initial?.cycles ?? ""} placeholder="5" />
               <FieldError message={fieldErrors?.cycles} />
             </div>
-            <div className="field">
-              <label>Temperature</label>
-              <input name="temperature" defaultValue={initial?.temperature ?? ""} placeholder="60 °C dry-down" />
-              <FieldError message={fieldErrors?.temperature} />
-            </div>
           </div>
-          <div className="field">
-            <label>Concentration</label>
-            <input name="concentration" defaultValue={initial?.concentration ?? ""} placeholder="50 mM each monomer, 5 mM ZnCl₂" />
-            <FieldError message={fieldErrors?.concentration} />
-          </div>
+          {/* T1.4 D4 — legacy free text stays exactly as recorded, display-only;
+              never silently reinterpreted as a specific structured quantity. */}
+          {(initial?.temperature || initial?.concentration) && (
+            <p className="sec-sub" style={{ margin: "0 0 8px" }}>
+              Recorded as free text (pre-T1.4): {[initial?.temperature, initial?.concentration].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          <QuantitiesEditor initial={initial?.quantities ?? {}} kinds={quantityKinds ?? []} />
         </section>
 
         <section className="fsec glass">

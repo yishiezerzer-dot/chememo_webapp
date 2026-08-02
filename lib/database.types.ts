@@ -137,6 +137,39 @@ export type Database = {
         }
         Relationships: []
       }
+      quantity_kinds: {
+        Row: {
+          active: boolean
+          canonical_unit_code: string
+          category: string
+          compatible_units: string[]
+          key: string
+          label: string
+          sort_order: number
+          standard_field_name: string
+        }
+        Insert: {
+          active?: boolean
+          canonical_unit_code: string
+          category: string
+          compatible_units: string[]
+          key: string
+          label: string
+          sort_order: number
+          standard_field_name: string
+        }
+        Update: {
+          active?: boolean
+          canonical_unit_code?: string
+          category?: string
+          compatible_units?: string[]
+          key?: string
+          label?: string
+          sort_order?: number
+          standard_field_name?: string
+        }
+        Relationships: []
+      }
       experiment_embeddings: {
         Row: {
           content: string | null
@@ -366,6 +399,7 @@ export type Database = {
           primary_outcome: string | null
           project: string | null
           protocol_version: string | null
+          quantities: Json
           rationale: string | null
           reaction_type: string | null
           researcher: string | null
@@ -418,6 +452,7 @@ export type Database = {
           primary_outcome?: string | null
           project?: string | null
           protocol_version?: string | null
+          quantities?: Json
           rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null
@@ -469,6 +504,7 @@ export type Database = {
           primary_outcome?: string | null
           project?: string | null
           protocol_version?: string | null
+          quantities?: Json
           rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null

@@ -5,10 +5,11 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/authorization/policies";
 import * as templatesService from "@/lib/templates/service";
 import { listSampleVocab } from "@/lib/experiments/service";
+import { listQuantityKinds } from "@/lib/quantities/service";
 import { discardDraftAction } from "@/app/(app)/drafts-actions";
 import { toActionResult } from "@/lib/errors";
 import { parseExperimentForm } from "@/lib/experiment-form-parse";
-import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab } from "@/lib/schemas";
+import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab, validateQuantityUnits } from "@/lib/schemas";
 import type { ActionResult, ExperimentInput } from "@/lib/types";
 import { z } from "zod";
 
@@ -64,6 +65,10 @@ export async function saveTemplateVersion(
   if (parsed.data.sample_matrix) {
     const vocabError = validateSampleMatrixVocab(parsed.data.sample_matrix, await listSampleVocab());
     if (vocabError) return { ok: false, error: vocabError };
+  }
+  if (parsed.data.quantities) {
+    const quantityError = validateQuantityUnits(parsed.data.quantities, await listQuantityKinds());
+    if (quantityError) return { ok: false, error: quantityError };
   }
 
   const requiredFields = ((formData.get("required_fields") as string | null) ?? "")

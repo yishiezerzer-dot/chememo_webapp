@@ -4,6 +4,7 @@ import {
   fieldErrorsFromZod,
   projectLabelSchema,
   validateSampleMatrixVocab,
+  validateQuantityUnits,
 } from "@/lib/schemas";
 
 const validInput = {
@@ -15,8 +16,6 @@ const validInput = {
   compounds: ["Histidine"],
   metals: ["Zn"],
   ph: 7,
-  concentration: "50 mM",
-  temperature: "60 °C",
   cycles: 5,
   methods: ["NMR"] as const,
   mz: [297, 595],
@@ -41,6 +40,7 @@ const validInput = {
   sample_storage_plan: null,
   sample_matrix: [] as const,
   controls: [] as const,
+  quantities: {},
 };
 
 const sampleRow = {
@@ -119,6 +119,40 @@ describe("experimentInputSchema", () => {
       controls: [{ label: "Fresh mixture control", checked: false }],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a well-formed quantities map", () => {
+    const result = experimentInputSchema.safeParse({
+      ...validInput,
+      quantities: { temperature: { value: 60, unit_code: "Cel" } },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a quantity whose value isn't a number", () => {
+    const result = experimentInputSchema.safeParse({
+      ...validInput,
+      quantities: { temperature: { value: "hot", unit_code: "Cel" } },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("validateQuantityUnits", () => {
+  const kinds = [
+    { key: "temperature", label: "Temperature", category: "physical", canonical_unit_code: "Cel", compatible_units: ["Cel", "degF", "K"], standard_field_name: "temperature_C", sort_order: 1, active: true },
+  ];
+
+  it("passes for a recognized kind and compatible unit", () => {
+    expect(validateQuantityUnits({ temperature: { value: 60, unit_code: "Cel" } }, kinds)).toBeNull();
+  });
+
+  it("rejects an unrecognized quantity kind", () => {
+    expect(validateQuantityUnits({ made_up: { value: 1, unit_code: "Cel" } }, kinds)).toMatch(/made_up/);
+  });
+
+  it("rejects a unit not compatible with the kind", () => {
+    expect(validateQuantityUnits({ temperature: { value: 60, unit_code: "mM" } }, kinds)).toMatch(/mM/);
   });
 });
 

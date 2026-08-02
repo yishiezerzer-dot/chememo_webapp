@@ -27,6 +27,14 @@ export function parseExperimentForm(formData: FormData) {
       return [];
     }
   };
+  const jsonObject = (k: string) => {
+    try {
+      const v = JSON.parse((formData.get(k) as string | null) || "{}");
+      return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+    } catch {
+      return {};
+    }
+  };
 
   const methods = METHOD_OPTIONS.filter((m) => formData.get(`method:${m}`) === "on");
 
@@ -39,8 +47,6 @@ export function parseExperimentForm(formData: FormData) {
     compounds: list("compounds"),
     metals: list("metals"),
     ph: num("ph"),
-    concentration: str("concentration"),
-    temperature: str("temperature"),
     cycles: num("cycles"),
     methods,
     mz: numList("mz"),
@@ -65,6 +71,13 @@ export function parseExperimentForm(formData: FormData) {
     sample_storage_plan: str("sample_storage_plan"),
     sample_matrix: jsonList("sample_matrix"),
     controls: jsonList("controls"),
+    // T1.4 D1/D4 — the new structured map. Note temperature/concentration
+    // (the old free-text columns) are deliberately NOT parsed here anymore:
+    // there's no form input for them post-T1.4, and including them as `null`
+    // would silently wipe legacy text on every save. They're display-only
+    // now, read straight from the loaded Experiment, never round-tripped
+    // through ExperimentInput.
+    quantities: jsonObject("quantities"),
   };
 }
 

@@ -15,6 +15,7 @@ type ExperimentTemplateRow =
 type ExperimentTemplateVersionRow =
   Database["public"]["Tables"]["experiment_template_versions"]["Row"];
 type ExperimentDraftRow = Database["public"]["Tables"]["experiment_drafts"]["Row"];
+type QuantityKindRow = Database["public"]["Tables"]["quantity_kinds"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -62,6 +63,16 @@ export type SampleMatrixRow = {
 // checklist syntax later (T1.11) with no translation (T1.2 D3).
 export type ControlItem = { label: string; checked: boolean };
 
+// T1.4 D1 — one physical/concentration value. unit_code is checked against
+// its kind's compatible_units at write time (lib/schemas.ts), the same
+// allow-list pattern T1.2 D2 already established for sample_type.
+export type Quantity = { value: number; unit_code: string; uncertainty?: number; qualifier?: string };
+
+// T1.4 D2 — read side of the quantity_kinds seed registry (T1.1 G11's
+// pattern: reference data as rows, not an enum, so a standard revision is
+// an UPDATE not a migration).
+export type QuantityKind = QuantityKindRow;
+
 // experiments.compounds/metals/methods/mz and created_at/updated_at are
 // nullable at the DB level (no NOT NULL constraint) but every write path sets
 // them (`default '{}'` / `now()`, never written null) — narrowed here to match
@@ -70,6 +81,8 @@ export type ControlItem = { label: string; checked: boolean };
 // primary key) — narrowed the same way (T1.1, standard §6.2).
 // sample_matrix/controls are stored as jsonb (generic `Json`) but every write
 // path sends the typed array shape above (T1.2, D2/D3) — narrowed the same way.
+// quantities is stored the same way (T1.4, D1) — a map of quantity_kind key
+// to Quantity, never the bare Json the generated type would otherwise imply.
 export type Experiment = Omit<
   ExperimentRow,
   | "compounds"
@@ -81,6 +94,7 @@ export type Experiment = Omit<
   | "short_code"
   | "sample_matrix"
   | "controls"
+  | "quantities"
 > & {
   compounds: string[];
   metals: string[];
@@ -91,6 +105,7 @@ export type Experiment = Omit<
   short_code: string;
   sample_matrix: SampleMatrixRow[];
   controls: ControlItem[];
+  quantities: Record<string, Quantity>;
 };
 
 // A prior state of an experiment, captured by the update trigger (audit #24).
@@ -130,6 +145,10 @@ export type ExperimentLockEvent = Omit<ExperimentLockEventRow, "event"> & {
 // provenance is never a plain form field): the instantiate/clone actions set
 // them explicitly before the first save, the same way status never moves
 // through a plain form submit.
+// concentration/temperature (the pre-T1.4 free-text columns) are also
+// absent — they're legacy/display-only now (T1.4 D4): read straight from
+// Experiment, never written again, so an update payload can never silently
+// wipe them.
 export type ExperimentInput = {
   name: string;
   date: string | null;
@@ -139,8 +158,6 @@ export type ExperimentInput = {
   compounds: string[];
   metals: string[];
   ph: number | null;
-  concentration: string | null;
-  temperature: string | null;
   cycles: number | null;
   methods: string[];
   mz: number[];
@@ -165,6 +182,10 @@ export type ExperimentInput = {
   protocol_version: string | null;
   planned_analyses: string | null;
   sample_storage_plan: string | null;
+  // T1.4 D1/D4 — new structured values only; the legacy temperature/
+  // concentration text columns above are untouched, display-only for
+  // pre-T1.4 records.
+  quantities: Record<string, Quantity>;
 };
 
 export type ExperimentStatus = Database["public"]["Enums"]["experiment_status"];

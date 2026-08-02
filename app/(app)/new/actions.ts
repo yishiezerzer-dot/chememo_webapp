@@ -6,11 +6,12 @@ import { requireUser } from "@/lib/authorization/policies";
 import { extractExperimentFields } from "@/lib/llm";
 import * as experimentsService from "@/lib/experiments/service";
 import { getTemplateVersion } from "@/lib/templates/service";
+import { listQuantityKinds } from "@/lib/quantities/service";
 import { discardDraftAction } from "@/app/(app)/drafts-actions";
 import { toActionResult } from "@/lib/errors";
 import { parseExperimentForm, isEmptyValue } from "@/lib/experiment-form-parse";
 import { type ActionResult, type ExperimentInput } from "@/lib/types";
-import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab } from "@/lib/schemas";
+import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab, validateQuantityUnits } from "@/lib/schemas";
 
 // LLM-assisted entry: parse pasted notes into structured fields for the user to
 // confirm/edit. No-ops (null) until a key exists (Phase 10). Never saves.
@@ -30,6 +31,11 @@ async function checkSampleMatrixVocab(
   return validateSampleMatrixVocab(rows, await experimentsService.listSampleVocab());
 }
 
+// T1.4 D2/D7 — same pattern, for quantities' kind/unit membership.
+async function checkQuantityUnits(quantities: ExperimentInput["quantities"]): Promise<string | null> {
+  return validateQuantityUnits(quantities, await listQuantityKinds());
+}
+
 export async function createExperiment(
   _prevState: ActionResult | null,
   formData: FormData
@@ -47,6 +53,9 @@ export async function createExperiment(
 
   const vocabError = await checkSampleMatrixVocab(parsed.data.sample_matrix);
   if (vocabError) return { ok: false, error: vocabError };
+
+  const quantityError = await checkQuantityUnits(parsed.data.quantities);
+  if (quantityError) return { ok: false, error: quantityError };
 
   // Provenance (T1.2 D6/D10) — never part of the schema; set by the
   // instantiate/clone pages as hidden fields, read directly here.
@@ -101,6 +110,9 @@ export async function updateExperiment(
 
   const vocabError = await checkSampleMatrixVocab(parsed.data.sample_matrix);
   if (vocabError) return { ok: false, error: vocabError };
+
+  const quantityError = await checkQuantityUnits(parsed.data.quantities);
+  if (quantityError) return { ok: false, error: quantityError };
 
   // T1.3 D4 — optimistic concurrency: the edit page stamps the record's
   // updated_at at render time; a mismatch means someone else's save landed

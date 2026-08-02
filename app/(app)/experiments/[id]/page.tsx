@@ -60,13 +60,26 @@ export default async function ExperimentDetailPage({
     href: f.kind === "link" ? f.url : f.storage_path ? signed[f.storage_path] ?? null : null,
   }));
 
+  // T1.4 — structured quantities.temperature wins once set; the legacy free
+  // text (pre-T1.4) still displays for records that predate this (D4).
+  const temperatureQty = e.quantities.temperature;
+  const concentrationEntries = Object.entries(e.quantities).filter(([k]) => k !== "temperature" && k !== "duration" && k !== "volume");
+
   const specs: { k: string; v: string; big?: boolean }[] = [
     { k: "pH", v: e.ph !== null ? String(e.ph) : "—", big: true },
     { k: "Cycles", v: e.cycles !== null ? String(e.cycles) : "—", big: true },
     { k: "Date", v: e.date ?? "—" },
     { k: "Researcher", v: e.researcher ?? "—" },
-    { k: "Temperature", v: e.temperature ?? "—" },
-    { k: "Concentration", v: e.concentration ?? "—" },
+    {
+      k: "Temperature",
+      v: temperatureQty ? `${temperatureQty.value} ${temperatureQty.unit_code}` : e.temperature ?? "—",
+    },
+    ...(concentrationEntries.length > 0
+      ? concentrationEntries.map(([key, q]) => ({
+          k: key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()),
+          v: `${q.value} ${q.unit_code}`,
+        }))
+      : [{ k: "Concentration", v: e.concentration ?? "—" }]),
   ];
 
   return (
