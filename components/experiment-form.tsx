@@ -1,9 +1,19 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
-import { METHOD_OPTIONS, type ActionResult, type Experiment, type Project } from "@/lib/types";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import {
+  METHOD_OPTIONS,
+  type ActionResult,
+  type DraftKey,
+  type Experiment,
+  type ExperimentDraft,
+  type ExperimentInput,
+  type Project,
+} from "@/lib/types";
 import { SampleMatrixEditor } from "@/components/sample-matrix-editor";
 import { ControlsChecklist } from "@/components/controls-checklist";
+import { useAutosave, readLocalDraft, type AutosaveState } from "@/lib/use-autosave";
+import { discardDraftAction } from "@/app/(app)/drafts-actions";
 
 type Props = {
   projects: Project[];
@@ -27,6 +37,15 @@ type Props = {
   // A template's defaults have no fixed experiment name to require (T1.2) —
   // the templates editor sets this false. Defaults true for every other caller.
   nameRequired?: boolean;
+  // T1.3 — every caller supplies a draft key (D2): the experiment's own id
+  // when editing, a deterministic route-derived string everywhere else.
+  draftKey: DraftKey;
+  // The server-side draft for this key, fetched by the page alongside its
+  // other data (cross-device recovery backstop, D3).
+  recoveredDraft?: ExperimentDraft | null;
+  // PasteNotes' current text (a sibling component, not a descendant of this
+  // <form> — T1.3 D7). Only ever set on the new-experiment entry points.
+  rawNote?: string;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -114,7 +133,95 @@ function toDatetimeLocal(v?: string | null): string {
   return v ? v.slice(0, 16) : "";
 }
 
-export function ExperimentForm({
+const SAVE_STATE_LABEL: Record<AutosaveState, string> = {
+  idle: "",
+  saving: "Saving…",
+  saved: "Saved",
+  offline: "Offline — will retry",
+  conflict: "Someone else changed this — reload to see the latest version",
+};
+
+// T1.3 — outer wrapper. Owns the "recover an unsaved draft?" banner and the
+// restore mechanism: TagField/SampleMatrixEditor/ControlsChecklist and the
+// `methods` checkboxes all seed their own state once at mount, so a restore
+// has to remount the entire form body (ExperimentFormBody, keyed below), not
+// just patch the `initial` prop — patching alone wouldn't reach any of them.
+export function ExperimentForm(props: Props) {
+  const { draftKey, recoveredDraft, initial } = props;
+  const [restoreKey, setRestoreKey] = useState(0);
+  const [restoredFields, setRestoredFields] = useState<Partial<ExperimentInput> | null>(null);
+  const [banner, setBanner] = useState<{ fields: Partial<ExperimentInput>; rawNote: string | null; savedAt: string } | null>(
+    null
+  );
+
+  // Fresh check per mount only (a new page load / crash recovery moment),
+  // not on every keystroke. Offers whichever draft is newer: the synchronous
+  // localStorage mirror (same device, no debounce lag) or the server draft.
+  // localStorage is a genuine external system unavailable during SSR (hence
+  // an effect, not a lazy useState initializer — that would mismatch between
+  // the server and client's first render); this is precisely the "subscribe
+  // to an external system, setState when it changes" case the lint rule's
+  // own docs carve out, not a render-derivable value being pushed to state.
+  useEffect(() => {
+    const local = readLocalDraft(draftKey);
+    const localTime = local?.savedAt ?? 0;
+    const serverTime = recoveredDraft ? new Date(recoveredDraft.updated_at).getTime() : 0;
+    if (local && Object.keys(local.fields).length > 0 && localTime >= serverTime) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBanner({ fields: local.fields as Partial<ExperimentInput>, rawNote: local.rawNote, savedAt: new Date(localTime).toISOString() });
+    } else if (recoveredDraft && Object.keys(recoveredDraft.fields).length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBanner({ fields: recoveredDraft.fields, rawNote: recoveredDraft.raw_note, savedAt: recoveredDraft.updated_at });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function restore() {
+    if (!banner) return;
+    const fields = { ...banner.fields };
+    // D7 (scoped) — a recovered raw note that hasn't otherwise been claimed
+    // rides into Notes, since PasteNotes is a sibling component this form
+    // doesn't control and can't repopulate directly.
+    if (banner.rawNote && !fields.notes) {
+      fields.notes = `[Recovered pasted note]\n${banner.rawNote}`;
+    }
+    setRestoredFields(fields);
+    setBanner(null);
+    setRestoreKey((k) => k + 1);
+    // The stale draft's job is done once its content is back in the visible
+    // form — otherwise a reload before the next autosave tick would re-offer
+    // this same banner even though the user already restored it.
+    void discardDraftAction(draftKey);
+  }
+
+  function discardBanner() {
+    setBanner(null);
+    void discardDraftAction(draftKey);
+  }
+
+  const effectiveInitial = restoredFields ? { ...initial, ...restoredFields } : initial;
+
+  return (
+    <>
+      {banner && (
+        <div className="obs-box glass" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+          <p style={{ margin: 0, flex: 1 }}>
+            Recover an unsaved draft from {new Date(banner.savedAt).toLocaleString()}?
+          </p>
+          <button type="button" className="btn btn-sm" onClick={restore}>
+            Restore
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={discardBanner}>
+            Discard
+          </button>
+        </div>
+      )}
+      <ExperimentFormBody key={restoreKey} {...props} initial={effectiveInitial} />
+    </>
+  );
+}
+
+function ExperimentFormBody({
   projects,
   action,
   initial,
@@ -125,12 +232,25 @@ export function ExperimentForm({
   basedOnExperimentId,
   formId,
   nameRequired = true,
+  draftKey,
+  rawNote,
 }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [state, setState] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
   const criteriaLocked = !!initial?.acceptance_criteria_locked_at;
+  const formRef = useRef<HTMLFormElement>(null);
+  const rawNoteRef = useRef(rawNote);
+  useEffect(() => {
+    rawNoteRef.current = rawNote;
+  }, [rawNote]);
+
+  const { state: saveState, markConflict, markSaved } = useAutosave({
+    formRef,
+    draftKey,
+    getRawNote: () => rawNoteRef.current ?? null,
+  });
 
   function toggleMethod(m: string) {
     setMethods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
@@ -144,14 +264,23 @@ export function ExperimentForm({
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
-      setState(await action(state, formData));
+      const result = await action(state, formData);
+      setState(result);
+      if (result.ok) markSaved();
+      else if (result.conflict) markConflict();
     });
   }
 
   return (
-    <form id={formId} onSubmit={handleSubmit} className="form-shell">
+    <form ref={formRef} id={formId} onSubmit={handleSubmit} className="form-shell">
       {templateVersionId && <input type="hidden" name="template_version_id" value={templateVersionId} />}
       {basedOnExperimentId && <input type="hidden" name="based_on_experiment_id" value={basedOnExperimentId} />}
+      <input type="hidden" name="base_updated_at" value={initial?.updated_at ?? ""} />
+      {/* T1.3 — lets createExperiment discard the matching draft on success;
+          only meaningful on the new-experiment entry points (D2). */}
+      {"clientDraftId" in draftKey && (
+        <input type="hidden" name="draft_client_id" value={draftKey.clientDraftId} />
+      )}
       <div className="form-sections">
         <details className="fsec glass" open>
           <summary>
@@ -439,10 +568,29 @@ export function ExperimentForm({
       <aside className="form-aside">
         <div className="summary-card glass">
           <h4>Ready to save?</h4>
-          {state && !state.ok && (
+          {state && !state.ok ? (
             <p className="field-error" role="alert" style={{ marginBottom: 10 }}>
               {state.error}
+              {state.conflict && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ display: "inline-flex", marginLeft: 6 }}
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload
+                  </button>
+                </>
+              )}
             </p>
+          ) : (
+            saveState !== "idle" && (
+              <p className="sec-sub" style={{ margin: "0 0 8px" }}>
+                {SAVE_STATE_LABEL[saveState]}
+              </p>
+            )
           )}
           <p className="sec-sub" style={{ margin: "0 0 14px" }}>
             The record is typed and searchable immediately. You can edit it later.

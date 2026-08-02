@@ -219,12 +219,23 @@ export async function createExperiment(
 export async function updateExperiment(
   supabase: Supabase,
   id: string,
-  input: ExperimentInput
-): Promise<void> {
-  // RLS enforces ownership; this update no-ops for non-owners.
-  const { error } = await supabase.from("experiments").update(input).eq("id", id);
+  input: ExperimentInput,
+  // T1.3 D4 — optimistic concurrency. When provided, the update only applies
+  // if the row's updated_at still matches what the edit page rendered; a
+  // 0-row result then means someone else's save landed in between, not a
+  // permission or validation failure. RLS already scopes this to the owner's
+  // own row, so a 0-row result here is never "wrong owner" — the edit page
+  // redirects non-owners away before this action can even be reached.
+  baseUpdatedAt?: string | null
+): Promise<{ conflict: boolean }> {
+  let query = supabase.from("experiments").update(input).eq("id", id);
+  if (baseUpdatedAt) query = query.eq("updated_at", baseUpdatedAt);
+  const { data, error } = await query.select("id");
   if (error) {
     throw new AppError("conflict", "Could not update the experiment.", { cause: error });
+  }
+  if (baseUpdatedAt && (data?.length ?? 0) === 0) {
+    return { conflict: true };
   }
 
   // Re-embed the edited record so semantic search reflects the changes.
@@ -242,6 +253,8 @@ export async function updateExperiment(
     .then(({ error: delErr }) => {
       if (delErr) logError("summary-invalidate", `update ${id} failed`, { error: delErr });
     });
+
+  return { conflict: false };
 }
 
 export async function softDeleteExperiment(supabase: Supabase, id: string): Promise<void> {

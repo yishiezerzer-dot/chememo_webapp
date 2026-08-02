@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getExperiment, listVocab, listSampleVocab } from "@/lib/experiments/service";
 import { listProjects } from "@/lib/projects/service";
 import { isLlmEnabled } from "@/lib/llm";
+import { getDraft } from "@/lib/drafts/service";
 import { createExperiment, extractFromNotes } from "../../actions";
 import { CloneSectionSelectClient } from "@/components/clone-section-select-client";
 
@@ -11,11 +12,13 @@ export default async function CloneExperimentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects, vocab, sampleVocab] = await Promise.all([
+  const draftKey = { clientDraftId: `new:clone:${id}` } as const;
+  const [result, projects, vocab, sampleVocab, recoveredDraft] = await Promise.all([
     getExperiment(id),
     listProjects(),
     listVocab(),
     listSampleVocab(),
+    getDraft(draftKey),
   ]);
   if (!result) notFound();
 
@@ -33,6 +36,8 @@ export default async function CloneExperimentPage({
         extractAction={extractFromNotes}
         vocab={vocab}
         sampleVocab={sampleVocab}
+        draftKey={draftKey}
+        recoveredDraft={recoveredDraft}
       />
     </div>
   );

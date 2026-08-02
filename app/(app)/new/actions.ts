@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/authorization/policies";
 import { extractExperimentFields } from "@/lib/llm";
 import * as experimentsService from "@/lib/experiments/service";
 import { getTemplateVersion } from "@/lib/templates/service";
+import { discardDraftAction } from "@/app/(app)/drafts-actions";
 import { toActionResult } from "@/lib/errors";
 import { parseExperimentForm, isEmptyValue } from "@/lib/experiment-form-parse";
 import { type ActionResult, type ExperimentInput } from "@/lib/types";
@@ -74,6 +75,10 @@ export async function createExperiment(
     return toActionResult("createExperiment", e);
   }
 
+  // T1.3 — the draft's job is done once the real record exists.
+  const draftClientId = (formData.get("draft_client_id") as string | null) || null;
+  if (draftClientId) void discardDraftAction({ clientDraftId: draftClientId });
+
   revalidatePath("/experiments");
   redirect(`/experiments/${id}`);
 }
@@ -97,11 +102,26 @@ export async function updateExperiment(
   const vocabError = await checkSampleMatrixVocab(parsed.data.sample_matrix);
   if (vocabError) return { ok: false, error: vocabError };
 
+  // T1.3 D4 — optimistic concurrency: the edit page stamps the record's
+  // updated_at at render time; a mismatch means someone else's save landed
+  // in between (D5: block and ask, never silently overwrite).
+  const baseUpdatedAt = (formData.get("base_updated_at") as string | null) || null;
+
+  let result: { conflict: boolean };
   try {
-    await experimentsService.updateExperiment(supabase, id, parsed.data);
+    result = await experimentsService.updateExperiment(supabase, id, parsed.data, baseUpdatedAt);
   } catch (e) {
     return toActionResult("updateExperiment", e);
   }
+  if (result.conflict) {
+    return {
+      ok: false,
+      conflict: true,
+      error: "Someone else changed this experiment since you started editing.",
+    };
+  }
+
+  void discardDraftAction({ targetExperimentId: id });
 
   revalidatePath(`/experiments/${id}`);
   revalidatePath("/experiments");

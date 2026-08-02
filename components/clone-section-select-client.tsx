@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionResult, Experiment, Project } from "@/lib/types";
+import type { ActionResult, DraftKey, Experiment, ExperimentDraft, Project } from "@/lib/types";
 import { NewExperimentClient } from "@/components/new-experiment-client";
 
 // T1.2 D6 — groups the copyable §8.1 sections. Files, results/analyses, and
@@ -52,6 +52,8 @@ export function CloneSectionSelectClient({
   extractAction,
   vocab,
   sampleVocab,
+  draftKey,
+  recoveredDraft,
 }: {
   source: Experiment;
   projects: Project[];
@@ -60,6 +62,8 @@ export function CloneSectionSelectClient({
   extractAction: (notes: string) => Promise<Partial<Experiment> | null>;
   vocab?: { compounds: string[]; metals: string[] };
   sampleVocab?: { sampleTypes: string[]; reactionModes: string[]; sampleStatuses: string[] };
+  draftKey: DraftKey;
+  recoveredDraft?: ExperimentDraft | null;
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(GROUPS.map((g) => [g.key, true]))
@@ -89,6 +93,8 @@ export function CloneSectionSelectClient({
         sampleVocab={sampleVocab}
         initialFields={initialFields}
         basedOnExperimentId={source.id}
+        draftKey={draftKey}
+        recoveredDraft={recoveredDraft}
       />
     );
   }

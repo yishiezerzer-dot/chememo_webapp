@@ -14,14 +14,18 @@ type ExperimentTemplateRow =
   Database["public"]["Tables"]["experiment_templates"]["Row"];
 type ExperimentTemplateVersionRow =
   Database["public"]["Tables"]["experiment_template_versions"]["Row"];
+type ExperimentDraftRow = Database["public"]["Tables"]["experiment_drafts"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 // Result shape for user-facing server actions so the client can toast a
 // friendly message instead of throwing to the error boundary.
+// `conflict` (T1.3 D4/D5) distinguishes "someone else saved a change since
+// you started editing" from an ordinary validation/server error, so the UI
+// can show "reload" instead of a generic field error.
 export type ActionResult =
   | { ok: true }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+  | { ok: false; error: string; fieldErrors?: Record<string, string>; conflict?: boolean };
 
 // T1.2, §8.2: the 19 required sample-matrix columns, one row per sample.
 // sample_id is blank on a template default and on a fresh clone (D2/D6 in
@@ -191,6 +195,30 @@ export type ExperimentTemplateVersion = Omit<
   created_at: string;
   defaults: Partial<ExperimentInput>;
   required_fields: (keyof ExperimentInput)[];
+};
+
+// T1.3 D1/D2 — private scratch space, never validated against
+// experimentInputSchema (half-typed/invalid-shaped data is the normal case).
+// Exactly one of targetExperimentId/clientDraftId is set, matching the DB
+// check constraint: editing an existing record keys on its real id; every
+// other entry point (blank/template/clone/template-editor) keys on a
+// deterministic, route-derived string (D2).
+// T1.3 D2 — exactly one of these is ever set, matching the DB check
+// constraint. Defined here (not in lib/drafts/service.ts, which has
+// `import "server-only"`) so client components can import the type without
+// pulling a server-only sentinel into the client bundle.
+export type DraftKey = { targetExperimentId: string } | { clientDraftId: string };
+
+export type ExperimentDraft = Omit<
+  ExperimentDraftRow,
+  "target_experiment_id" | "client_draft_id" | "fields" | "raw_note" | "base_updated_at" | "created_at"
+> & {
+  target_experiment_id: string | null;
+  client_draft_id: string | null;
+  fields: Partial<ExperimentInput>;
+  raw_note: string | null;
+  base_updated_at: string | null;
+  created_at: string;
 };
 
 export const METHOD_OPTIONS = [

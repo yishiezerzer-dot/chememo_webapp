@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionResult, Experiment, Project } from "@/lib/types";
+import type { ActionResult, DraftKey, Experiment, ExperimentDraft, Project } from "@/lib/types";
 import { ExperimentForm } from "@/components/experiment-form";
 import { PasteNotes } from "@/components/paste-notes";
 
@@ -15,6 +15,8 @@ export function NewExperimentClient({
   initialFields,
   templateVersionId,
   basedOnExperimentId,
+  draftKey,
+  recoveredDraft,
 }: {
   projects: Project[];
   aiEnabled: boolean;
@@ -28,10 +30,15 @@ export function NewExperimentClient({
   initialFields?: Partial<Experiment>;
   templateVersionId?: string | null;
   basedOnExperimentId?: string | null;
+  // T1.3 — draft key for this entry point (D2) and its server-fetched draft,
+  // if any (D3's cross-device backstop).
+  draftKey: DraftKey;
+  recoveredDraft?: ExperimentDraft | null;
 }) {
   const [initial, setInitial] = useState<Partial<Experiment> | undefined>(initialFields);
   // Bump the key so the (uncontrolled) form remounts with pre-filled defaults.
   const [version, setVersion] = useState(0);
+  const [rawNote, setRawNote] = useState("");
 
   return (
     <>
@@ -42,6 +49,7 @@ export function NewExperimentClient({
           setInitial(fields);
           setVersion((v) => v + 1);
         }}
+        onNotesChange={setRawNote}
       />
       <ExperimentForm
         key={version}
@@ -53,6 +61,9 @@ export function NewExperimentClient({
         sampleVocab={sampleVocab}
         templateVersionId={templateVersionId}
         basedOnExperimentId={basedOnExperimentId}
+        draftKey={draftKey}
+        recoveredDraft={recoveredDraft}
+        rawNote={rawNote}
       />
     </>
   );

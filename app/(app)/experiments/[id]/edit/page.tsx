@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getExperiment, listVocab, listSampleVocab } from "@/lib/experiments/service";
 import { listProjects } from "@/lib/projects/service";
+import { getDraft } from "@/lib/drafts/service";
 import { updateExperiment } from "@/app/(app)/new/actions";
 import { reopenExperiment } from "../lifecycle-actions";
 import { ExperimentForm } from "@/components/experiment-form";
@@ -15,11 +16,13 @@ export default async function EditExperimentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects, vocab, sampleVocab] = await Promise.all([
+  const draftKey = { targetExperimentId: id } as const;
+  const [result, projects, vocab, sampleVocab, recoveredDraft] = await Promise.all([
     getExperiment(id),
     listProjects(),
     listVocab(),
     listSampleVocab(),
+    getDraft(draftKey),
   ]);
   if (!result) notFound();
 
@@ -69,6 +72,8 @@ export default async function EditExperimentPage({
         submitLabel="Save changes"
         vocab={vocab}
         sampleVocab={sampleVocab}
+        draftKey={draftKey}
+        recoveredDraft={recoveredDraft}
       />
     </div>
   );

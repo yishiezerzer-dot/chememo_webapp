@@ -4,6 +4,7 @@ import { listProjects } from "@/lib/projects/service";
 import { listVocab, listSampleVocab } from "@/lib/experiments/service";
 import { listVersions, getLatestVersion } from "@/lib/templates/service";
 import { isLlmEnabled } from "@/lib/llm";
+import { getDraft } from "@/lib/drafts/service";
 import { NewExperimentClient } from "@/components/new-experiment-client";
 import { createExperiment, extractFromNotes } from "../../actions";
 import type { Experiment } from "@/lib/types";
@@ -26,6 +27,9 @@ export default async function InstantiateTemplatePage({
   ]);
   const version = (v ? versions.find((x) => x.id === v) : null) ?? (await getLatestVersion(id));
   if (!version) notFound();
+
+  const draftKey = { clientDraftId: `new:template:${version.id}` } as const;
+  const recoveredDraft = await getDraft(draftKey);
 
   return (
     <div>
@@ -54,6 +58,8 @@ export default async function InstantiateTemplatePage({
         sampleVocab={sampleVocab}
         initialFields={version.defaults as Partial<Experiment>}
         templateVersionId={version.id}
+        draftKey={draftKey}
+        recoveredDraft={recoveredDraft}
       />
     </div>
   );

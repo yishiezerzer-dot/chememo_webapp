@@ -9,12 +9,19 @@ export function PasteNotes({
   aiEnabled,
   extractAction,
   onExtract,
+  onNotesChange,
+  initialNotes,
 }: {
   aiEnabled: boolean;
   extractAction: Extract;
   onExtract: (fields: Partial<Experiment>) => void;
+  // T1.3 D7 — fired on every keystroke so the raw text can ride along with
+  // the rest of the form's autosave, even though this textarea is a sibling
+  // of <ExperimentForm>'s <form>, not a descendant of it.
+  onNotesChange?: (text: string) => void;
+  initialNotes?: string;
 }) {
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(initialNotes ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -47,7 +54,10 @@ export function PasteNotes({
       <textarea
         rows={4}
         value={notes}
-        onChange={(e) => setNotes(e.target.value)}
+        onChange={(e) => {
+          setNotes(e.target.value);
+          onNotesChange?.(e.target.value);
+        }}
         disabled={!aiEnabled || busy}
         placeholder="e.g. His + TGA + 5mM ZnCl2, pH 7, 60C dry-down x5 cycles, LC-MS neg, saw m/z 297, yellowing + precipitate on rehydration…"
       />

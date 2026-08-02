@@ -219,6 +219,50 @@ export type Database = {
           },
         ]
       }
+      experiment_drafts: {
+        Row: {
+          base_updated_at: string | null
+          client_draft_id: string | null
+          created_at: string
+          fields: Json
+          id: string
+          owner_id: string
+          raw_note: string | null
+          target_experiment_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          base_updated_at?: string | null
+          client_draft_id?: string | null
+          created_at?: string
+          fields?: Json
+          id?: string
+          owner_id: string
+          raw_note?: string | null
+          target_experiment_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          base_updated_at?: string | null
+          client_draft_id?: string | null
+          created_at?: string
+          fields?: Json
+          id?: string
+          owner_id?: string
+          raw_note?: string | null
+          target_experiment_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_drafts_target_experiment_id_fkey"
+            columns: ["target_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experiment_lock_events: {
         Row: {
           actor_id: string | null

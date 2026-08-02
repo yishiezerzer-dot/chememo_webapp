@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { listTemplates, getLatestVersion } from "@/lib/templates/service";
 import { listProjects } from "@/lib/projects/service";
 import { listVocab, listSampleVocab } from "@/lib/experiments/service";
+import { getDraft } from "@/lib/drafts/service";
 import { ExperimentForm } from "@/components/experiment-form";
 import { saveTemplateVersion } from "../../actions";
 import type { Experiment } from "@/lib/types";
@@ -14,12 +15,14 @@ export default async function EditTemplatePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [templates, latest, projects, vocab, sampleVocab] = await Promise.all([
+  const draftKey = { clientDraftId: `template-edit:${id}` } as const;
+  const [templates, latest, projects, vocab, sampleVocab, recoveredDraft] = await Promise.all([
     listTemplates(true),
     getLatestVersion(id),
     listProjects(),
     listVocab(),
     listSampleVocab(),
+    getDraft(draftKey),
   ]);
   const template = templates.find((t) => t.id === id);
   if (!template) notFound();
@@ -61,6 +64,8 @@ export default async function EditTemplatePage({
         submitLabel="Save template version"
         vocab={vocab}
         sampleVocab={sampleVocab}
+        draftKey={draftKey}
+        recoveredDraft={recoveredDraft}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/authorization/policies";
 import * as templatesService from "@/lib/templates/service";
 import { listSampleVocab } from "@/lib/experiments/service";
+import { discardDraftAction } from "@/app/(app)/drafts-actions";
 import { toActionResult } from "@/lib/errors";
 import { parseExperimentForm } from "@/lib/experiment-form-parse";
 import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab } from "@/lib/schemas";
@@ -75,6 +76,8 @@ export async function saveTemplateVersion(
   } catch (e) {
     return toActionResult("saveTemplateVersion", e);
   }
+
+  void discardDraftAction({ clientDraftId: `template-edit:${templateId}` });
 
   revalidatePath(`/templates/${templateId}/edit`);
   revalidatePath("/templates");
