@@ -28,25 +28,30 @@ test("versioned protocol steps: create, link, run, and freeze", async ({ page })
   await page.getByRole("button", { name: "Save experiment" }).click();
   await page.waitForURL(/\/experiments\/EXP-\d+/);
 
-  await expect(page.getByRole("button", { name: "Instantiate steps" })).toBeVisible();
-  await page.getByRole("button", { name: "Instantiate steps" }).click();
-  await expect(page.getByText("Added 250 µL ACN to the dry residue.")).toBeVisible();
+  // Scoped to the Protocol & steps box — the experiment's own
+  // LifecycleControls also renders a "Start" button (draft -> in_progress)
+  // on this same page, which a plain page-wide getByRole would also match.
+  const protocolSection = page.locator(".obs-box", { has: page.locator("h4", { hasText: "Protocol & steps" }) });
 
-  await page.getByRole("button", { name: "Start" }).click();
-  await expect(page.getByText("In progress")).toBeVisible();
+  await expect(protocolSection.getByRole("button", { name: "Instantiate steps" })).toBeVisible();
+  await protocolSection.getByRole("button", { name: "Instantiate steps" }).click();
+  await expect(protocolSection.getByText("Added 250 µL ACN to the dry residue.")).toBeVisible();
 
-  await page.getByRole("button", { name: "Complete" }).click();
-  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await protocolSection.getByRole("button", { name: "Start" }).click();
+  await expect(protocolSection.getByText("In progress")).toBeVisible();
 
-  await page.getByPlaceholder("Add an observation…").fill("Solution stayed clear.");
-  await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByText("Solution stayed clear.")).toBeVisible();
+  await protocolSection.getByRole("button", { name: "Complete" }).click();
+  await expect(protocolSection.getByText("Completed", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "+ Add deviation" }).click();
-  await page.locator("select[name=category]").selectOption("wrong_solvent");
-  await page.locator("textarea[name=what_happened]").fill("Used ACN instead of the specified solvent.");
-  await page.getByRole("button", { name: "Save deviation" }).click();
-  await expect(page.getByText(/Used ACN instead of the specified solvent\./)).toBeVisible();
+  await protocolSection.getByPlaceholder("Add an observation…").fill("Solution stayed clear.");
+  await protocolSection.getByRole("button", { name: "Add" }).click();
+  await expect(protocolSection.getByText("Solution stayed clear.")).toBeVisible();
+
+  await protocolSection.getByRole("button", { name: "+ Add deviation" }).click();
+  await protocolSection.locator("select[name=category]").selectOption("wrong_solvent");
+  await protocolSection.locator("textarea[name=what_happened]").fill("Used ACN instead of the specified solvent.");
+  await protocolSection.getByRole("button", { name: "Save deviation" }).click();
+  await expect(protocolSection.getByText(/Used ACN instead of the specified solvent\./)).toBeVisible();
 
   const id = page.url().match(/EXP-\d+/)![0];
   await page.goto(`/experiments/${id}`);
