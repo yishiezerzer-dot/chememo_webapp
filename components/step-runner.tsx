@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import type { ActionResult, Quantity, QuantityKind } from "@/lib/types";
-import type { StepDetail } from "@/lib/experiment-steps/service";
+import type { StepDetail, DeviationInput } from "@/lib/experiment-steps/service";
 
 const STATUS_LABEL: Record<string, string> = {
   not_started: "Not started",
@@ -53,12 +53,17 @@ function StepQuantityInput({
   );
 }
 
+// The native <form> here submits to a plain client function (React 19's form
+// action supports that, distinct from a server action) so this component can
+// parse the FormData into a plain DeviationInput itself; the resulting
+// object — not a FormData — is what actually crosses to the server action
+// (T1.5 direct-call convention, steps-actions.ts).
 function DeviationForm({
   deviationCategories,
   onSubmit,
 }: {
   deviationCategories: string[];
-  onSubmit: (formData: FormData) => void;
+  onSubmit: (input: DeviationInput) => void;
 }) {
   const [open, setOpen] = useState(false);
   if (!open) {
@@ -71,7 +76,20 @@ function DeviationForm({
   return (
     <form
       action={(fd) => {
-        onSubmit(fd);
+        const str = (k: string) => {
+          const v = (fd.get(k) as string | null)?.trim();
+          return v ? v : null;
+        };
+        onSubmit({
+          category: str("category") ?? "",
+          what_happened: str("what_happened") ?? "",
+          how_discovered: str("how_discovered"),
+          likely_impact: str("likely_impact"),
+          sample_still_usable: fd.get("sample_still_usable") === "true" ? true : null,
+          corrective_action: str("corrective_action"),
+          preventive_action: str("preventive_action"),
+          affected_samples: str("affected_samples"),
+        });
         setOpen(false);
       }}
       style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}
@@ -123,8 +141,8 @@ function StepCard({
     status: string,
     actual: { ph: number | null; quantities: Record<string, Quantity>; atmosphere: string | null }
   ) => Promise<ActionResult>;
-  recordObservation: (stepId: string, formData: FormData) => Promise<ActionResult>;
-  recordDeviation: (stepId: string, formData: FormData) => Promise<ActionResult>;
+  recordObservation: (stepId: string, note: string) => Promise<ActionResult>;
+  recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
 }) {
   const { step, protocolStep, observations, deviations } = detail;
   const [pending, start] = useTransition();
@@ -236,10 +254,8 @@ function StepCard({
           onClick={() => {
             const note = noteRef.current?.value.trim();
             if (!note) return;
-            const fd = new FormData();
-            fd.set("note", note);
             run(async () => {
-              const res = await recordObservation(step.id, fd);
+              const res = await recordObservation(step.id, note);
               if (res.ok && noteRef.current) noteRef.current.value = "";
               return res;
             });
@@ -260,7 +276,7 @@ function StepCard({
       )}
       <DeviationForm
         deviationCategories={deviationCategories}
-        onSubmit={(fd) => run(() => recordDeviation(step.id, fd))}
+        onSubmit={(input) => run(() => recordDeviation(step.id, input))}
       />
     </div>
   );
@@ -284,8 +300,8 @@ export function StepRunner({
     status: string,
     actual: { ph: number | null; quantities: Record<string, Quantity>; atmosphere: string | null }
   ) => Promise<ActionResult>;
-  recordObservation: (stepId: string, formData: FormData) => Promise<ActionResult>;
-  recordDeviation: (stepId: string, formData: FormData) => Promise<ActionResult>;
+  recordObservation: (stepId: string, note: string) => Promise<ActionResult>;
+  recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
   const { showToast } = useToast();

@@ -8,6 +8,7 @@ import { listQuantityKinds } from "@/lib/quantities/service";
 import { validateQuantityUnits, validateDeviationCategory } from "@/lib/schemas";
 import { toActionResult } from "@/lib/errors";
 import type { ActionResult, Quantity } from "@/lib/types";
+import type { DeviationInput } from "@/lib/experiment-steps/service";
 
 export async function instantiateStepsAction(
   experimentId: string,
@@ -47,17 +48,19 @@ export async function updateStepStatusAction(
   return { ok: true };
 }
 
+// Direct-call convention (D9's note above) — StepRunner never submits a
+// native <form> to this action, so it takes the note as a plain argument.
 export async function recordObservationAction(
   experimentId: string,
   stepId: string,
-  formData: FormData
+  note: string
 ): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
-  const note = ((formData.get("note") as string | null) ?? "").trim();
-  if (!note) return { ok: false, error: "An observation needs a note." };
+  const trimmed = note.trim();
+  if (!trimmed) return { ok: false, error: "An observation needs a note." };
 
   try {
-    await stepsService.recordObservation(supabase, stepId, user.id, note);
+    await stepsService.recordObservation(supabase, stepId, user.id, trimmed);
   } catch (e) {
     return toActionResult("recordObservationAction", e);
   }
@@ -65,39 +68,25 @@ export async function recordObservationAction(
   return { ok: true };
 }
 
+// Same direct-call convention — DeviationForm parses its own native <form>'s
+// FormData client-side (a real form submission, not a server action) and
+// passes the resulting plain object here.
 export async function recordDeviationAction(
   experimentId: string,
   stepId: string,
-  formData: FormData
+  input: DeviationInput
 ): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
 
-  const str = (k: string) => {
-    const v = (formData.get(k) as string | null)?.trim();
-    return v ? v : null;
-  };
-  const category = str("category");
-  const whatHappened = str("what_happened");
-  if (!category) return { ok: false, error: "Pick a deviation category." };
-  if (!whatHappened) return { ok: false, error: "Describe what happened." };
+  if (!input.category) return { ok: false, error: "Pick a deviation category." };
+  if (!input.what_happened.trim()) return { ok: false, error: "Describe what happened." };
 
   const allowed = await listControlledVocab("deviation_category");
-  const categoryError = validateDeviationCategory(category, allowed);
+  const categoryError = validateDeviationCategory(input.category, allowed);
   if (categoryError) return { ok: false, error: categoryError };
 
-  const sampleUsable = formData.get("sample_still_usable") as string | null;
-
   try {
-    await stepsService.recordDeviation(supabase, stepId, user.id, {
-      category,
-      what_happened: whatHappened,
-      how_discovered: str("how_discovered"),
-      likely_impact: str("likely_impact"),
-      sample_still_usable: sampleUsable === "" || sampleUsable === null ? null : sampleUsable === "true",
-      corrective_action: str("corrective_action"),
-      preventive_action: str("preventive_action"),
-      affected_samples: str("affected_samples"),
-    });
+    await stepsService.recordDeviation(supabase, stepId, user.id, input);
   } catch (e) {
     return toActionResult("recordDeviationAction", e);
   }
