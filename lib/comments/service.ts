@@ -21,10 +21,15 @@ export async function listComments(targetType: CommentTargetType, targetId: stri
   if (!comments || comments.length === 0) return [];
 
   const commentIds = comments.map((c) => c.id);
-  const [{ data: mentions }, { data: profiles }] = await Promise.all([
-    supabase.from("comment_mentions").select("comment_id, mentioned_user_id").in("comment_id", commentIds),
-    supabase.from("profiles").select("id, full_name, initials"),
-  ]);
+  const { data: mentions } = await supabase
+    .from("comment_mentions")
+    .select("comment_id, mentioned_user_id")
+    .in("comment_id", commentIds);
+
+  const userIds = new Set<string>();
+  for (const c of comments) userIds.add(c.created_by);
+  for (const m of mentions ?? []) userIds.add(m.mentioned_user_id);
+  const { data: profiles } = await supabase.from("profiles").select("id, full_name, initials").in("id", [...userIds]);
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name || p.initials || "Someone"]));
   const mentionsByComment = new Map<string, string[]>();
   for (const m of mentions ?? []) {
