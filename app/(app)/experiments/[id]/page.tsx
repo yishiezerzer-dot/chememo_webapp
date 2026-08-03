@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -76,11 +77,9 @@ export default async function ExperimentDetailPage({
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
-  const [timeline, stepDetails, comments, tasks] = await Promise.all([
+  const [timeline, stepDetails] = await Promise.all([
     listTimeline(id, e, files),
     e.protocol_version_id ? listStepDetails(e.id) : Promise.resolve([]),
-    listComments("experiment", id),
-    listTasks("experiment", id),
   ]);
   const protocolVersionLabel = protocolVersions.find((v) => v.id === e.protocol_version_id)?.label;
 
@@ -278,21 +277,13 @@ export default async function ExperimentDetailPage({
             removeFromSeries={removeExperimentFromSeriesAction.bind(null, e.id)}
           />
 
-          <TasksPanel
-            tasks={tasks}
-            createTask={createTaskAction.bind(null, e.id, "experiment", e.id)}
-            updateStatus={updateTaskStatusAction.bind(null, e.id)}
-          />
+          <Suspense fallback={<div className="obs-box glass"><h4>Tasks</h4><p className="muted">Loading…</p></div>}>
+            <TasksSection experimentId={e.id} />
+          </Suspense>
 
-          <div className="obs-box glass">
-            <h4>Comments</h4>
-            <CommentThread
-              comments={comments}
-              createComment={createCommentAction.bind(null, e.id, "experiment", e.id)}
-              resolveComment={resolveCommentAction.bind(null, e.id)}
-              reopenComment={reopenCommentAction.bind(null, e.id)}
-            />
-          </div>
+          <Suspense fallback={<div className="obs-box glass"><h4>Comments</h4><p className="muted">Loading…</p></div>}>
+            <CommentsSection experimentId={e.id} />
+          </Suspense>
 
           {(e.scientific_question || e.conclusion) && (
             <div className="obs-box glass">
@@ -395,6 +386,38 @@ export default async function ExperimentDetailPage({
           />
         </aside>
       </div>
+    </div>
+  );
+}
+
+// Streamed in its own Suspense boundary rather than joining the page's main
+// Promise.all — every lifecycle/step-runner action calls router.refresh(),
+// which re-runs that whole load, and folding tasks in there would slow down
+// every one of those refreshes for data that isn't part of the transition
+// being confirmed (the T1.8 listTimeline duplicate-query bug was the same
+// shape of mistake).
+async function TasksSection({ experimentId }: { experimentId: string }) {
+  const tasks = await listTasks("experiment", experimentId);
+  return (
+    <TasksPanel
+      tasks={tasks}
+      createTask={createTaskAction.bind(null, experimentId, "experiment", experimentId)}
+      updateStatus={updateTaskStatusAction.bind(null, experimentId)}
+    />
+  );
+}
+
+async function CommentsSection({ experimentId }: { experimentId: string }) {
+  const comments = await listComments("experiment", experimentId);
+  return (
+    <div className="obs-box glass">
+      <h4>Comments</h4>
+      <CommentThread
+        comments={comments}
+        createComment={createCommentAction.bind(null, experimentId, "experiment", experimentId)}
+        resolveComment={resolveCommentAction.bind(null, experimentId)}
+        reopenComment={reopenCommentAction.bind(null, experimentId)}
+      />
     </div>
   );
 }
