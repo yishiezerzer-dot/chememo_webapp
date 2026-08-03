@@ -7,6 +7,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileNav } from "@/components/mobile-nav";
 import { PageBodyClass } from "@/components/page-body-class";
 import { GlobalSearch } from "@/components/global-search";
+import { NotificationBell } from "@/components/notification-bell";
+import { unreadCount } from "@/lib/notifications/service";
 import { ToastProvider } from "@/components/toast-provider";
 
 export default async function AppLayout({
@@ -21,7 +23,7 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const projects = await listProjects();
+  const [projects, unread] = await Promise.all([listProjects(), unreadCount(user.id)]);
 
   const fullName =
     (user.user_metadata?.full_name as string | undefined) ||
@@ -95,6 +97,7 @@ export default async function AppLayout({
           <h1>ChemMemo</h1>
           <div className="spacer"></div>
           <GlobalSearch />
+          <NotificationBell count={unread} />
           <ThemeToggle />
         </header>
 

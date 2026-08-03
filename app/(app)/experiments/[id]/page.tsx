@@ -27,6 +27,10 @@ import {
 import { createRelationshipAction, deleteRelationshipAction } from "./relationships-actions";
 import { restoreRevisionAction } from "./restore-actions";
 import { addExperimentToSeriesAction, removeExperimentFromSeriesAction } from "@/app/(app)/series/actions";
+import { listComments } from "@/lib/comments/service";
+import { listTasks } from "@/lib/tasks/service";
+import { createCommentAction, resolveCommentAction, reopenCommentAction } from "@/app/(app)/comments-actions";
+import { createTaskAction, updateTaskStatusAction } from "@/app/(app)/tasks-actions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
@@ -37,6 +41,8 @@ import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { LifecycleControls } from "@/components/lifecycle-controls";
 import { StepRunner } from "@/components/step-runner";
+import { CommentThread } from "@/components/comment-thread";
+import { TasksPanel } from "@/components/tasks-panel";
 
 const fmtDateTime = (iso: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "—");
 
@@ -70,9 +76,11 @@ export default async function ExperimentDetailPage({
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
-  const [timeline, stepDetails] = await Promise.all([
+  const [timeline, stepDetails, comments, tasks] = await Promise.all([
     listTimeline(id, e, files),
     e.protocol_version_id ? listStepDetails(e.id) : Promise.resolve([]),
+    listComments("experiment", id),
+    listTasks("experiment", id),
   ]);
   const protocolVersionLabel = protocolVersions.find((v) => v.id === e.protocol_version_id)?.label;
 
@@ -269,6 +277,22 @@ export default async function ExperimentDetailPage({
             addToSeries={addExperimentToSeriesAction.bind(null, e.id)}
             removeFromSeries={removeExperimentFromSeriesAction.bind(null, e.id)}
           />
+
+          <TasksPanel
+            tasks={tasks}
+            createTask={createTaskAction.bind(null, e.id, "experiment", e.id)}
+            updateStatus={updateTaskStatusAction.bind(null, e.id)}
+          />
+
+          <div className="obs-box glass">
+            <h4>Comments</h4>
+            <CommentThread
+              comments={comments}
+              createComment={createCommentAction.bind(null, e.id, "experiment", e.id)}
+              resolveComment={resolveCommentAction.bind(null, e.id)}
+              reopenComment={reopenCommentAction.bind(null, e.id)}
+            />
+          </div>
 
           {(e.scientific_question || e.conclusion) && (
             <div className="obs-box glass">

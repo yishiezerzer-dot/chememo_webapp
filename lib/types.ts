@@ -26,6 +26,10 @@ type SavedViewRow = Database["public"]["Tables"]["saved_views"]["Row"];
 type ExperimentRelationshipRow = Database["public"]["Tables"]["experiment_relationships"]["Row"];
 type ExperimentSeriesRow = Database["public"]["Tables"]["experiment_series"]["Row"];
 type ExperimentSeriesMemberRow = Database["public"]["Tables"]["experiment_series_members"]["Row"];
+type CommentRow = Database["public"]["Tables"]["comments"]["Row"];
+type CommentMentionRow = Database["public"]["Tables"]["comment_mentions"]["Row"];
+type ExperimentTaskRow = Database["public"]["Tables"]["experiment_tasks"]["Row"];
+type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -400,6 +404,41 @@ export const RELATIONSHIP_TYPES: RelationshipType[] = [
   "contradicts",
   "same_series",
 ];
+
+// T1.9 D1 — comments/tasks target one of three entities that are both real
+// today and benefit from an in-context note (results/AI-answers deferred —
+// neither has a persisted target yet).
+export type CommentTargetType = "experiment" | "experiment_step" | "experiment_file";
+export const COMMENT_TARGET_TYPES: CommentTargetType[] = ["experiment", "experiment_step", "experiment_file"];
+
+export type Comment = Omit<CommentRow, "target_type"> & { target_type: CommentTargetType };
+export type CommentMention = CommentMentionRow;
+
+// T1.9 D4 — a review request is a task with task_type "review" and a
+// checklist payload, not a separate entity.
+export type TaskType = "task" | "review";
+export type TaskStatus =
+  | "not_started"
+  | "ready"
+  | "in_progress"
+  | "blocked"
+  | "waiting"
+  | "completed"
+  | "failed"
+  | "cancelled";
+export const TASK_STATUSES: TaskStatus[] = [
+  "not_started", "ready", "in_progress", "blocked", "waiting", "completed", "failed", "cancelled",
+];
+
+export type ExperimentTask = Omit<ExperimentTaskRow, "target_type" | "task_type" | "status" | "checklist"> & {
+  target_type: CommentTargetType;
+  task_type: TaskType;
+  status: TaskStatus;
+  checklist: string[] | null;
+};
+
+export type NotificationKind = "mention" | "task_assigned" | "review_requested";
+export type Notification = Omit<NotificationRow, "kind"> & { kind: NotificationKind };
 
 export const METHOD_OPTIONS = [
   "LC-MS/MS (neg)",

@@ -269,6 +269,152 @@ export type Database = {
           },
         ]
       }
+      comments: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
+      comment_mentions: {
+        Row: {
+          comment_id: string
+          mentioned_user_id: string
+        }
+        Insert: {
+          comment_id: string
+          mentioned_user_id: string
+        }
+        Update: {
+          comment_id?: string
+          mentioned_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_mentions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_tasks: {
+        Row: {
+          assignee_id: string | null
+          blocker_note: string | null
+          checklist: Json | null
+          created_at: string
+          created_by: string
+          due_at: string | null
+          id: string
+          status: string
+          target_id: string
+          target_type: string
+          task_type: string
+          title: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          blocker_note?: string | null
+          checklist?: Json | null
+          created_at?: string
+          created_by: string
+          due_at?: string | null
+          id?: string
+          status?: string
+          target_id: string
+          target_type: string
+          task_type: string
+          title: string
+        }
+        Update: {
+          assignee_id?: string | null
+          blocker_note?: string | null
+          checklist?: Json | null
+          created_at?: string
+          created_by?: string
+          due_at?: string | null
+          id?: string
+          status?: string
+          target_id?: string
+          target_type?: string
+          task_type?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          read_at: string | null
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          read_at?: string | null
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          read_at?: string | null
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_views: {
         Row: {
           created_at: string
