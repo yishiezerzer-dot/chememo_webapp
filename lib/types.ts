@@ -23,6 +23,9 @@ type ExperimentStepRow = Database["public"]["Tables"]["experiment_steps"]["Row"]
 type StepObservationRow = Database["public"]["Tables"]["step_observations"]["Row"];
 type StepDeviationRow = Database["public"]["Tables"]["step_deviations"]["Row"];
 type SavedViewRow = Database["public"]["Tables"]["saved_views"]["Row"];
+type ExperimentRelationshipRow = Database["public"]["Tables"]["experiment_relationships"]["Row"];
+type ExperimentSeriesRow = Database["public"]["Tables"]["experiment_series"]["Row"];
+type ExperimentSeriesMemberRow = Database["public"]["Tables"]["experiment_series_members"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -313,6 +316,61 @@ export type SavedView = Omit<SavedViewRow, "created_at" | "query"> & {
   created_at: string;
   query: ExperimentSearchParams;
 };
+
+// T1.7 D2 — relationship_type is DB-checked to this list but stored as plain
+// text (same pattern ExperimentFile.kind already uses for "upload"|"link").
+export type RelationshipType =
+  | "replicate_of"
+  | "control_for"
+  | "optimization_of"
+  | "continuation_of"
+  | "based_on"
+  | "confirms"
+  | "contradicts"
+  | "same_series";
+
+export type ExperimentRelationship = Omit<ExperimentRelationshipRow, "relationship_type"> & {
+  relationship_type: RelationshipType;
+};
+
+export type ExperimentSeries = ExperimentSeriesRow;
+export type ExperimentSeriesMember = ExperimentSeriesMemberRow;
+
+// T1.7 D2 — the *other* experiment's page shows the same row with an
+// inverse-phrased label instead of a second stored row. contradicts is
+// symmetric (same phrasing from both sides).
+export const RELATIONSHIP_LABEL: Record<RelationshipType, string> = {
+  replicate_of: "replicate of",
+  control_for: "control for",
+  optimization_of: "optimization of",
+  continuation_of: "continuation of",
+  based_on: "based on",
+  confirms: "confirms",
+  contradicts: "contradicts",
+  same_series: "same series as",
+};
+
+export const INVERSE_RELATIONSHIP_LABEL: Record<RelationshipType, string> = {
+  replicate_of: "has a replicate",
+  control_for: "uses control",
+  optimization_of: "has an optimization",
+  continuation_of: "has a continuation",
+  based_on: "is the basis for",
+  confirms: "is confirmed by",
+  contradicts: "contradicts",
+  same_series: "same series as",
+};
+
+export const RELATIONSHIP_TYPES: RelationshipType[] = [
+  "replicate_of",
+  "control_for",
+  "optimization_of",
+  "continuation_of",
+  "based_on",
+  "confirms",
+  "contradicts",
+  "same_series",
+];
 
 export const METHOD_OPTIONS = [
   "LC-MS/MS (neg)",

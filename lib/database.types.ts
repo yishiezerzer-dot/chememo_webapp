@@ -170,6 +170,105 @@ export type Database = {
         }
         Relationships: []
       }
+      experiment_relationships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          relationship_type: string
+          source_experiment_id: string
+          target_experiment_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relationship_type: string
+          source_experiment_id: string
+          target_experiment_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relationship_type?: string
+          source_experiment_id?: string
+          target_experiment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_relationships_source_experiment_id_fkey"
+            columns: ["source_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_relationships_target_experiment_id_fkey"
+            columns: ["target_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_series: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      experiment_series_members: {
+        Row: {
+          added_at: string
+          experiment_id: string
+          series_id: string
+        }
+        Insert: {
+          added_at?: string
+          experiment_id: string
+          series_id: string
+        }
+        Update: {
+          added_at?: string
+          experiment_id?: string
+          series_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_series_members_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_series_members_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_views: {
         Row: {
           created_at: string

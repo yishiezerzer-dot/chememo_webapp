@@ -13,6 +13,8 @@ import { listControlledVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
 import { listVersionOptions } from "@/lib/protocols/service";
 import { listStepDetails } from "@/lib/experiment-steps/service";
+import { listRelationships } from "@/lib/relationships/service";
+import { listSeries, listSeriesForExperiment } from "@/lib/series/service";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";
@@ -23,11 +25,14 @@ import {
   recordObservationAction,
   recordDeviationAction,
 } from "./steps-actions";
+import { createRelationshipAction, deleteRelationshipAction } from "./relationships-actions";
+import { addExperimentToSeriesAction, removeExperimentFromSeriesAction } from "@/app/(app)/series/actions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
 import { FileManager } from "@/components/file-manager";
 import { SummaryCard } from "@/components/summary-card";
+import { RelationshipsPanel } from "@/components/relationships-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { LifecycleControls } from "@/components/lifecycle-controls";
@@ -41,17 +46,31 @@ export default async function ExperimentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [result, projects, summary, revisions, lockEvents, quantityKinds, deviationCategories, protocolVersions] =
-    await Promise.all([
-      getExperiment(id),
-      listProjects(),
-      getExperimentSummary(id),
-      listRevisions(id),
-      listLockEvents(id),
-      listQuantityKinds(),
-      listControlledVocab("deviation_category"),
-      listVersionOptions(),
-    ]);
+  const [
+    result,
+    projects,
+    summary,
+    revisions,
+    lockEvents,
+    quantityKinds,
+    deviationCategories,
+    protocolVersions,
+    relationships,
+    allSeries,
+    memberSeries,
+  ] = await Promise.all([
+    getExperiment(id),
+    listProjects(),
+    getExperimentSummary(id),
+    listRevisions(id),
+    listLockEvents(id),
+    listQuantityKinds(),
+    listControlledVocab("deviation_category"),
+    listVersionOptions(),
+    listRelationships(id),
+    listSeries(),
+    listSeriesForExperiment(id),
+  ]);
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
@@ -241,6 +260,16 @@ export default async function ExperimentDetailPage({
               )}
             </div>
           )}
+
+          <RelationshipsPanel
+            relationships={relationships}
+            allSeries={allSeries}
+            memberSeries={memberSeries}
+            createRelationship={createRelationshipAction.bind(null, e.id)}
+            deleteRelationship={deleteRelationshipAction.bind(null, e.id)}
+            addToSeries={addExperimentToSeriesAction.bind(null, e.id)}
+            removeFromSeries={removeExperimentFromSeriesAction.bind(null, e.id)}
+          />
 
           {(e.scientific_question || e.conclusion) && (
             <div className="obs-box glass">

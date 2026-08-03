@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/authorization/policies";
 import { extractExperimentFields } from "@/lib/llm";
 import * as experimentsService from "@/lib/experiments/service";
+import { createRelationship } from "@/lib/relationships/service";
 import { getTemplateVersion } from "@/lib/templates/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
 import { discardDraftAction } from "@/app/(app)/drafts-actions";
 import { toActionResult } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 import { parseExperimentForm, isEmptyValue } from "@/lib/experiment-form-parse";
 import { type ActionResult, type ExperimentInput } from "@/lib/types";
 import { experimentInputSchema, fieldErrorsFromZod, validateSampleMatrixVocab, validateQuantityUnits } from "@/lib/schemas";
@@ -82,6 +84,21 @@ export async function createExperiment(
     });
   } catch (e) {
     return toActionResult("createExperiment", e);
+  }
+
+  // T1.7 D6 — clone's existing based_on_experiment_id stamp (T1.2) is left
+  // untouched; this additionally records the same fact as a real, bidirectional
+  // relationship so it shows up in the new relationships UI on both sides.
+  if (basedOnExperimentId) {
+    try {
+      await createRelationship(supabase, user.id, id, basedOnExperimentId, "based_on");
+    } catch (e) {
+      // Non-fatal: the experiment itself was created successfully and its
+      // based_on_experiment_id column already records the provenance: a
+      // failure here (e.g. the source was deleted between clone and submit)
+      // shouldn't block the save the user is actually waiting on.
+      logError("createExperiment", "relationship insert failed", { error: e });
+    }
   }
 
   // T1.3 — the draft's job is done once the real record exists.
