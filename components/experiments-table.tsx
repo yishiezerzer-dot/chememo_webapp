@@ -151,6 +151,7 @@ export function ExperimentsTable({
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input
             type="number"
+            aria-label="pH min"
             placeholder="pH min"
             defaultValue={params.phMin ?? ""}
             style={{ width: 80 }}
@@ -158,6 +159,7 @@ export function ExperimentsTable({
           />
           <input
             type="number"
+            aria-label="pH max"
             placeholder="pH max"
             defaultValue={params.phMax ?? ""}
             style={{ width: 80 }}
@@ -167,11 +169,13 @@ export function ExperimentsTable({
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input
             type="date"
+            aria-label="Date from"
             defaultValue={params.dateFrom ?? ""}
             onBlur={(e) => navigate({ dateFrom: e.target.value || undefined })}
           />
           <input
             type="date"
+            aria-label="Date to"
             defaultValue={params.dateTo ?? ""}
             onBlur={(e) => navigate({ dateTo: e.target.value || undefined })}
           />
@@ -201,6 +205,7 @@ export function ExperimentsTable({
         </div>
         <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
           <input
+            aria-label="Save this view as"
             value={viewName}
             onChange={(e) => setViewName(e.target.value)}
             placeholder="Save this view as…"

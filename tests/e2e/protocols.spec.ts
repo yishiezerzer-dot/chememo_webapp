@@ -6,6 +6,12 @@ import { signIn } from "./helpers";
 // observation and a deviation, then confirm the protocol version can no
 // longer be edited (frozen the moment the experiment linked to it).
 test("versioned protocol steps: create, link, run, and freeze", async ({ page }) => {
+  // This journey chains several server-action + router.refresh() round trips
+  // against the real chememo-dev project; the default 30s test timeout is
+  // occasionally too tight for the cumulative latency of all of them together
+  // (each individual step's REFRESH_TIMEOUT below already accounts for one
+  // round trip, but the overall test-level timeout caps their sum).
+  test.setTimeout(60000);
   await signIn(page);
 
   const protocolName = `E2E protocol test ${Date.now()}`;
