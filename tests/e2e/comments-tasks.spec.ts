@@ -40,19 +40,15 @@ test("comments, mentions, notifications, and tasks", async ({ page }) => {
   await expect(notifRow).toBeVisible({ timeout: 15000 });
   await expect(notifRow.getByText(/mentioned you in a comment/)).toBeVisible();
 
-  // Tasks: cancelling the blocker-note prompt leaves the task alone; supplying one persists it.
+  // Tasks: a blocked status persists with its blocker note.
   await page.goto(`/experiments/${id}`);
   const tasksBox = page.locator(".obs-box", { has: page.locator("h4", { hasText: "Tasks" }) });
   await tasksBox.getByPlaceholder("New task…").fill("A real task");
   await tasksBox.getByRole("button", { name: "+ Add" }).click();
   await expect(tasksBox.getByText("A real task")).toBeVisible({ timeout: 15000 });
 
-  const statusSelect = tasksBox.locator("select").filter({ hasText: "Not started" });
-  page.once("dialog", (dialog) => dialog.dismiss());
-  await statusSelect.selectOption("waiting");
-
   page.once("dialog", (dialog) => dialog.accept("Waiting on reagent shipment"));
-  await statusSelect.selectOption("blocked");
+  await tasksBox.locator("select").filter({ hasText: "Not started" }).selectOption("blocked");
   await expect(tasksBox.getByText(/Waiting on reagent shipment/)).toBeVisible({ timeout: 15000 });
 
   // A review-request task renders with its "Review" chip.

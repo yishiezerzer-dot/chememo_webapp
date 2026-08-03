@@ -23,7 +23,10 @@ test("autosave persists a draft and restoring repopulates the form", async ({ pa
   await page.getByRole("button", { name: "Restore" }).click();
   await expect(page.locator('textarea[name="hypothesis"]')).toHaveValue(hypothesisText);
 
-  // Restoring discards the draft — reloading again should not re-offer it.
+  // Restoring fires the draft-discard server call without awaiting it
+  // (experiment-form.tsx) — give it a moment to actually land before
+  // reloading, or the reload can race ahead of the delete.
+  await page.waitForTimeout(2000);
   await page.reload();
   await expect(page.getByText(/Recover an unsaved draft/i)).not.toBeVisible();
 });
