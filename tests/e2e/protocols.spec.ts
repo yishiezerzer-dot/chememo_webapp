@@ -43,7 +43,7 @@ test("versioned protocol steps: create, link, run, and freeze", async ({ page })
   // against the real chememo-dev project — a longer timeout than the 5s
   // default absorbs CI's real network/DB latency for that cycle (same
   // hardening T1.1's e2e suite already needed for this environment).
-  const REFRESH_TIMEOUT = 15000;
+  const REFRESH_TIMEOUT = 20000;
 
   await expect(protocolSection.getByRole("button", { name: "Instantiate steps" })).toBeVisible();
   await protocolSection.getByRole("button", { name: "Instantiate steps" }).click();

@@ -15,7 +15,9 @@ export function NotificationBell({ count }: { count: number }) {
             position: "absolute",
             top: 2,
             right: 2,
-            background: "var(--red, #e5484d)",
+            // #b91c1c, not the lighter Radix red — the lighter shade fails
+            // WCAG AA contrast against white text at this badge's small size.
+            background: "#b91c1c",
             color: "white",
             borderRadius: "999px",
             fontSize: 10,
