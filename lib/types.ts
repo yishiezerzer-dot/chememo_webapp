@@ -177,10 +177,11 @@ export type ExperimentFile = Omit<
   created_at: string;
 };
 
-// A lock or reopen event (T1.1, §10.2 append-only). `event` is DB-checked to
-// 'lock'|'reopen' but stored as plain `text`.
+// A lock/reopen/restore event (T1.1, §10.2 append-only). `event` is
+// DB-checked to 'lock'|'reopen'|'restore' (T1.8 added restore) but stored as
+// plain `text`.
 export type ExperimentLockEvent = Omit<ExperimentLockEventRow, "event"> & {
-  event: "lock" | "reopen";
+  event: "lock" | "reopen" | "restore";
 };
 
 // Shape written by the New/Edit form (id + owner_id assigned server-side).
@@ -236,6 +237,34 @@ export type ExperimentInput = {
   // pre-T1.4 records.
   quantities: Record<string, Quantity>;
 };
+
+// T1.8 D6 — the exact keys ExperimentInput carries, kept as one literal
+// array so restore builds a patch from a revision snapshot touching exactly
+// the fields a normal edit can touch (no more, no less) — and so drift is a
+// compile error (typed as (keyof ExperimentInput)[]) rather than a silently
+// stale allowlist.
+export const EXPERIMENT_INPUT_KEYS: (keyof ExperimentInput)[] = [
+  "name", "date", "researcher", "project", "reaction_type",
+  "compounds", "metals", "ph", "cycles", "methods", "mz",
+  "observations", "notes", "scientific_question", "rationale", "hypothesis",
+  "primary_outcome", "secondary_outcomes", "data_analysis_plan", "risks_failure_modes",
+  "conclusion", "next_steps", "acceptance_criteria",
+  "planned_start_at", "planned_end_at", "independent_variables", "controlled_variables",
+  "sample_matrix", "controls", "protocol_version_id", "planned_analyses",
+  "sample_storage_plan", "quantities",
+];
+
+// T1.8 D6 — build an ExperimentInput-shaped restore patch from a revision's
+// full-row snapshot, touching only the fields a normal edit could touch
+// (never status/locked_at/etc — restoring content must not silently
+// un-complete or re-lock a record).
+export function experimentInputFromSnapshot(snapshot: Experiment): ExperimentInput {
+  const patch = {} as ExperimentInput;
+  for (const key of EXPERIMENT_INPUT_KEYS) {
+    (patch as Record<string, unknown>)[key] = snapshot[key];
+  }
+  return patch;
+}
 
 export type ExperimentStatus = Database["public"]["Enums"]["experiment_status"];
 

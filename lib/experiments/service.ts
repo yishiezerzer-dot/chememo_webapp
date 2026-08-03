@@ -94,7 +94,14 @@ export async function listRevisions(
   return (data ?? []) as ExperimentRevision[];
 }
 
-// Lock/reopen history (newest first) — T1.1, §10.2 append-only log.
+// T1.8 D6 — a single revision by id, for restore.
+export async function getRevision(revisionId: string): Promise<ExperimentRevision | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("experiment_revisions").select("*").eq("id", revisionId).maybeSingle();
+  return (data as ExperimentRevision | null) ?? null;
+}
+
+// Lock/reopen/restore history (newest first) — T1.1, §10.2 append-only log.
 export async function listLockEvents(experimentId: string): Promise<ExperimentLockEvent[]> {
   const supabase = await createClient();
   const { data } = await supabase

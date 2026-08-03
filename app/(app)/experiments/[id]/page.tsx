@@ -4,10 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getExperiment,
   getExperimentSummary,
-  listLockEvents,
-  listRevisions,
   signedUrlsFor,
 } from "@/lib/experiments/service";
+import { listTimeline } from "@/lib/experiments/timeline";
 import { listProjects } from "@/lib/projects/service";
 import { listControlledVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
@@ -26,6 +25,7 @@ import {
   recordDeviationAction,
 } from "./steps-actions";
 import { createRelationshipAction, deleteRelationshipAction } from "./relationships-actions";
+import { restoreRevisionAction } from "./restore-actions";
 import { addExperimentToSeriesAction, removeExperimentFromSeriesAction } from "@/app/(app)/series/actions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
@@ -50,8 +50,7 @@ export default async function ExperimentDetailPage({
     result,
     projects,
     summary,
-    revisions,
-    lockEvents,
+    timeline,
     quantityKinds,
     deviationCategories,
     protocolVersions,
@@ -62,8 +61,7 @@ export default async function ExperimentDetailPage({
     getExperiment(id),
     listProjects(),
     getExperimentSummary(id),
-    listRevisions(id),
-    listLockEvents(id),
+    listTimeline(id),
     listQuantityKinds(),
     listControlledVocab("deviation_category"),
     listVersionOptions(),
@@ -365,35 +363,11 @@ export default async function ExperimentDetailPage({
             action={generateSummary.bind(null, e.id)}
           />
 
-          {lockEvents.length > 0 && (
-            <div className="panel glass" style={{ marginTop: 16 }}>
-              <h4 style={{ fontFamily: "var(--display)", margin: "0 0 12px" }}>Lock history</h4>
-              <div className="activity">
-                {lockEvents.map((ev) => (
-                  <div key={ev.id} className="act-row">
-                    <span className="act-dot"></span>
-                    <span style={{ fontSize: 13 }}>
-                      {ev.event === "reopen" ? "Reopened" : "Locked"} — {ev.reason}
-                    </span>
-                    <time
-                      style={{
-                        marginLeft: "auto",
-                        fontFamily: "var(--mono)",
-                        fontSize: 11,
-                        color: "var(--ink-mute)",
-                        whiteSpace: "nowrap",
-                        flex: "none",
-                      }}
-                    >
-                      {fmtDateTime(ev.created_at)}
-                    </time>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <HistoryPanel current={e} revisions={revisions} />
+          <HistoryPanel
+            entries={timeline}
+            isOwner={isOwner}
+            restoreRevision={restoreRevisionAction.bind(null, e.id)}
+          />
         </aside>
       </div>
     </div>

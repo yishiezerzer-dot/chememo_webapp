@@ -1,73 +1,166 @@
-import type { Experiment, ExperimentRevision } from "@/lib/types";
+"use client";
 
-const FIELDS: { key: keyof Experiment; label: string }[] = [
-  { key: "name", label: "name" },
-  { key: "date", label: "date" },
-  { key: "researcher", label: "researcher" },
-  { key: "project", label: "project" },
-  { key: "reaction_type", label: "reaction type" },
-  { key: "compounds", label: "compounds" },
-  { key: "metals", label: "metals" },
-  { key: "ph", label: "pH" },
-  { key: "concentration", label: "concentration" },
-  { key: "temperature", label: "temperature" },
-  { key: "cycles", label: "cycles" },
-  { key: "methods", label: "methods" },
-  { key: "mz", label: "m/z" },
-  { key: "observations", label: "observations" },
-  { key: "notes", label: "notes" },
-  { key: "deleted_at", label: "deleted" },
-];
-
-const norm = (v: unknown): string => (Array.isArray(v) ? v.join("|") : v == null ? "" : String(v));
-
-// Fields that differ between a snapshot and the state that followed it.
-function changedFields(before: Experiment, after: Experiment): string[] {
-  return FIELDS.filter((f) => norm(before[f.key]) !== norm(after[f.key])).map((f) => f.label);
-}
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/toast-provider";
+import type { ActionResult } from "@/lib/types";
+import type { TimelineEntry } from "@/lib/experiments/timeline";
+import type { DiffField } from "@/lib/diff";
 
 const fmt = (iso: string) => iso.slice(0, 16).replace("T", " ");
 
-// Each revision is the PRIOR state before an edit; the edit that created it
-// produced the next-newer state (or the current record for the latest one).
-export function HistoryPanel({
-  current,
-  revisions,
+const LOCK_EVENT_LABEL: Record<"lock" | "reopen" | "restore", string> = {
+  lock: "Locked",
+  reopen: "Reopened",
+  restore: "Restored a prior version",
+};
+
+function fieldValue(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+function DiffLine({ field }: { field: DiffField }) {
+  if (field.kind === "array") {
+    return (
+      <div style={{ fontSize: 12.5 }}>
+        <b>{field.label}</b>:{" "}
+        {field.added && field.added.length > 0 && <span style={{ color: "var(--teal)" }}>+{field.added.join(", ")}</span>}
+        {field.added && field.added.length > 0 && field.removed && field.removed.length > 0 && "  "}
+        {field.removed && field.removed.length > 0 && <span style={{ color: "var(--ink-mute)" }}>−{field.removed.join(", ")}</span>}
+      </div>
+    );
+  }
+  if (field.kind === "json") {
+    return (
+      <div style={{ fontSize: 12.5 }}>
+        <b>{field.label}</b>: changed
+      </div>
+    );
+  }
+  return (
+    <div style={{ fontSize: 12.5 }}>
+      <b>{field.label}</b>: {fieldValue(field.before)} → {fieldValue(field.after)}
+    </div>
+  );
+}
+
+function RestoreControl({
+  revisionId,
+  restoreRevision,
 }: {
-  current: Experiment;
-  revisions: ExperimentRevision[];
+  revisionId: string;
+  restoreRevision: (revisionId: string, reason: string) => Promise<ActionResult>;
 }) {
-  if (revisions.length === 0) return null;
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pending, start] = useTransition();
+  const { showToast } = useToast();
+  const router = useRouter();
+
+  if (!open) {
+    return (
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>
+        Restore this version
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6, maxWidth: 420 }}>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        rows={2}
+        placeholder="Why are you restoring this version? (always required)"
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={pending || !reason.trim()}
+          onClick={() =>
+            start(async () => {
+              const res = await restoreRevision(revisionId, reason);
+              if (!res.ok) showToast(res.error, "error");
+              else router.refresh();
+            })
+          }
+        >
+          {pending ? "Restoring…" : "Confirm restore"}
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// T1.8 D5 — one merged, chronological timeline (revisions + lock/reopen/
+// restore events + file adds) replacing the two separate boxes this used to
+// be. Each revision shows its actual field-level diff (D2/D3) and editor
+// identity (D4) instead of just a list of changed field names.
+export function HistoryPanel({
+  entries,
+  isOwner,
+  restoreRevision,
+}: {
+  entries: TimelineEntry[];
+  isOwner: boolean;
+  restoreRevision: (revisionId: string, reason: string) => Promise<ActionResult>;
+}) {
+  if (entries.length === 0) return null;
   return (
     <div className="panel glass" style={{ marginTop: 16 }}>
       <h4 style={{ fontFamily: "var(--display)", margin: "0 0 12px" }}>
-        History · {revisions.length} edit{revisions.length === 1 ? "" : "s"}
+        History · {entries.length} event{entries.length === 1 ? "" : "s"}
       </h4>
       <div className="activity">
-        {revisions.map((r, i) => {
-          const after = i === 0 ? current : revisions[i - 1].snapshot;
-          const changed = changedFields(r.snapshot, after);
-          return (
-            <div key={r.id} className="act-row">
-              <span className="act-dot"></span>
-              <span style={{ fontSize: 13 }}>
-                {changed.length ? `Changed ${changed.join(", ")}` : "Edited"}
-              </span>
-              <time
-                style={{
-                  marginLeft: "auto",
-                  fontFamily: "var(--mono)",
-                  fontSize: 11,
-                  color: "var(--ink-mute)",
-                  whiteSpace: "nowrap",
-                  flex: "none",
-                }}
-              >
-                {fmt(r.created_at)}
-              </time>
+        {entries.map((entry) => (
+          <div key={`${entry.kind}-${entry.id}`} className="act-row" style={{ flexWrap: "wrap" }}>
+            <span className="act-dot"></span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              {entry.kind === "revision" && (
+                <>
+                  <div style={{ fontSize: 13, marginBottom: 4 }}>
+                    <b>{entry.actorName}</b> edited this record
+                  </div>
+                  {entry.diff.map((f) => (
+                    <DiffLine key={f.key} field={f} />
+                  ))}
+                  {isOwner && (
+                    <div style={{ marginTop: 6 }}>
+                      <RestoreControl revisionId={entry.id} restoreRevision={restoreRevision} />
+                    </div>
+                  )}
+                </>
+              )}
+              {entry.kind === "lock_event" && (
+                <div style={{ fontSize: 13 }}>
+                  <b>{entry.actorName}</b> — {LOCK_EVENT_LABEL[entry.event]}: {entry.reason}
+                </div>
+              )}
+              {entry.kind === "file" && (
+                <div style={{ fontSize: 13 }}>
+                  <b>{entry.actorName}</b> added {entry.fileKind === "upload" ? "a file" : "a link"}: {entry.label}
+                </div>
+              )}
             </div>
-          );
-        })}
+            <time
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                color: "var(--ink-mute)",
+                whiteSpace: "nowrap",
+                flex: "none",
+              }}
+            >
+              {fmt(entry.created_at)}
+            </time>
+          </div>
+        ))}
       </div>
     </div>
   );
