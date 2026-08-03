@@ -35,6 +35,8 @@ test("saved view: save the current filter, navigate away, and reapply it", async
   await page.getByRole("link", { name: viewName }).click();
   await expect(page).toHaveURL(/\/experiments\?q=Histidine.*sort=name.*dir=asc/);
 
-  // Clean up so repeat runs don't accumulate saved views.
-  await page.getByText("×", { exact: true }).click();
+  // Clean up so repeat runs don't accumulate saved views. Scoped to this
+  // test's own view by name -- a plain page-wide "×" match breaks once any
+  // other saved view exists (e.g. a leftover from an earlier failed run).
+  await page.locator("span", { hasText: viewName }).getByText("×", { exact: true }).click();
 });
