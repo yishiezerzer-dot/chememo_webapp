@@ -22,6 +22,7 @@ type ProtocolStepRow = Database["public"]["Tables"]["protocol_steps"]["Row"];
 type ExperimentStepRow = Database["public"]["Tables"]["experiment_steps"]["Row"];
 type StepObservationRow = Database["public"]["Tables"]["step_observations"]["Row"];
 type StepDeviationRow = Database["public"]["Tables"]["step_deviations"]["Row"];
+type SavedViewRow = Database["public"]["Tables"]["saved_views"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -285,6 +286,32 @@ export type ExperimentDraft = Omit<
   raw_note: string | null;
   base_updated_at: string | null;
   created_at: string;
+};
+
+// T1.6 D5 — the one shape shared by the URL query string, searchExperiments(),
+// exportExperimentsCsvAction, and a saved_views.query blob. sort/dir default
+// to "date"/"desc" when absent (matches the pre-T1.6 default view).
+export type ExperimentSortKey = "date" | "name" | "ph" | "cycles" | "id";
+export type ExperimentSearchParams = {
+  q?: string;
+  project?: string;
+  status?: ExperimentStatus;
+  reactionType?: string;
+  methods?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  phMin?: number;
+  phMax?: number;
+  sort?: ExperimentSortKey;
+  dir?: "asc" | "desc";
+};
+
+// T1.6 D4 — a named snapshot of the current filter/sort/search state.
+// Private scratch space, not lab-shared like controlled_vocabularies/
+// experiment_templates — owner-only, same RLS shape as experiment_drafts (T1.3).
+export type SavedView = Omit<SavedViewRow, "created_at" | "query"> & {
+  created_at: string;
+  query: ExperimentSearchParams;
 };
 
 export const METHOD_OPTIONS = [

@@ -170,6 +170,30 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_views: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          query: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          query: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          query?: Json
+        }
+        Relationships: []
+      }
       protocols: {
         Row: {
           archived: boolean
@@ -692,6 +716,7 @@ export type Database = {
           sample_matrix: Json
           sample_storage_plan: string | null
           scientific_question: string | null
+          search_vector: string | null
           secondary_outcomes: string | null
           short_code: string | null
           started_at: string | null

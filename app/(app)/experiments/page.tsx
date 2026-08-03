@@ -1,17 +1,22 @@
 import Link from "next/link";
-import { listExperiments } from "@/lib/experiments/service";
+import { searchExperiments } from "@/lib/experiments/search";
+import { parseExperimentSearchParams } from "@/lib/experiments/search-params";
 import { listProjects } from "@/lib/projects/service";
+import { listViewsAction } from "./actions";
 import { ExperimentsTable } from "@/components/experiments-table";
 
 export default async function ExperimentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; project?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [{ q, project }, experiments, projects] = await Promise.all([
-    searchParams,
-    listExperiments(),
+  const raw = await searchParams;
+  const params = parseExperimentSearchParams(raw);
+
+  const [{ rows, nextCursor, facets }, projects, savedViews] = await Promise.all([
+    searchExperiments(params, { cursor: raw.cursor || null }),
     listProjects(),
+    listViewsAction(),
   ]);
 
   return (
@@ -28,10 +33,12 @@ export default async function ExperimentsPage({
         </Link>
       </div>
       <ExperimentsTable
-        experiments={experiments}
+        rows={rows}
+        nextCursor={nextCursor}
+        facets={facets}
         projects={projects}
-        initialQuery={q}
-        initialProject={project}
+        savedViews={savedViews}
+        params={params}
       />
     </div>
   );

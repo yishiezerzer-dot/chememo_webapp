@@ -1,6 +1,6 @@
 import type { ExperimentStatus } from "@/lib/types";
 
-const LABEL: Record<ExperimentStatus, string> = {
+export const STATUS_LABEL: Record<ExperimentStatus, string> = {
   draft: "Draft",
   planned: "Planned",
   in_progress: "In progress",
@@ -115,7 +115,7 @@ export function StatusBadge({ status }: { status: ExperimentStatus | null }) {
   return (
     <span className={`status-badge ${CLASS[status]}`}>
       <Icon status={status} />
-      {LABEL[status]}
+      {STATUS_LABEL[status]}
     </span>
   );
 }

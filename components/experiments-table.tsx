@@ -1,151 +1,67 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { StatusBadge } from "@/components/status-badge";
-import type { Experiment, Project } from "@/lib/types";
+import { useToast } from "@/components/toast-provider";
+import { StatusBadge, STATUS_LABEL } from "@/components/status-badge";
+import { exportExperimentsCsvAction, saveViewAction, deleteViewAction } from "@/app/(app)/experiments/actions";
+import { buildExperimentQueryString as buildQueryString } from "@/lib/experiments/search-params";
+import type { Experiment, ExperimentSearchParams, ExperimentSortKey, ExperimentStatus, Project, SavedView } from "@/lib/types";
 
-type SortKey = "id" | "name" | "date" | "project" | "ph" | "cycles";
-type PhFilter = "all" | "lt7" | "eq7" | "gt8";
+type Facets = {
+  status: Record<string, number>;
+  project: Record<string, number>;
+  reactionType: Record<string, number>;
+  methods: Record<string, number>;
+};
 
-// Quote a CSV cell only when it contains a comma, quote, or newline.
-function csvCell(v: unknown): string {
-  const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function toCsv(rows: Experiment[], projectLabel: Record<string, string>): string {
-  const headers = [
-    "ID", "Name", "Date", "Researcher", "Project", "Reaction type",
-    "pH", "Cycles", "Compounds", "Metals", "Methods", "m/z",
-    "Observations", "Notes",
-  ];
-  const lines = rows.map((e) =>
-    [
-      e.id, e.name, e.date, e.researcher,
-      e.project ? projectLabel[e.project] ?? e.project : "",
-      e.reaction_type, e.ph, e.cycles,
-      e.compounds.join("; "), e.metals.join("; "), e.methods.join("; "),
-      e.mz.join("; "), e.observations, e.notes,
-    ]
-      .map(csvCell)
-      .join(",")
-  );
-  return [headers.join(","), ...lines].join("\r\n");
-}
+const ALL_STATUSES: ExperimentStatus[] = [
+  "draft", "planned", "in_progress", "paused", "completed", "reviewed", "archived", "failed", "cancelled",
+];
 
 export function ExperimentsTable({
-  experiments,
+  rows,
+  nextCursor,
+  facets,
   projects,
-  initialQuery = "",
-  initialProject = "all",
+  savedViews,
+  params,
 }: {
-  experiments: Experiment[];
+  rows: Experiment[];
+  nextCursor: string | null;
+  facets: Facets;
   projects: Project[];
-  initialQuery?: string;
-  initialProject?: string;
+  savedViews: SavedView[];
+  params: ExperimentSearchParams;
 }) {
   const router = useRouter();
-  const [q, setQ] = useState(initialQuery);
-  const [project, setProject] = useState<string>(initialProject);
-  const [ph, setPh] = useState<PhFilter>("all");
-  // D12 — archived leaves the default "active work" view and nothing else.
-  const [showArchived, setShowArchived] = useState(false);
-  const [sort, setSort] = useState<SortKey>("date");
-  const [asc, setAsc] = useState(false);
+  const { showToast } = useToast();
+  const [pending, start] = useTransition();
+  const [q, setQ] = useState(params.q ?? "");
+  const [viewName, setViewName] = useState("");
 
-  // Re-sync from the URL when navigation changes the params (e.g. clicking a
-  // sidebar project link, or a global search, while already on this page).
-  // Adjusted during render (React's recommended pattern for resetting state
-  // from a tracked value) rather than in an effect.
-  const [prevInitialProject, setPrevInitialProject] = useState(initialProject);
-  if (initialProject !== prevInitialProject) {
-    setPrevInitialProject(initialProject);
-    setProject(initialProject);
-  }
-  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
-  if (initialQuery !== prevInitialQuery) {
-    setPrevInitialQuery(initialQuery);
-    setQ(initialQuery);
+  function navigate(patch: Partial<ExperimentSearchParams>) {
+    // Any filter change restarts pagination (a stale cursor from a different
+    // filter set could skip or duplicate rows).
+    router.push(`/experiments?${buildQueryString({ ...params, ...patch })}`);
   }
 
-  const projectLabel = useMemo(
-    () => Object.fromEntries(projects.map((p) => [p.id, p.label])),
-    [projects]
-  );
-
-  const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    let out = experiments.filter((e) => {
-      if (!showArchived && e.status === "archived") return false;
-      if (project !== "all" && e.project !== project) return false;
-      if (ph === "lt7" && !(e.ph !== null && e.ph < 7)) return false;
-      if (ph === "eq7" && e.ph !== 7) return false;
-      if (ph === "gt8" && !(e.ph !== null && e.ph > 8)) return false;
-      if (!needle) return true;
-      const hay = [
-        e.id,
-        e.name,
-        e.researcher,
-        e.reaction_type,
-        ...e.compounds,
-        ...e.metals,
-        ...e.methods,
-        e.observations,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(needle);
-    });
-
-    out = [...out].sort((a, b) => {
-      let av: string | number = "";
-      let bv: string | number = "";
-      switch (sort) {
-        case "ph":
-          av = a.ph ?? -Infinity;
-          bv = b.ph ?? -Infinity;
-          break;
-        case "cycles":
-          av = a.cycles ?? -Infinity;
-          bv = b.cycles ?? -Infinity;
-          break;
-        case "date":
-          av = a.date ?? "";
-          bv = b.date ?? "";
-          break;
-        default:
-          av = (a[sort] ?? "") as string;
-          bv = (b[sort] ?? "") as string;
-      }
-      if (av < bv) return asc ? -1 : 1;
-      if (av > bv) return asc ? 1 : -1;
-      return 0;
-    });
-    return out;
-  }, [experiments, q, project, ph, showArchived, sort, asc]);
-
-  function toggleSort(key: SortKey) {
-    if (sort === key) setAsc((a) => !a);
-    else {
-      setSort(key);
-      setAsc(key === "name" || key === "id");
+  function toggleSort(key: ExperimentSortKey) {
+    if (params.sort === key || (!params.sort && key === "date")) {
+      navigate({ sort: key, dir: params.dir === "asc" ? "desc" : "asc" });
+    } else {
+      navigate({ sort: key, dir: key === "name" || key === "id" ? "asc" : "desc" });
     }
   }
 
-  const arrow = (key: SortKey) =>
-    sort === key ? <span className="sort-i">{asc ? "▲" : "▼"}</span> : null;
+  const sortKey = params.sort ?? "date";
+  const dir = params.dir ?? "desc";
+  const arrow = (key: ExperimentSortKey) => (sortKey === key ? <span className="sort-i">{dir === "asc" ? "▲" : "▼"}</span> : null);
 
-  const phChips: { key: PhFilter; label: string }[] = [
-    { key: "all", label: "All pH" },
-    { key: "lt7", label: "pH < 7" },
-    { key: "eq7", label: "pH = 7" },
-    { key: "gt8", label: "pH > 8" },
-  ];
+  const projectLabel = Object.fromEntries(projects.map((p) => [p.id, p.label]));
 
-  function exportCsv() {
-    const csv = toCsv(rows, projectLabel);
+  async function exportCsv() {
+    const csv = await exportExperimentsCsvAction(params);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -157,10 +73,38 @@ export function ExperimentsTable({
     URL.revokeObjectURL(url);
   }
 
+  function saveView() {
+    const name = viewName.trim();
+    if (!name) return;
+    start(async () => {
+      const res = await saveViewAction(name, params);
+      if (!res.ok) showToast(res.error, "error");
+      else {
+        setViewName("");
+        router.refresh();
+      }
+    });
+  }
+
+  function deleteView(id: string) {
+    start(async () => {
+      const res = await deleteViewAction(id);
+      if (!res.ok) showToast(res.error, "error");
+      else router.refresh();
+    });
+  }
+
   return (
     <>
       <div className="toolbar">
-        <div className="searchbox" style={{ maxWidth: 340 }}>
+        <form
+          className="searchbox"
+          style={{ maxWidth: 340 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            navigate({ q: q.trim() || undefined });
+          }}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4-4" />
@@ -171,64 +115,104 @@ export function ExperimentsTable({
             placeholder="Search experiments…"
             aria-label="Search experiments"
           />
-        </div>
+        </form>
         <div className="filter-chips">
           <button
-            className={`chip${project === "all" ? " active" : ""}`}
-            onClick={() => setProject("all")}
+            className={`chip${!params.project ? " active" : ""}`}
+            onClick={() => navigate({ project: undefined })}
           >
             All projects
           </button>
           {projects.map((p) => (
             <button
               key={p.id}
-              className={`chip${project === p.id ? " active" : ""}`}
-              onClick={() => setProject(p.id)}
+              className={`chip${params.project === p.id ? " active" : ""}`}
+              onClick={() => navigate({ project: p.id })}
             >
               <span className="pdot" style={{ color: p.color ?? "var(--teal)" }}></span>
               {p.label}
+              {facets.project[p.id] ? ` (${facets.project[p.id]})` : ""}
             </button>
           ))}
         </div>
-        <div className="filter-chips">
-          {phChips.map((c) => (
-            <button
-              key={c.key}
-              className={`chip${ph === c.key ? " active" : ""}`}
-              onClick={() => setPh(c.key)}
-            >
-              {c.label}
-            </button>
+        <select
+          aria-label="Status filter"
+          value={params.status ?? ""}
+          onChange={(e) => navigate({ status: (e.target.value || undefined) as ExperimentStatus | undefined })}
+        >
+          <option value="">All statuses</option>
+          {ALL_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABEL[s]}
+              {facets.status[s] ? ` (${facets.status[s]})` : ""}
+            </option>
           ))}
+        </select>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="number"
+            placeholder="pH min"
+            defaultValue={params.phMin ?? ""}
+            style={{ width: 80 }}
+            onBlur={(e) => navigate({ phMin: e.target.value === "" ? undefined : Number(e.target.value) })}
+          />
+          <input
+            type="number"
+            placeholder="pH max"
+            defaultValue={params.phMax ?? ""}
+            style={{ width: 80 }}
+            onBlur={(e) => navigate({ phMax: e.target.value === "" ? undefined : Number(e.target.value) })}
+          />
         </div>
-        <div className="filter-chips">
-          <button
-            type="button"
-            className={`chip${showArchived ? " active" : ""}`}
-            onClick={() => setShowArchived((v) => !v)}
-          >
-            {showArchived ? "Hide archived" : "Show archived"}
-          </button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="date"
+            defaultValue={params.dateFrom ?? ""}
+            onBlur={(e) => navigate({ dateFrom: e.target.value || undefined })}
+          />
+          <input
+            type="date"
+            defaultValue={params.dateTo ?? ""}
+            onBlur={(e) => navigate({ dateTo: e.target.value || undefined })}
+          />
         </div>
-        <span className="count-pill" style={{ marginLeft: "auto" }}>
-          {rows.length} / {experiments.length}
-        </span>
         <button
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={exportCsv}
-          disabled={rows.length === 0}
-          title="Download the filtered rows as CSV"
-          style={{ marginLeft: 8 }}
+          title="Download every matching row (not just this page) as CSV"
         >
           Export CSV
         </button>
       </div>
 
+      <div className="toolbar" style={{ marginTop: 8 }}>
+        <div className="filter-chips">
+          {savedViews.map((v) => (
+            <span key={v.id} className="chip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <a href={`/experiments?${buildQueryString(v.query)}`} style={{ color: "inherit" }}>
+                {v.name}
+              </a>
+              <b onClick={() => deleteView(v.id)} style={{ cursor: "pointer" }}>
+                ×
+              </b>
+            </span>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+          <input
+            value={viewName}
+            onChange={(e) => setViewName(e.target.value)}
+            placeholder="Save this view as…"
+            style={{ maxWidth: 180 }}
+          />
+          <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={saveView}>
+            Save view
+          </button>
+        </div>
+      </div>
+
       <div className="table-scroll">
-        {/* The status column widened this table enough to overflow on
-            narrower viewports; a horizontally scrollable region must be
-            keyboard-reachable (axe scrollable-region-focusable, WCAG 2.1.1). */}
         <div className="table-scroll-inner" tabIndex={0} role="region" aria-label="Experiments table, scrollable">
           <table className="exp-table">
             <thead>
@@ -243,9 +227,7 @@ export function ExperimentsTable({
                   Date {arrow("date")}
                 </th>
                 <th className="col-status">Status</th>
-                <th className="col-proj" onClick={() => toggleSort("project")}>
-                  Project {arrow("project")}
-                </th>
+                <th className="col-proj">Project</th>
                 <th className="col-ph" onClick={() => toggleSort("ph")}>
                   pH {arrow("ph")}
                 </th>
@@ -278,9 +260,7 @@ export function ExperimentsTable({
                           {c}
                         </span>
                       ))}
-                      {e.compounds.length > 3 && (
-                        <span className="muted">+{e.compounds.length - 3}</span>
-                      )}
+                      {e.compounds.length > 3 && <span className="muted">+{e.compounds.length - 3}</span>}
                     </div>
                   </td>
                   <td className="muted">{e.methods.join(", ") || "—"}</td>
@@ -296,6 +276,18 @@ export function ExperimentsTable({
           )}
         </div>
       </div>
+
+      {nextCursor && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => router.push(`/experiments?${buildQueryString(params, nextCursor)}`)}
+          >
+            Load more
+          </button>
+        </div>
+      )}
     </>
   );
 }
