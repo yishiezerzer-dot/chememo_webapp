@@ -1,8 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { diffExperiments, type DiffField } from "@/lib/diff";
-import { getExperiment, listLockEvents, listRevisions } from "@/lib/experiments/service";
-import type { ExperimentFile } from "@/lib/types";
+import { listLockEvents, listRevisions } from "@/lib/experiments/service";
+import type { Experiment, ExperimentFile } from "@/lib/types";
 
 export type TimelineEntry =
   | { kind: "revision"; id: string; created_at: string; actorName: string; diff: DiffField[] }
@@ -12,17 +12,21 @@ export type TimelineEntry =
 // T1.8 D5 — one merged, chronological feed replacing the two separate
 // panels (revisions + lock history) the detail page rendered before.
 // Editor/actor identity (D4) is resolved via profiles — its first real UI use.
-export async function listTimeline(experimentId: string): Promise<TimelineEntry[]> {
+// Takes the current experiment + its files as already-fetched arguments
+// (the detail page already loads both via getExperiment) rather than
+// re-querying them — two fewer round trips per page render, which matters
+// since this runs on every router.refresh() the step-runner/protocol/
+// relationships panels on the same page trigger.
+export async function listTimeline(
+  experimentId: string,
+  current: Experiment,
+  files: ExperimentFile[]
+): Promise<TimelineEntry[]> {
   const supabase = await createClient();
-  const [result, revisions, lockEvents, filesResult] = await Promise.all([
-    getExperiment(experimentId),
+  const [revisions, lockEvents] = await Promise.all([
     listRevisions(experimentId),
     listLockEvents(experimentId),
-    supabase.from("experiment_files").select("*").eq("experiment_id", experimentId),
   ]);
-  if (!result) return [];
-  const current = result.experiment;
-  const files = (filesResult.data ?? []) as ExperimentFile[];
 
   const userIds = new Set<string>();
   for (const r of revisions) if (r.editor_id) userIds.add(r.editor_id);

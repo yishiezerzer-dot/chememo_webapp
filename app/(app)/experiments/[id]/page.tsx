@@ -50,7 +50,6 @@ export default async function ExperimentDetailPage({
     result,
     projects,
     summary,
-    timeline,
     quantityKinds,
     deviationCategories,
     protocolVersions,
@@ -61,7 +60,6 @@ export default async function ExperimentDetailPage({
     getExperiment(id),
     listProjects(),
     getExperimentSummary(id),
-    listTimeline(id),
     listQuantityKinds(),
     listControlledVocab("deviation_category"),
     listVersionOptions(),
@@ -72,7 +70,10 @@ export default async function ExperimentDetailPage({
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
-  const stepDetails = e.protocol_version_id ? await listStepDetails(e.id) : [];
+  const [timeline, stepDetails] = await Promise.all([
+    listTimeline(id, e, files),
+    e.protocol_version_id ? listStepDetails(e.id) : Promise.resolve([]),
+  ]);
   const protocolVersionLabel = protocolVersions.find((v) => v.id === e.protocol_version_id)?.label;
 
   const supabase = await createClient();
