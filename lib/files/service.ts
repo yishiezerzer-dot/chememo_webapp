@@ -140,3 +140,25 @@ export async function removeFile(supabase: Supabase, fileId: string): Promise<vo
     await supabase.storage.from(BUCKET).remove([deleted.storage_path]);
   }
 }
+
+// Audit §3 "soft delete orphans" — soft-deleting a draft experiment (the
+// only status DeleteExperimentButton allows) left its files rows and
+// storage objects behind forever. A draft has no real work invested yet,
+// so removing its attachments outright (not just the experiment row) is
+// safe and matches what "delete" means for that stage.
+export async function deleteAllFiles(supabase: Supabase, experimentId: string): Promise<void> {
+  const { data: deleted, error } = await supabase
+    .from("experiment_files")
+    .delete()
+    .eq("experiment_id", experimentId)
+    .select("kind, storage_path");
+  if (error) {
+    throw new AppError("conflict", `Could not remove attached files: ${error.message}`, { cause: error });
+  }
+  const paths = (deleted ?? [])
+    .filter((f) => f.kind === "upload" && f.storage_path)
+    .map((f) => f.storage_path as string);
+  if (paths.length > 0) {
+    await supabase.storage.from(BUCKET).remove(paths);
+  }
+}

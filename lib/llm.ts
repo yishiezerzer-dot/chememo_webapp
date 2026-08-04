@@ -43,10 +43,10 @@ async function chatComplete(opts: {
 
   if (p === "gemini") {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: opts.system }] },
           contents: [{ role: "user", parts: [{ text: opts.user }] }],
@@ -116,10 +116,10 @@ async function* chatStream(opts: {
 
   if (p === "gemini") {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: opts.system }] },
           contents: [{ role: "user", parts: [{ text: opts.user }] }],

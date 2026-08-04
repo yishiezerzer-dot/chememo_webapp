@@ -61,10 +61,13 @@ async function semanticSearch(semanticQuery: string, k = 8): Promise<Experiment[
 
 // Retrieval only (no answer generation) — routes the query, runs filters and/or
 // semantic search, returns the deduped records. Used by the streaming route
-// handler, which generates the answer itself. [] when the router is unavailable.
-export async function retrieveRecords(query: string): Promise<Experiment[]> {
+// handler, which generates the answer itself. `routerFailed` lets the caller
+// tell "the router genuinely found nothing" apart from "the router itself
+// was unavailable/unparseable" (audit §3 — these read as the same silent
+// "no matches" to the user otherwise).
+export async function retrieveRecords(query: string): Promise<{ records: Experiment[]; routerFailed: boolean }> {
   const intent = await routeQuery(query);
-  if (!intent) return [];
+  if (!intent) return { records: [], routerFailed: true };
   const seen = new Map<string, Experiment>();
   if (intent.mode !== "semantic") {
     for (const e of await executeFilters(intent.filters)) seen.set(e.id, e);
@@ -74,7 +77,7 @@ export async function retrieveRecords(query: string): Promise<Experiment[]> {
       if (!seen.has(e.id)) seen.set(e.id, e);
     }
   }
-  return [...seen.values()];
+  return { records: [...seen.values()], routerFailed: false };
 }
 
 async function keylessAsk(query: string): Promise<AskResult> {

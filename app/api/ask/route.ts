@@ -82,7 +82,8 @@ export async function POST(req: Request) {
 
   // Lab mode: retrieve first. If nothing matches, say so explicitly — never
   // fall back to general knowledge, which could read as a lab conclusion.
-  const records = askMode === "lab" ? await retrieveRecords(query) : [];
+  const retrieved = askMode === "lab" ? await retrieveRecords(query) : { records: [], routerFailed: false };
+  const records = retrieved.records;
   const grounded = askMode === "lab" && records.length > 0;
 
   if (askMode === "lab" && !grounded) {
@@ -95,7 +96,9 @@ export async function POST(req: Request) {
         streaming: false,
         interpretation: [],
         results: [],
-        emptyReason: "No matching experiments found in your lab.",
+        emptyReason: retrieved.routerFailed
+          ? "Couldn't parse that question for lab search — try rephrasing it."
+          : "No matching experiments found in your lab.",
       }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );

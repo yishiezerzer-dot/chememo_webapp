@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { nextExperimentId } from "@/lib/experiment-id";
 import { runIndexJob } from "@/lib/index-jobs";
+import { deleteAllFiles } from "@/lib/files/service";
 import { AppError } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import type {
@@ -276,5 +277,12 @@ export async function softDeleteExperiment(supabase: Supabase, id: string): Prom
   // Drop the now-deleted experiment from semantic search.
   void runIndexJob(id).catch((e) =>
     logError("index-jobs", `delete ${id} failed`, { error: e })
+  );
+
+  // Audit §3 "soft delete orphans" — a draft (the only status this path
+  // allows) has no real work invested yet, so its attachments go with it
+  // rather than sitting as orphaned storage/rows forever.
+  await deleteAllFiles(supabase, id).catch((e) =>
+    logError("files", `cleanup for deleted experiment ${id} failed`, { error: e })
   );
 }
