@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/authorization/policies";
+import { requireUser, requireWorkspace } from "@/lib/authorization/policies";
 import { searchAllExperiments } from "@/lib/experiments/search";
 import { listProjects } from "@/lib/projects/service";
 import * as savedViewsService from "@/lib/saved-views/service";
@@ -47,12 +47,12 @@ export async function listViewsAction(): Promise<SavedView[]> {
 }
 
 export async function saveViewAction(name: string, query: ExperimentSearchParams): Promise<ActionResult> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireWorkspace();
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Name this view before saving it." };
 
   try {
-    await savedViewsService.createSavedView(supabase, user.id, trimmed, query);
+    await savedViewsService.createSavedView(supabase, user.id, workspaceId, trimmed, query);
   } catch (e) {
     return toActionResult("saveViewAction", e);
   }

@@ -43,12 +43,13 @@ export async function getTemplateVersion(id: string): Promise<ExperimentTemplate
 export async function createTemplate(
   supabase: Supabase,
   userId: string,
+  workspaceId: string,
   name: string,
   description: string | null
 ): Promise<string> {
   const { data, error } = await supabase
     .from("experiment_templates")
-    .insert({ name, description, created_by: userId })
+    .insert({ name, description, created_by: userId, workspace_id: workspaceId })
     .select("id")
     .single();
   if (error) throw new AppError("conflict", "Could not create the template.", { cause: error });

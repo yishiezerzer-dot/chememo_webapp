@@ -1,6 +1,6 @@
 "use server";
 
-import { requireUser } from "@/lib/authorization/policies";
+import { requireUser, requireWorkspace } from "@/lib/authorization/policies";
 import * as draftsService from "@/lib/drafts/service";
 import type { DraftKey, ExperimentInput } from "@/lib/types";
 
@@ -15,8 +15,8 @@ export async function saveDraftAction(
   baseUpdatedAt: string | null
 ): Promise<{ ok: boolean }> {
   try {
-    const { supabase, user } = await requireUser();
-    await draftsService.saveDraft(supabase, user.id, key, fields, rawNote, baseUpdatedAt);
+    const { supabase, user, workspaceId } = await requireWorkspace();
+    await draftsService.saveDraft(supabase, user.id, workspaceId, key, fields, rawNote, baseUpdatedAt);
     return { ok: true };
   } catch {
     return { ok: false };

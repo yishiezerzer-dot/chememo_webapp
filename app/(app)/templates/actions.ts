@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/authorization/policies";
+import { requireUser, requireWorkspace } from "@/lib/authorization/policies";
 import * as templatesService from "@/lib/templates/service";
 import { listSampleVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
@@ -17,7 +17,7 @@ export async function createNewTemplate(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireWorkspace();
   const name = ((formData.get("name") as string | null) ?? "").trim();
   if (!name) {
     return { ok: false, error: "Name is required.", fieldErrors: { name: "Name is required." } };
@@ -26,7 +26,7 @@ export async function createNewTemplate(
 
   let id: string;
   try {
-    id = await templatesService.createTemplate(supabase, user.id, name, description);
+    id = await templatesService.createTemplate(supabase, user.id, workspaceId, name, description);
   } catch (e) {
     return toActionResult("createNewTemplate", e);
   }

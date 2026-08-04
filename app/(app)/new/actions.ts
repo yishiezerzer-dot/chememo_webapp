@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/authorization/policies";
+import { requireUser, requireWorkspace } from "@/lib/authorization/policies";
 import { extractExperimentFields } from "@/lib/llm";
 import * as experimentsService from "@/lib/experiments/service";
 import { createRelationship } from "@/lib/relationships/service";
@@ -42,7 +42,7 @@ export async function createExperiment(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireWorkspace();
 
   const parsed = experimentInputSchema.safeParse(parseExperimentForm(formData));
   if (!parsed.success) {
@@ -78,7 +78,7 @@ export async function createExperiment(
 
   let id: string;
   try {
-    id = await experimentsService.createExperiment(supabase, user.id, parsed.data, {
+    id = await experimentsService.createExperiment(supabase, user.id, workspaceId, parsed.data, {
       templateVersionId,
       basedOnExperimentId,
     });

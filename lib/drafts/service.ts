@@ -26,6 +26,7 @@ export async function getDraft(key: DraftKey): Promise<ExperimentDraft | null> {
 export async function saveDraft(
   supabase: Supabase,
   userId: string,
+  workspaceId: string,
   key: DraftKey,
   fields: Partial<ExperimentInput>,
   rawNote: string | null,
@@ -34,8 +35,8 @@ export async function saveDraft(
   const { column, value } = keyColumn(key);
   const row =
     column === "target_experiment_id"
-      ? { owner_id: userId, target_experiment_id: value, client_draft_id: null }
-      : { owner_id: userId, client_draft_id: value, target_experiment_id: null };
+      ? { owner_id: userId, workspace_id: workspaceId, target_experiment_id: value, client_draft_id: null }
+      : { owner_id: userId, workspace_id: workspaceId, client_draft_id: value, target_experiment_id: null };
   const { error } = await supabase.from("experiment_drafts").upsert(
     {
       ...row,

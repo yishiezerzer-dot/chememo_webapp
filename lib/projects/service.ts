@@ -26,6 +26,7 @@ function slugify(label: string): string {
 export async function createProject(
   supabase: Supabase,
   userId: string,
+  workspaceId: string,
   name: string,
   color: string
 ): Promise<void> {
@@ -34,7 +35,7 @@ export async function createProject(
     const id = attempt === 0 ? base : `${base}-${attempt + 1}`;
     const { error } = await supabase
       .from("projects")
-      .insert({ id, label: name, color, owner_id: userId });
+      .insert({ id, label: name, color, owner_id: userId, workspace_id: workspaceId });
     if (!error) return;
     // 23505 = unique_violation (id already taken) — retry with a suffix.
     if (error.code !== "23505") {

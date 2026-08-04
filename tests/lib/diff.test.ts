@@ -5,6 +5,7 @@ import type { Experiment } from "@/lib/types";
 const base: Experiment = {
   id: "EXP-001",
   owner_id: "user-1",
+  workspace_id: "ws-1",
   name: "Test experiment",
   date: "2026-01-01",
   researcher: "Y. Ezerzer",

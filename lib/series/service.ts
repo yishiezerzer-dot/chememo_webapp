@@ -38,10 +38,16 @@ export async function listSeriesMembers(seriesId: string): Promise<Experiment[]>
   return ids.map((id) => byId.get(id)).filter((e): e is Experiment => !!e) as Experiment[];
 }
 
-export async function createSeries(supabase: Supabase, userId: string, name: string, description: string | null): Promise<string> {
+export async function createSeries(
+  supabase: Supabase,
+  userId: string,
+  workspaceId: string,
+  name: string,
+  description: string | null
+): Promise<string> {
   const { data, error } = await supabase
     .from("experiment_series")
-    .insert({ name, description, created_by: userId })
+    .insert({ name, description, created_by: userId, workspace_id: workspaceId })
     .select("id")
     .single();
   if (error) throw new AppError("conflict", "Could not create the series.", { cause: error });

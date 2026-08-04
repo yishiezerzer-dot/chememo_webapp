@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { listProjects } from "@/lib/projects/service";
+import { listMyWorkspaces } from "@/lib/workspaces/service";
 import { BrandMark } from "@/components/brand-mark";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -8,6 +10,7 @@ import { MobileNav } from "@/components/mobile-nav";
 import { PageBodyClass } from "@/components/page-body-class";
 import { GlobalSearch } from "@/components/global-search";
 import { NotificationBell } from "@/components/notification-bell";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { unreadCount } from "@/lib/notifications/service";
 import { ToastProvider } from "@/components/toast-provider";
 
@@ -23,7 +26,14 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const [projects, unread] = await Promise.all([listProjects(), unreadCount(user.id)]);
+  const [projects, unread, workspaces] = await Promise.all([
+    listProjects(),
+    unreadCount(user.id),
+    listMyWorkspaces(supabase, user.id),
+  ]);
+  const cookieStore = await cookies();
+  const cookieWorkspaceId = cookieStore.get("cm_workspace")?.value;
+  const activeWorkspace = workspaces.find((w) => w.id === cookieWorkspaceId) ?? workspaces[0];
 
   const fullName =
     (user.user_metadata?.full_name as string | undefined) ||
@@ -50,6 +60,12 @@ export default async function AppLayout({
             <div className="brand-sub">MFP Lab</div>
           </div>
         </div>
+
+        {activeWorkspace && (
+          <div style={{ padding: "0 14px 14px" }}>
+            <WorkspaceSwitcher memberships={workspaces} activeId={activeWorkspace.id} />
+          </div>
+        )}
 
         <SidebarNav projects={projects} currentUserId={user.id} />
 

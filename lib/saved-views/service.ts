@@ -18,12 +18,13 @@ export async function listSavedViews(): Promise<SavedView[]> {
 export async function createSavedView(
   supabase: Supabase,
   userId: string,
+  workspaceId: string,
   name: string,
   query: ExperimentSearchParams
 ): Promise<SavedView> {
   const { data, error } = await supabase
     .from("saved_views")
-    .insert({ owner_id: userId, name, query })
+    .insert({ owner_id: userId, workspace_id: workspaceId, name, query })
     .select("*")
     .single();
   if (error) throw new AppError("conflict", "Could not save this view.", { cause: error });

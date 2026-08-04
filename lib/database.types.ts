@@ -84,6 +84,7 @@ export type Database = {
           scope: string | null
           source_ids: string[] | null
           summary: string | null
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -93,6 +94,7 @@ export type Database = {
           scope?: string | null
           source_ids?: string[] | null
           summary?: string | null
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -102,6 +104,7 @@ export type Database = {
           scope?: string | null
           source_ids?: string[] | null
           summary?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -109,6 +112,90 @@ export type Database = {
             columns: ["experiment_id"]
             isOneToOne: false
             referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_summaries_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comment_mentions: {
+        Row: {
+          comment_id: string
+          mentioned_user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          comment_id: string
+          mentioned_user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          comment_id?: string
+          mentioned_user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_mentions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_mentions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          target_id: string
+          target_type: string
+          workspace_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_id: string
+          target_type: string
+          workspace_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_id?: string
+          target_type?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -137,576 +224,56 @@ export type Database = {
         }
         Relationships: []
       }
-      quantity_kinds: {
+      experiment_drafts: {
         Row: {
-          active: boolean
-          canonical_unit_code: string
-          category: string
-          compatible_units: string[]
-          key: string
-          label: string
-          sort_order: number
-          standard_field_name: string
-        }
-        Insert: {
-          active?: boolean
-          canonical_unit_code: string
-          category: string
-          compatible_units: string[]
-          key: string
-          label: string
-          sort_order: number
-          standard_field_name: string
-        }
-        Update: {
-          active?: boolean
-          canonical_unit_code?: string
-          category?: string
-          compatible_units?: string[]
-          key?: string
-          label?: string
-          sort_order?: number
-          standard_field_name?: string
-        }
-        Relationships: []
-      }
-      experiment_relationships: {
-        Row: {
+          base_updated_at: string | null
+          client_draft_id: string | null
           created_at: string
-          created_by: string | null
+          fields: Json
           id: string
-          relationship_type: string
-          source_experiment_id: string
-          target_experiment_id: string
+          owner_id: string
+          raw_note: string | null
+          target_experiment_id: string | null
+          updated_at: string
+          workspace_id: string
         }
         Insert: {
+          base_updated_at?: string | null
+          client_draft_id?: string | null
           created_at?: string
-          created_by?: string | null
+          fields?: Json
           id?: string
-          relationship_type: string
-          source_experiment_id: string
-          target_experiment_id: string
+          owner_id: string
+          raw_note?: string | null
+          target_experiment_id?: string | null
+          updated_at?: string
+          workspace_id: string
         }
         Update: {
+          base_updated_at?: string | null
+          client_draft_id?: string | null
           created_at?: string
-          created_by?: string | null
+          fields?: Json
           id?: string
-          relationship_type?: string
-          source_experiment_id?: string
-          target_experiment_id?: string
+          owner_id?: string
+          raw_note?: string | null
+          target_experiment_id?: string | null
+          updated_at?: string
+          workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "experiment_relationships_source_experiment_id_fkey"
-            columns: ["source_experiment_id"]
-            isOneToOne: false
-            referencedRelation: "experiments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "experiment_relationships_target_experiment_id_fkey"
+            foreignKeyName: "experiment_drafts_target_experiment_id_fkey"
             columns: ["target_experiment_id"]
             isOneToOne: false
             referencedRelation: "experiments"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      experiment_series: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
-      experiment_series_members: {
-        Row: {
-          added_at: string
-          experiment_id: string
-          series_id: string
-        }
-        Insert: {
-          added_at?: string
-          experiment_id: string
-          series_id: string
-        }
-        Update: {
-          added_at?: string
-          experiment_id?: string
-          series_id?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "experiment_series_members_experiment_id_fkey"
-            columns: ["experiment_id"]
+            foreignKeyName: "experiment_drafts_workspace_id_fkey"
+            columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "experiments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "experiment_series_members_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "experiment_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      comments: {
-        Row: {
-          body: string
-          created_at: string
-          created_by: string
-          id: string
-          resolved_at: string | null
-          resolved_by: string | null
-          target_id: string
-          target_type: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          created_by: string
-          id?: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          target_id: string
-          target_type: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          created_by?: string
-          id?: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          target_id?: string
-          target_type?: string
-        }
-        Relationships: []
-      }
-      comment_mentions: {
-        Row: {
-          comment_id: string
-          mentioned_user_id: string
-        }
-        Insert: {
-          comment_id: string
-          mentioned_user_id: string
-        }
-        Update: {
-          comment_id?: string
-          mentioned_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comment_mentions_comment_id_fkey"
-            columns: ["comment_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      experiment_tasks: {
-        Row: {
-          assignee_id: string | null
-          blocker_note: string | null
-          checklist: Json | null
-          created_at: string
-          created_by: string
-          due_at: string | null
-          id: string
-          status: string
-          target_id: string
-          target_type: string
-          task_type: string
-          title: string
-        }
-        Insert: {
-          assignee_id?: string | null
-          blocker_note?: string | null
-          checklist?: Json | null
-          created_at?: string
-          created_by: string
-          due_at?: string | null
-          id?: string
-          status?: string
-          target_id: string
-          target_type: string
-          task_type: string
-          title: string
-        }
-        Update: {
-          assignee_id?: string | null
-          blocker_note?: string | null
-          checklist?: Json | null
-          created_at?: string
-          created_by?: string
-          due_at?: string | null
-          id?: string
-          status?: string
-          target_id?: string
-          target_type?: string
-          task_type?: string
-          title?: string
-        }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          comment_id: string | null
-          created_at: string
-          id: string
-          kind: string
-          read_at: string | null
-          task_id: string | null
-          user_id: string
-        }
-        Insert: {
-          comment_id?: string | null
-          created_at?: string
-          id?: string
-          kind: string
-          read_at?: string | null
-          task_id?: string | null
-          user_id: string
-        }
-        Update: {
-          comment_id?: string | null
-          created_at?: string
-          id?: string
-          kind?: string
-          read_at?: string | null
-          task_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_comment_id_fkey"
-            columns: ["comment_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "experiment_tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      saved_views: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          owner_id: string
-          query: Json
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          owner_id: string
-          query: Json
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          owner_id?: string
-          query?: Json
-        }
-        Relationships: []
-      }
-      protocols: {
-        Row: {
-          archived: boolean
-          created_at: string
-          created_by: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          archived?: boolean
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          archived?: boolean
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
-      protocol_versions: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          critical_parameters: Json
-          equipment: string | null
-          frozen_at: string | null
-          id: string
-          known_failure_modes: Json
-          protocol_id: string
-          purpose: string | null
-          qc_checks: string | null
-          required_materials: string | null
-          safety_notes: string | null
-          scope: string | null
-          version: number
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          critical_parameters?: Json
-          equipment?: string | null
-          frozen_at?: string | null
-          id?: string
-          known_failure_modes?: Json
-          protocol_id: string
-          purpose?: string | null
-          qc_checks?: string | null
-          required_materials?: string | null
-          safety_notes?: string | null
-          scope?: string | null
-          version: number
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          critical_parameters?: Json
-          equipment?: string | null
-          frozen_at?: string | null
-          id?: string
-          known_failure_modes?: Json
-          protocol_id?: string
-          purpose?: string | null
-          qc_checks?: string | null
-          required_materials?: string | null
-          safety_notes?: string | null
-          scope?: string | null
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "protocol_versions_protocol_id_fkey"
-            columns: ["protocol_id"]
-            isOneToOne: false
-            referencedRelation: "protocols"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      protocol_steps: {
-        Row: {
-          id: string
-          instruction: string
-          protocol_version_id: string
-          required_material: string | null
-          safety_note: string | null
-          step_number: number
-          target_atmosphere: string | null
-          target_ph: number | null
-          target_quantities: Json
-        }
-        Insert: {
-          id?: string
-          instruction: string
-          protocol_version_id: string
-          required_material?: string | null
-          safety_note?: string | null
-          step_number: number
-          target_atmosphere?: string | null
-          target_ph?: number | null
-          target_quantities?: Json
-        }
-        Update: {
-          id?: string
-          instruction?: string
-          protocol_version_id?: string
-          required_material?: string | null
-          safety_note?: string | null
-          step_number?: number
-          target_atmosphere?: string | null
-          target_ph?: number | null
-          target_quantities?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "protocol_steps_protocol_version_id_fkey"
-            columns: ["protocol_version_id"]
-            isOneToOne: false
-            referencedRelation: "protocol_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      experiment_steps: {
-        Row: {
-          actual_atmosphere: string | null
-          actual_ph: number | null
-          actual_quantities: Json
-          completed_at: string | null
-          completed_by: string | null
-          experiment_id: string
-          id: string
-          protocol_step_id: string
-          started_at: string | null
-          status: string
-        }
-        Insert: {
-          actual_atmosphere?: string | null
-          actual_ph?: number | null
-          actual_quantities?: Json
-          completed_at?: string | null
-          completed_by?: string | null
-          experiment_id: string
-          id?: string
-          protocol_step_id: string
-          started_at?: string | null
-          status?: string
-        }
-        Update: {
-          actual_atmosphere?: string | null
-          actual_ph?: number | null
-          actual_quantities?: Json
-          completed_at?: string | null
-          completed_by?: string | null
-          experiment_id?: string
-          id?: string
-          protocol_step_id?: string
-          started_at?: string | null
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "experiment_steps_experiment_id_fkey"
-            columns: ["experiment_id"]
-            isOneToOne: false
-            referencedRelation: "experiments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "experiment_steps_protocol_step_id_fkey"
-            columns: ["protocol_step_id"]
-            isOneToOne: false
-            referencedRelation: "protocol_steps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      step_observations: {
-        Row: {
-          experiment_step_id: string
-          id: string
-          note: string
-          observed_at: string
-          observed_by: string | null
-        }
-        Insert: {
-          experiment_step_id: string
-          id?: string
-          note: string
-          observed_at?: string
-          observed_by?: string | null
-        }
-        Update: {
-          experiment_step_id?: string
-          id?: string
-          note?: string
-          observed_at?: string
-          observed_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "step_observations_experiment_step_id_fkey"
-            columns: ["experiment_step_id"]
-            isOneToOne: false
-            referencedRelation: "experiment_steps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      step_deviations: {
-        Row: {
-          affected_samples: string | null
-          category: string
-          corrective_action: string | null
-          decision_owner: string | null
-          experiment_step_id: string
-          how_discovered: string | null
-          id: string
-          likely_impact: string | null
-          linked_replacement_sample: string | null
-          preventive_action: string | null
-          reported_at: string
-          reported_by: string | null
-          sample_still_usable: boolean | null
-          what_happened: string
-        }
-        Insert: {
-          affected_samples?: string | null
-          category: string
-          corrective_action?: string | null
-          decision_owner?: string | null
-          experiment_step_id: string
-          how_discovered?: string | null
-          id?: string
-          likely_impact?: string | null
-          linked_replacement_sample?: string | null
-          preventive_action?: string | null
-          reported_at?: string
-          reported_by?: string | null
-          sample_still_usable?: boolean | null
-          what_happened: string
-        }
-        Update: {
-          affected_samples?: string | null
-          category?: string
-          corrective_action?: string | null
-          decision_owner?: string | null
-          experiment_step_id?: string
-          how_discovered?: string | null
-          id?: string
-          likely_impact?: string | null
-          linked_replacement_sample?: string | null
-          preventive_action?: string | null
-          reported_at?: string
-          reported_by?: string | null
-          sample_still_usable?: boolean | null
-          what_happened?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "step_deviations_experiment_step_id_fkey"
-            columns: ["experiment_step_id"]
-            isOneToOne: false
-            referencedRelation: "experiment_steps"
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -717,18 +284,21 @@ export type Database = {
           embedding: string | null
           experiment_id: string
           updated_at: string | null
+          workspace_id: string | null
         }
         Insert: {
           content?: string | null
           embedding?: string | null
           experiment_id: string
           updated_at?: string | null
+          workspace_id?: string | null
         }
         Update: {
           content?: string | null
           embedding?: string | null
           experiment_id?: string
           updated_at?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -736,6 +306,13 @@ export type Database = {
             columns: ["experiment_id"]
             isOneToOne: true
             referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_embeddings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -755,6 +332,7 @@ export type Database = {
           storage_path: string | null
           uploaded_by: string | null
           url: string | null
+          workspace_id: string | null
         }
         Insert: {
           byte_size?: number | null
@@ -770,6 +348,7 @@ export type Database = {
           storage_path?: string | null
           uploaded_by?: string | null
           url?: string | null
+          workspace_id?: string | null
         }
         Update: {
           byte_size?: number | null
@@ -785,6 +364,7 @@ export type Database = {
           storage_path?: string | null
           uploaded_by?: string | null
           url?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -801,48 +381,11 @@ export type Database = {
             referencedRelation: "experiment_steps"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      experiment_drafts: {
-        Row: {
-          base_updated_at: string | null
-          client_draft_id: string | null
-          created_at: string
-          fields: Json
-          id: string
-          owner_id: string
-          raw_note: string | null
-          target_experiment_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          base_updated_at?: string | null
-          client_draft_id?: string | null
-          created_at?: string
-          fields?: Json
-          id?: string
-          owner_id: string
-          raw_note?: string | null
-          target_experiment_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          base_updated_at?: string | null
-          client_draft_id?: string | null
-          created_at?: string
-          fields?: Json
-          id?: string
-          owner_id?: string
-          raw_note?: string | null
-          target_experiment_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "experiment_drafts_target_experiment_id_fkey"
-            columns: ["target_experiment_id"]
+            foreignKeyName: "experiment_files_workspace_id_fkey"
+            columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "experiments"
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -855,6 +398,7 @@ export type Database = {
           experiment_id: string
           id: string
           reason: string
+          workspace_id: string | null
         }
         Insert: {
           actor_id?: string | null
@@ -863,6 +407,7 @@ export type Database = {
           experiment_id: string
           id?: string
           reason: string
+          workspace_id?: string | null
         }
         Update: {
           actor_id?: string | null
@@ -871,6 +416,7 @@ export type Database = {
           experiment_id?: string
           id?: string
           reason?: string
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -878,6 +424,65 @@ export type Database = {
             columns: ["experiment_id"]
             isOneToOne: false
             referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_lock_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_relationships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          relationship_type: string
+          source_experiment_id: string
+          target_experiment_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relationship_type: string
+          source_experiment_id: string
+          target_experiment_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relationship_type?: string
+          source_experiment_id?: string
+          target_experiment_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_relationships_source_experiment_id_fkey"
+            columns: ["source_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_relationships_target_experiment_id_fkey"
+            columns: ["target_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_relationships_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -889,6 +494,7 @@ export type Database = {
           experiment_id: string | null
           id: string
           snapshot: Json
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -896,6 +502,7 @@ export type Database = {
           experiment_id?: string | null
           id?: string
           snapshot: Json
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -903,6 +510,7 @@ export type Database = {
           experiment_id?: string | null
           id?: string
           snapshot?: Json
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -910,6 +518,300 @@ export type Database = {
             columns: ["experiment_id"]
             isOneToOne: false
             referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_revisions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_series: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_series_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_series_members: {
+        Row: {
+          added_at: string
+          experiment_id: string
+          series_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          added_at?: string
+          experiment_id: string
+          series_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          added_at?: string
+          experiment_id?: string
+          series_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_series_members_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_series_members_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_series_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_steps: {
+        Row: {
+          actual_atmosphere: string | null
+          actual_ph: number | null
+          actual_quantities: Json
+          completed_at: string | null
+          completed_by: string | null
+          experiment_id: string
+          id: string
+          protocol_step_id: string
+          started_at: string | null
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          actual_atmosphere?: string | null
+          actual_ph?: number | null
+          actual_quantities?: Json
+          completed_at?: string | null
+          completed_by?: string | null
+          experiment_id: string
+          id?: string
+          protocol_step_id: string
+          started_at?: string | null
+          status?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          actual_atmosphere?: string | null
+          actual_ph?: number | null
+          actual_quantities?: Json
+          completed_at?: string | null
+          completed_by?: string | null
+          experiment_id?: string
+          id?: string
+          protocol_step_id?: string
+          started_at?: string | null
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_steps_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_steps_protocol_step_id_fkey"
+            columns: ["protocol_step_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_steps_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_tasks: {
+        Row: {
+          assignee_id: string | null
+          blocker_note: string | null
+          checklist: Json | null
+          created_at: string
+          created_by: string
+          due_at: string | null
+          id: string
+          status: string
+          target_id: string
+          target_type: string
+          task_type: string
+          title: string
+          workspace_id: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          blocker_note?: string | null
+          checklist?: Json | null
+          created_at?: string
+          created_by: string
+          due_at?: string | null
+          id?: string
+          status?: string
+          target_id: string
+          target_type: string
+          task_type: string
+          title: string
+          workspace_id?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          blocker_note?: string | null
+          checklist?: Json | null
+          created_at?: string
+          created_by?: string
+          due_at?: string | null
+          id?: string
+          status?: string
+          target_id?: string
+          target_type?: string
+          task_type?: string
+          title?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_tasks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_template_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          defaults: Json
+          frozen_at: string | null
+          id: string
+          required_fields: string[]
+          template_id: string
+          version: number
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          defaults?: Json
+          frozen_at?: string | null
+          id?: string
+          required_fields?: string[]
+          template_id: string
+          version: number
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          defaults?: Json
+          frozen_at?: string | null
+          id?: string
+          required_fields?: string[]
+          template_id?: string
+          version?: number
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_template_versions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_templates: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -961,14 +863,15 @@ export type Database = {
           sample_matrix: Json
           sample_storage_plan: string | null
           scientific_question: string | null
-          search_vector: string | null
+          search_vector: unknown
           secondary_outcomes: string | null
           short_code: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["experiment_status"] | null
-          template_version_id: string | null
           temperature: string | null
+          template_version_id: string | null
           updated_at: string | null
+          workspace_id: string
         }
         Insert: {
           acceptance_criteria?: string | null
@@ -1016,12 +919,15 @@ export type Database = {
           sample_matrix?: Json
           sample_storage_plan?: string | null
           scientific_question?: string | null
+          search_vector?: unknown
           secondary_outcomes?: string | null
+          short_code?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["experiment_status"] | null
-          template_version_id?: string | null
           temperature?: string | null
+          template_version_id?: string | null
           updated_at?: string | null
+          workspace_id: string
         }
         Update: {
           acceptance_criteria?: string | null
@@ -1069,14 +975,24 @@ export type Database = {
           sample_matrix?: Json
           sample_storage_plan?: string | null
           scientific_question?: string | null
+          search_vector?: unknown
           secondary_outcomes?: string | null
+          short_code?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["experiment_status"] | null
-          template_version_id?: string | null
           temperature?: string | null
+          template_version_id?: string | null
           updated_at?: string | null
+          workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "experiments_based_on_experiment_id_fkey"
+            columns: ["based_on_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "experiments_project_fkey"
             columns: ["project"]
@@ -1085,10 +1001,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "experiments_based_on_experiment_id_fkey"
-            columns: ["based_on_experiment_id"]
+            foreignKeyName: "experiments_protocol_version_id_fkey"
+            columns: ["protocol_version_id"]
             isOneToOne: false
-            referencedRelation: "experiments"
+            referencedRelation: "protocol_versions"
             referencedColumns: ["id"]
           },
           {
@@ -1099,78 +1015,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "experiments_protocol_version_fk"
-            columns: ["protocol_version_id"]
+            foreignKeyName: "experiments_workspace_id_fkey"
+            columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "protocol_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      experiment_templates: {
-        Row: {
-          archived: boolean
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          archived?: boolean
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          archived?: boolean
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
-      experiment_template_versions: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          defaults: Json
-          frozen_at: string | null
-          id: string
-          required_fields: string[]
-          template_id: string
-          version: number
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          defaults?: Json
-          frozen_at?: string | null
-          id?: string
-          required_fields?: string[]
-          template_id: string
-          version: number
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          defaults?: Json
-          frozen_at?: string | null
-          id?: string
-          required_fields?: string[]
-          template_id?: string
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "experiment_template_versions_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "experiment_templates"
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -1216,6 +1064,95 @@ export type Database = {
           },
         ]
       }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["workspace_role"]
+          token: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role: Database["public"]["Enums"]["workspace_role"]
+          token?: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["workspace_role"]
+          token?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          read_at: string | null
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          read_at?: string | null
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          read_at?: string | null
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -1237,24 +1174,448 @@ export type Database = {
         }
         Relationships: []
       }
+      project_members: {
+        Row: {
+          project_id: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+        }
+        Insert: {
+          project_id: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+        }
+        Update: {
+          project_id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           color: string | null
           id: string
           label: string
           owner_id: string | null
+          workspace_id: string
         }
         Insert: {
           color?: string | null
           id: string
           label: string
           owner_id?: string | null
+          workspace_id: string
         }
         Update: {
           color?: string | null
           id?: string
           label?: string
           owner_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_steps: {
+        Row: {
+          id: string
+          instruction: string
+          protocol_version_id: string
+          required_material: string | null
+          safety_note: string | null
+          step_number: number
+          target_atmosphere: string | null
+          target_ph: number | null
+          target_quantities: Json
+          workspace_id: string | null
+        }
+        Insert: {
+          id?: string
+          instruction: string
+          protocol_version_id: string
+          required_material?: string | null
+          safety_note?: string | null
+          step_number: number
+          target_atmosphere?: string | null
+          target_ph?: number | null
+          target_quantities?: Json
+          workspace_id?: string | null
+        }
+        Update: {
+          id?: string
+          instruction?: string
+          protocol_version_id?: string
+          required_material?: string | null
+          safety_note?: string | null
+          step_number?: number
+          target_atmosphere?: string | null
+          target_ph?: number | null
+          target_quantities?: Json
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_steps_protocol_version_id_fkey"
+            columns: ["protocol_version_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_steps_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          critical_parameters: Json
+          equipment: string | null
+          frozen_at: string | null
+          id: string
+          known_failure_modes: Json
+          protocol_id: string
+          purpose: string | null
+          qc_checks: string | null
+          required_materials: string | null
+          safety_notes: string | null
+          scope: string | null
+          version: number
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          critical_parameters?: Json
+          equipment?: string | null
+          frozen_at?: string | null
+          id?: string
+          known_failure_modes?: Json
+          protocol_id: string
+          purpose?: string | null
+          qc_checks?: string | null
+          required_materials?: string | null
+          safety_notes?: string | null
+          scope?: string | null
+          version: number
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          critical_parameters?: Json
+          equipment?: string | null
+          frozen_at?: string | null
+          id?: string
+          known_failure_modes?: Json
+          protocol_id?: string
+          purpose?: string | null
+          qc_checks?: string | null
+          required_materials?: string | null
+          safety_notes?: string | null
+          scope?: string | null
+          version?: number
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_versions_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_versions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocols: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocols_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quantity_kinds: {
+        Row: {
+          active: boolean
+          canonical_unit_code: string
+          category: string
+          compatible_units: string[]
+          key: string
+          label: string
+          sort_order: number
+          standard_field_name: string
+        }
+        Insert: {
+          active?: boolean
+          canonical_unit_code: string
+          category: string
+          compatible_units: string[]
+          key: string
+          label: string
+          sort_order: number
+          standard_field_name: string
+        }
+        Update: {
+          active?: boolean
+          canonical_unit_code?: string
+          category?: string
+          compatible_units?: string[]
+          key?: string
+          label?: string
+          sort_order?: number
+          standard_field_name?: string
+        }
+        Relationships: []
+      }
+      saved_views: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          query: Json
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          query: Json
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          query?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_views_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_deviations: {
+        Row: {
+          affected_samples: string | null
+          category: string
+          corrective_action: string | null
+          decision_owner: string | null
+          experiment_step_id: string
+          how_discovered: string | null
+          id: string
+          likely_impact: string | null
+          linked_replacement_sample: string | null
+          preventive_action: string | null
+          reported_at: string
+          reported_by: string | null
+          sample_still_usable: boolean | null
+          what_happened: string
+          workspace_id: string | null
+        }
+        Insert: {
+          affected_samples?: string | null
+          category: string
+          corrective_action?: string | null
+          decision_owner?: string | null
+          experiment_step_id: string
+          how_discovered?: string | null
+          id?: string
+          likely_impact?: string | null
+          linked_replacement_sample?: string | null
+          preventive_action?: string | null
+          reported_at?: string
+          reported_by?: string | null
+          sample_still_usable?: boolean | null
+          what_happened: string
+          workspace_id?: string | null
+        }
+        Update: {
+          affected_samples?: string | null
+          category?: string
+          corrective_action?: string | null
+          decision_owner?: string | null
+          experiment_step_id?: string
+          how_discovered?: string | null
+          id?: string
+          likely_impact?: string | null
+          linked_replacement_sample?: string | null
+          preventive_action?: string | null
+          reported_at?: string
+          reported_by?: string | null
+          sample_still_usable?: boolean | null
+          what_happened?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_deviations_experiment_step_id_fkey"
+            columns: ["experiment_step_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_deviations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_observations: {
+        Row: {
+          experiment_step_id: string
+          id: string
+          note: string
+          observed_at: string
+          observed_by: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          experiment_step_id: string
+          id?: string
+          note: string
+          observed_at?: string
+          observed_by?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          experiment_step_id?: string
+          id?: string
+          note?: string
+          observed_at?: string
+          observed_by?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_observations_experiment_step_id_fkey"
+            columns: ["experiment_step_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_observations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_members: {
+        Row: {
+          joined_at: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          joined_at?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspaces: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -1267,6 +1628,22 @@ export type Database = {
         Args: { p_ended_as?: string; p_id: string }
         Returns: undefined
       }
+      effective_role: {
+        Args: { proj_id: string; uid: string; ws_id: string }
+        Returns: Database["public"]["Enums"]["workspace_role"]
+      }
+      is_workspace_admin: {
+        Args: { uid: string; ws_id: string }
+        Returns: boolean
+      }
+      is_workspace_member: {
+        Args: { uid: string; ws_id: string }
+        Returns: boolean
+      }
+      is_workspace_writer: {
+        Args: { uid: string; ws_id: string }
+        Returns: boolean
+      }
       match_experiments: {
         Args: { match_count?: number; query_embedding: string }
         Returns: {
@@ -1276,6 +1653,7 @@ export type Database = {
         }[]
       }
       next_experiment_id: { Args: never; Returns: string }
+      next_protocol_id: { Args: never; Returns: string }
       reopen_experiment: {
         Args: { p_id: string; p_reason: string }
         Returns: undefined
@@ -1292,6 +1670,13 @@ export type Database = {
         | "archived"
         | "failed"
         | "cancelled"
+      workspace_role:
+        | "owner"
+        | "admin"
+        | "pi"
+        | "researcher"
+        | "student"
+        | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1432,6 +1817,14 @@ export const Constants = {
         "archived",
         "failed",
         "cancelled",
+      ],
+      workspace_role: [
+        "owner",
+        "admin",
+        "pi",
+        "researcher",
+        "student",
+        "viewer",
       ],
     },
   },

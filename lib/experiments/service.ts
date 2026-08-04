@@ -188,6 +188,7 @@ export async function getExperiment(
 export async function createExperiment(
   supabase: Supabase,
   userId: string,
+  workspaceId: string,
   input: ExperimentInput,
   // T1.2 D6 — provenance is never part of ExperimentInput/the plain form
   // (D10's rule extended): the instantiate/clone actions set these
@@ -202,6 +203,7 @@ export async function createExperiment(
   const { error } = await supabase.from("experiments").insert({
     id,
     owner_id: userId,
+    workspace_id: workspaceId,
     status: "draft",
     template_version_id: provenance?.templateVersionId ?? null,
     based_on_experiment_id: provenance?.basedOnExperimentId ?? null,

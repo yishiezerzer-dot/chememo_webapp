@@ -440,6 +440,12 @@ export type ExperimentTask = Omit<ExperimentTaskRow, "target_type" | "task_type"
 export type NotificationKind = "mention" | "task_assigned" | "review_requested";
 export type Notification = Omit<NotificationRow, "kind"> & { kind: NotificationKind };
 
+// T2.1 — workspace & role model.
+export type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
+export const WORKSPACE_ROLES: WorkspaceRole[] = ["owner", "admin", "pi", "researcher", "student", "viewer"];
+export type Workspace = Database["public"]["Tables"]["workspaces"]["Row"];
+export type WorkspaceMembership = { id: string; name: string; role: WorkspaceRole };
+
 export const METHOD_OPTIONS = [
   "LC-MS/MS (neg)",
   "LC-MS/MS (pos)",

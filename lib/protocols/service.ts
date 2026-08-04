@@ -65,10 +65,10 @@ export async function listSteps(protocolVersionId: string): Promise<ProtocolStep
   return (data ?? []) as ProtocolStep[];
 }
 
-export async function createProtocol(supabase: Supabase, userId: string, name: string): Promise<string> {
+export async function createProtocol(supabase: Supabase, userId: string, workspaceId: string, name: string): Promise<string> {
   const { data, error } = await supabase
     .from("protocols")
-    .insert({ name, created_by: userId })
+    .insert({ name, created_by: userId, workspace_id: workspaceId })
     .select("id")
     .single();
   if (error) throw new AppError("conflict", "Could not create the protocol.", { cause: error });
