@@ -12,6 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -23,6 +24,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
   let userAClient: SupabaseClient;
   let userBClient: SupabaseClient;
   let userAId: string;
+  let workspaceId: string;
   const experimentIds: string[] = [];
   const protocolIds: string[] = [];
 
@@ -40,7 +42,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
     userAId = userA.user.id;
 
     const emailB = `protocols-b-${randomUUID()}@test.local`;
-    const { error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
+    const { data: userB, error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
     if (errB) throw errB;
 
     userAClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
@@ -50,6 +52,8 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
     userBClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
     const { error: signInB } = await userBClient.auth.signInWithPassword({ email: emailB, password });
     if (signInB) throw signInB;
+
+    workspaceId = await createTestWorkspace(admin, [{ id: userAId }, { id: userB.user.id }]);
   });
 
   afterAll(async () => {
@@ -60,7 +64,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
   it("is lab-shared: any authenticated user creates, reads, and edits a protocol (D2)", async () => {
     const { data: protocol, error: createErr } = await userAClient
       .from("protocols")
-      .insert({ name: "Dry-down, standard", created_by: userAId })
+      .insert({ name: "Dry-down, standard", created_by: userAId, workspace_id: workspaceId })
       .select()
       .single();
     expect(createErr).toBeNull();
@@ -84,7 +88,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
   it("freezes a version (and its steps) the moment an experiment links to it, then rejects further edits", async () => {
     const { data: protocol, error: protocolErr } = await userAClient
       .from("protocols")
-      .insert({ name: "Freeze test protocol", created_by: userAId })
+      .insert({ name: "Freeze test protocol", created_by: userAId, workspace_id: workspaceId })
       .select()
       .single();
     expect(protocolErr).toBeNull();
@@ -121,6 +125,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
       name: "Linked to a protocol",
       status: "draft",
       protocol_version_id: version!.id,
+      workspace_id: workspaceId,
     });
     expect(insertErr).toBeNull();
 
@@ -153,7 +158,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
   it("experiment_steps follows the experiment_files ownership split (D9)", async () => {
     const { data: protocol } = await userAClient
       .from("protocols")
-      .insert({ name: "Ownership test protocol", created_by: userAId })
+      .insert({ name: "Ownership test protocol", created_by: userAId, workspace_id: workspaceId })
       .select()
       .single();
     protocolIds.push(protocol!.id);
@@ -176,6 +181,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
       name: "Ownership test experiment",
       status: "draft",
       protocol_version_id: version!.id,
+      workspace_id: workspaceId,
     });
 
     const { data: expStep, error: instantiateErr } = await userAClient
@@ -214,7 +220,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
   it("step_observations/step_deviations are append-only — no update or delete path exists (D6)", async () => {
     const { data: protocol } = await userAClient
       .from("protocols")
-      .insert({ name: "Append-only test protocol", created_by: userAId })
+      .insert({ name: "Append-only test protocol", created_by: userAId, workspace_id: workspaceId })
       .select()
       .single();
     protocolIds.push(protocol!.id);
@@ -237,6 +243,7 @@ describe.skipIf(!ready)("versioned protocols & experiment steps (local Supabase)
       name: "Append-only test experiment",
       status: "draft",
       protocol_version_id: version!.id,
+      workspace_id: workspaceId,
     });
     const { data: expStep } = await userAClient
       .from("experiment_steps")

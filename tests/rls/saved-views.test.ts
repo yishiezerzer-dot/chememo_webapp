@@ -7,6 +7,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -18,6 +19,7 @@ describe.skipIf(!ready)("saved views (local Supabase)", () => {
   let userAClient: SupabaseClient;
   let userBClient: SupabaseClient;
   let userAId: string;
+  let workspaceId: string;
   const viewIds: string[] = [];
 
   beforeAll(async () => {
@@ -34,7 +36,7 @@ describe.skipIf(!ready)("saved views (local Supabase)", () => {
     userAId = userA.user.id;
 
     const emailB = `views-b-${randomUUID()}@test.local`;
-    const { error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
+    const { data: userB, error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
     if (errB) throw errB;
 
     userAClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
@@ -44,6 +46,8 @@ describe.skipIf(!ready)("saved views (local Supabase)", () => {
     userBClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
     const { error: signInB } = await userBClient.auth.signInWithPassword({ email: emailB, password });
     if (signInB) throw signInB;
+
+    workspaceId = await createTestWorkspace(admin, [{ id: userAId }, { id: userB.user.id }]);
   });
 
   afterAll(async () => {
@@ -53,7 +57,7 @@ describe.skipIf(!ready)("saved views (local Supabase)", () => {
   it("is owner-only: a second user cannot read, update, or delete another's saved view", async () => {
     const { data: view, error: insertErr } = await userAClient
       .from("saved_views")
-      .insert({ owner_id: userAId, name: "Wet-dry, this month", query: { reactionType: "Wet-dry cycling" } })
+      .insert({ owner_id: userAId, name: "Wet-dry, this month", query: { reactionType: "Wet-dry cycling" }, workspace_id: workspaceId })
       .select()
       .single();
     expect(insertErr).toBeNull();
@@ -83,7 +87,7 @@ describe.skipIf(!ready)("saved views (local Supabase)", () => {
   it("cannot insert a saved view owned by someone else", async () => {
     const { data, error } = await userBClient
       .from("saved_views")
-      .insert({ owner_id: userAId, name: "Spoofed ownership", query: {} })
+      .insert({ owner_id: userAId, name: "Spoofed ownership", query: {}, workspace_id: workspaceId })
       .select();
     // WITH CHECK (owner_id = auth.uid()) rejects this outright.
     expect(data).toBeNull();

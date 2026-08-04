@@ -10,6 +10,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -20,6 +21,7 @@ describe.skipIf(!ready)("full-text search over experiments (local Supabase)", ()
   let admin: SupabaseClient;
   let userClient: SupabaseClient;
   let userId: string;
+  let workspaceId: string;
   const experimentIds: string[] = [];
 
   beforeAll(async () => {
@@ -33,6 +35,8 @@ describe.skipIf(!ready)("full-text search over experiments (local Supabase)", ()
     userClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
     const { error: signInErr } = await userClient.auth.signInWithPassword({ email, password });
     if (signInErr) throw signInErr;
+
+    workspaceId = await createTestWorkspace(admin, [{ id: userId }]);
   });
 
   afterAll(async () => {
@@ -49,6 +53,7 @@ describe.skipIf(!ready)("full-text search over experiments (local Supabase)", ()
       owner_id: userId,
       name: "Full-text search legacy-code test",
       status: "draft",
+      workspace_id: workspaceId,
       sample_matrix: [
         {
           sample_id: "", vial_label: "", legacy_code: legacyCode, batch: "B01", replicate: "R1",

@@ -8,6 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -19,6 +20,7 @@ describe.skipIf(!ready)("experiment series (local Supabase)", () => {
   let userAClient: SupabaseClient;
   let userBClient: SupabaseClient;
   let userAId: string;
+  let workspaceId: string;
   const experimentIds: string[] = [];
   const seriesIds: string[] = [];
 
@@ -32,7 +34,7 @@ describe.skipIf(!ready)("experiment series (local Supabase)", () => {
     userAId = userA.user.id;
 
     const emailB = `series-b-${randomUUID()}@test.local`;
-    const { error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
+    const { data: userB, error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
     if (errB) throw errB;
 
     userAClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
@@ -42,6 +44,8 @@ describe.skipIf(!ready)("experiment series (local Supabase)", () => {
     userBClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
     const { error: signInB } = await userBClient.auth.signInWithPassword({ email: emailB, password });
     if (signInB) throw signInB;
+
+    workspaceId = await createTestWorkspace(admin, [{ id: userAId }, { id: userB.user.id }]);
   });
 
   afterAll(async () => {
@@ -52,7 +56,7 @@ describe.skipIf(!ready)("experiment series (local Supabase)", () => {
   it("is lab-shared: a different user adds a member to another user's series and reads it back", async () => {
     const { data: series, error: seriesErr } = await userAClient
       .from("experiment_series")
-      .insert({ name: "Wet-dry dose-response, Zn", created_by: userAId })
+      .insert({ name: "Wet-dry dose-response, Zn", created_by: userAId, workspace_id: workspaceId })
       .select()
       .single();
     expect(seriesErr).toBeNull();
@@ -60,7 +64,7 @@ describe.skipIf(!ready)("experiment series (local Supabase)", () => {
 
     const expId = `EXP-SERIES-${randomUUID().slice(0, 8)}`;
     experimentIds.push(expId);
-    await admin.from("experiments").insert({ id: expId, owner_id: userAId, name: "Series member", status: "draft" });
+    await admin.from("experiments").insert({ id: expId, owner_id: userAId, name: "Series member", status: "draft", workspace_id: workspaceId });
 
     // userB (not the series creator) can still add a member.
     const { error: addErr } = await userBClient
@@ -80,14 +84,14 @@ describe.skipIf(!ready)("experiment series (local Supabase)", () => {
   it("rejects adding the same experiment to the same series twice", async () => {
     const { data: series } = await userAClient
       .from("experiment_series")
-      .insert({ name: "Duplicate-member test", created_by: userAId })
+      .insert({ name: "Duplicate-member test", created_by: userAId, workspace_id: workspaceId })
       .select()
       .single();
     seriesIds.push(series!.id);
 
     const expId = `EXP-SERIESDUP-${randomUUID().slice(0, 8)}`;
     experimentIds.push(expId);
-    await admin.from("experiments").insert({ id: expId, owner_id: userAId, name: "Dup member", status: "draft" });
+    await admin.from("experiments").insert({ id: expId, owner_id: userAId, name: "Dup member", status: "draft", workspace_id: workspaceId });
 
     const { error: firstErr } = await userAClient
       .from("experiment_series_members")

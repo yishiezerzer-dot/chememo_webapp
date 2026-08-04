@@ -11,6 +11,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -22,6 +23,7 @@ describe.skipIf(!ready)("experiment drafts (local Supabase)", () => {
   let userAClient: SupabaseClient;
   let userBClient: SupabaseClient;
   let userAId: string;
+  let workspaceId: string;
   const experimentIds: string[] = [];
 
   beforeAll(async () => {
@@ -38,7 +40,7 @@ describe.skipIf(!ready)("experiment drafts (local Supabase)", () => {
     userAId = userA.user.id;
 
     const emailB = `drafts-b-${randomUUID()}@test.local`;
-    const { error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
+    const { data: userB, error: errB } = await admin.auth.admin.createUser({ email: emailB, password, email_confirm: true });
     if (errB) throw errB;
 
     userAClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
@@ -48,6 +50,8 @@ describe.skipIf(!ready)("experiment drafts (local Supabase)", () => {
     userBClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
     const { error: signInB } = await userBClient.auth.signInWithPassword({ email: emailB, password });
     if (signInB) throw signInB;
+
+    workspaceId = await createTestWorkspace(admin, [{ id: userAId }, { id: userB.user.id }]);
   });
 
   afterAll(async () => {
@@ -57,7 +61,7 @@ describe.skipIf(!ready)("experiment drafts (local Supabase)", () => {
   it("is owner-only: a second user cannot read or write another's draft", async () => {
     const { data: draft, error: insertErr } = await userAClient
       .from("experiment_drafts")
-      .insert({ owner_id: userAId, client_draft_id: `test:${randomUUID()}`, fields: { name: "draft A" } })
+      .insert({ owner_id: userAId, client_draft_id: `test:${randomUUID()}`, fields: { name: "draft A" }, workspace_id: workspaceId })
       .select()
       .single();
     expect(insertErr).toBeNull();
@@ -84,7 +88,7 @@ describe.skipIf(!ready)("experiment drafts (local Supabase)", () => {
     const { error: firstErr } = await userAClient
       .from("experiment_drafts")
       .upsert(
-        { owner_id: userAId, client_draft_id: clientDraftId, fields: { name: "v1" } },
+        { owner_id: userAId, client_draft_id: clientDraftId, fields: { name: "v1" }, workspace_id: workspaceId },
         { onConflict: "owner_id,client_draft_id" }
       );
     expect(firstErr).toBeNull();
@@ -92,7 +96,7 @@ describe.skipIf(!ready)("experiment drafts (local Supabase)", () => {
     const { error: secondErr } = await userAClient
       .from("experiment_drafts")
       .upsert(
-        { owner_id: userAId, client_draft_id: clientDraftId, fields: { name: "v2" } },
+        { owner_id: userAId, client_draft_id: clientDraftId, fields: { name: "v2" }, workspace_id: workspaceId },
         { onConflict: "owner_id,client_draft_id" }
       );
     expect(secondErr).toBeNull();
@@ -113,7 +117,7 @@ describe.skipIf(!ready)("experiment drafts (local Supabase)", () => {
     experimentIds.push(id);
     const { data: created, error: createErr } = await admin
       .from("experiments")
-      .insert({ id, owner_id: userAId, name: "Conflict test" })
+      .insert({ id, owner_id: userAId, name: "Conflict test", workspace_id: workspaceId })
       .select("updated_at")
       .single();
     expect(createErr).toBeNull();

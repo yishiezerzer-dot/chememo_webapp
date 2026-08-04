@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -21,6 +22,7 @@ describe.skipIf(!ready)("comments, tasks, notifications (local Supabase)", () =>
   let userBClient: SupabaseClient;
   let userAId: string;
   let userBId: string;
+  let workspaceId: string;
   const experimentIds: string[] = [];
 
   beforeAll(async () => {
@@ -41,6 +43,8 @@ describe.skipIf(!ready)("comments, tasks, notifications (local Supabase)", () =>
     await userAClient.auth.signInWithPassword({ email: emailA, password });
     userBClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
     await userBClient.auth.signInWithPassword({ email: emailB, password });
+
+    workspaceId = await createTestWorkspace(admin, [{ id: userAId }, { id: userBId }]);
   });
 
   afterAll(async () => {
@@ -50,7 +54,7 @@ describe.skipIf(!ready)("comments, tasks, notifications (local Supabase)", () =>
   async function newExperiment(): Promise<string> {
     const id = `EXP-CTN-${randomUUID().slice(0, 8)}`;
     experimentIds.push(id);
-    await admin.from("experiments").insert({ id, owner_id: userAId, name: "Comments/tasks test", status: "draft" });
+    await admin.from("experiments").insert({ id, owner_id: userAId, name: "Comments/tasks test", status: "draft", workspace_id: workspaceId });
     return id;
   }
 

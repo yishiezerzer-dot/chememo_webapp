@@ -20,6 +20,7 @@ const LOCKED_STATES = ["completed", "reviewed", "archived", "failed", "cancelled
 describe.skipIf(!ready)("experiment lifecycle trigger (local Supabase)", () => {
   let admin: SupabaseClient;
   let ownerId: string;
+  let workspaceId: string;
   const ids: string[] = [];
 
   beforeAll(async () => {
@@ -32,6 +33,14 @@ describe.skipIf(!ready)("experiment lifecycle trigger (local Supabase)", () => {
     });
     if (error) throw error;
     ownerId = data.user.id;
+
+    // This suite writes exclusively through the admin (service-role) client,
+    // which bypasses RLS entirely — so no workspace_members row is needed
+    // here, unlike every other RLS suite. A real workspace row is still
+    // required to satisfy the workspace_id NOT NULL constraint on inserts.
+    const { data: ws, error: wsErr } = await admin.from("workspaces").insert({ name: `Lifecycle test ws ${randomUUID()}` }).select("id").single();
+    if (wsErr) throw wsErr;
+    workspaceId = ws!.id;
   });
 
   afterAll(async () => {
@@ -43,7 +52,7 @@ describe.skipIf(!ready)("experiment lifecycle trigger (local Supabase)", () => {
     ids.push(id);
     const { error } = await admin
       .from("experiments")
-      .insert({ id, owner_id: ownerId, name: "Lifecycle test", ...overrides });
+      .insert({ id, owner_id: ownerId, name: "Lifecycle test", workspace_id: workspaceId, ...overrides });
     if (error) throw error;
     return id;
   }

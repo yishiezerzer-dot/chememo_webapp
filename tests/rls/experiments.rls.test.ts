@@ -10,6 +10,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -22,6 +23,7 @@ describe.skipIf(!ready)("experiments RLS isolation (local Supabase)", () => {
   let userBClient: SupabaseClient;
   let anonClient: SupabaseClient;
   let userAId: string;
+  let workspaceId: string;
   const experimentId = `EXP-RLS-${randomUUID().slice(0, 8)}`;
   const emailA = `rls-a-${randomUUID()}@test.local`;
   const emailB = `rls-b-${randomUUID()}@test.local`;
@@ -39,7 +41,7 @@ describe.skipIf(!ready)("experiments RLS isolation (local Supabase)", () => {
     if (errA) throw errA;
     userAId = userA.user.id;
 
-    const { error: errB } = await admin.auth.admin.createUser({
+    const { data: userB, error: errB } = await admin.auth.admin.createUser({
       email: emailB,
       password,
       email_confirm: true,
@@ -54,9 +56,11 @@ describe.skipIf(!ready)("experiments RLS isolation (local Supabase)", () => {
     const { error: signInB } = await userBClient.auth.signInWithPassword({ email: emailB, password });
     if (signInB) throw signInB;
 
+    workspaceId = await createTestWorkspace(admin, [{ id: userAId }, { id: userB.user.id }]);
+
     const { error: insertErr } = await userAClient
       .from("experiments")
-      .insert({ id: experimentId, owner_id: userAId, name: "RLS test experiment" });
+      .insert({ id: experimentId, owner_id: userAId, name: "RLS test experiment", workspace_id: workspaceId });
     if (insertErr) throw insertErr;
   });
 
@@ -105,7 +109,7 @@ describe.skipIf(!ready)("experiments RLS isolation (local Supabase)", () => {
   it("blocks inserting an experiment owned by someone else", async () => {
     const { error } = await userBClient
       .from("experiments")
-      .insert({ id: `EXP-RLS-forged-${randomUUID().slice(0, 8)}`, owner_id: userAId, name: "forged" });
+      .insert({ id: `EXP-RLS-forged-${randomUUID().slice(0, 8)}`, owner_id: userAId, name: "forged", workspace_id: workspaceId });
     expect(error).not.toBeNull();
   });
 

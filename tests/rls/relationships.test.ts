@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestWorkspace } from "./helpers";
 
 const URL = process.env.SUPABASE_LOCAL_URL;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -21,6 +22,7 @@ describe.skipIf(!ready)("experiment relationships (local Supabase)", () => {
   let userBClient: SupabaseClient;
   let userAId: string;
   let userBId: string;
+  let workspaceId: string;
   const experimentIds: string[] = [];
   const relationshipIds: string[] = [];
 
@@ -45,6 +47,8 @@ describe.skipIf(!ready)("experiment relationships (local Supabase)", () => {
     userBClient = createClient(URL!, ANON_KEY!, { auth: { persistSession: false } });
     const { error: signInB } = await userBClient.auth.signInWithPassword({ email: emailB, password });
     if (signInB) throw signInB;
+
+    workspaceId = await createTestWorkspace(admin, [{ id: userAId }, { id: userBId }]);
   });
 
   afterAll(async () => {
@@ -56,8 +60,8 @@ describe.skipIf(!ready)("experiment relationships (local Supabase)", () => {
     const expA = `EXP-RELA-${randomUUID().slice(0, 8)}`;
     const expB = `EXP-RELB-${randomUUID().slice(0, 8)}`;
     experimentIds.push(expA, expB);
-    await admin.from("experiments").insert({ id: expA, owner_id: userAId, name: "Owned by A", status: "draft" });
-    await admin.from("experiments").insert({ id: expB, owner_id: userBId, name: "Owned by B", status: "draft" });
+    await admin.from("experiments").insert({ id: expA, owner_id: userAId, name: "Owned by A", status: "draft", workspace_id: workspaceId });
+    await admin.from("experiments").insert({ id: expB, owner_id: userBId, name: "Owned by B", status: "draft", workspace_id: workspaceId });
 
     // userA links their own experiment to userB's, as replicate_of.
     const { data: relationship, error: insertErr } = await userAClient
@@ -87,7 +91,7 @@ describe.skipIf(!ready)("experiment relationships (local Supabase)", () => {
   it("rejects a self-relationship and an unrecognized relationship_type", async () => {
     const exp = `EXP-RELSELF-${randomUUID().slice(0, 8)}`;
     experimentIds.push(exp);
-    await admin.from("experiments").insert({ id: exp, owner_id: userAId, name: "Self-relationship test", status: "draft" });
+    await admin.from("experiments").insert({ id: exp, owner_id: userAId, name: "Self-relationship test", status: "draft", workspace_id: workspaceId });
 
     const { error: selfErr } = await userAClient
       .from("experiment_relationships")
@@ -97,7 +101,7 @@ describe.skipIf(!ready)("experiment relationships (local Supabase)", () => {
 
     const expOther = `EXP-RELOTHER-${randomUUID().slice(0, 8)}`;
     experimentIds.push(expOther);
-    await admin.from("experiments").insert({ id: expOther, owner_id: userAId, name: "Other", status: "draft" });
+    await admin.from("experiments").insert({ id: expOther, owner_id: userAId, name: "Other", status: "draft", workspace_id: workspaceId });
 
     const { error: badTypeErr } = await userAClient
       .from("experiment_relationships")
@@ -110,8 +114,8 @@ describe.skipIf(!ready)("experiment relationships (local Supabase)", () => {
     const expA = `EXP-DUPA-${randomUUID().slice(0, 8)}`;
     const expB = `EXP-DUPB-${randomUUID().slice(0, 8)}`;
     experimentIds.push(expA, expB);
-    await admin.from("experiments").insert({ id: expA, owner_id: userAId, name: "Dup A", status: "draft" });
-    await admin.from("experiments").insert({ id: expB, owner_id: userAId, name: "Dup B", status: "draft" });
+    await admin.from("experiments").insert({ id: expA, owner_id: userAId, name: "Dup A", status: "draft", workspace_id: workspaceId });
+    await admin.from("experiments").insert({ id: expB, owner_id: userAId, name: "Dup B", status: "draft", workspace_id: workspaceId });
 
     const { data: first, error: firstErr } = await userAClient
       .from("experiment_relationships")
