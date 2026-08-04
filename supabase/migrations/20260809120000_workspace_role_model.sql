@@ -602,23 +602,47 @@ create policy protocol_steps_write on protocol_steps for all to authenticated
 drop policy if exists experiment_steps_read on experiment_steps;
 create policy experiment_steps_read on experiment_steps for select to authenticated
   using (is_workspace_member(workspace_id, auth.uid()));
+-- D9: writable only by the parent experiment's owner (mirrors
+-- experiment_files) — workspace scoping narrows the read/membership check,
+-- it doesn't replace the ownership check the pre-T2.1 policy already had.
 drop policy if exists experiment_steps_write on experiment_steps;
 create policy experiment_steps_write on experiment_steps for all to authenticated
-  using (is_workspace_writer(workspace_id, auth.uid())) with check (is_workspace_writer(workspace_id, auth.uid()));
+  using (
+    is_workspace_writer(workspace_id, auth.uid())
+    and exists (select 1 from experiments e where e.id = experiment_id and e.owner_id = auth.uid())
+  )
+  with check (
+    is_workspace_writer(workspace_id, auth.uid())
+    and exists (select 1 from experiments e where e.id = experiment_id and e.owner_id = auth.uid())
+  );
 
 drop policy if exists step_observations_read on step_observations;
 create policy step_observations_read on step_observations for select to authenticated
   using (is_workspace_member(workspace_id, auth.uid()));
+-- D9: insertable only by the parent experiment's owner (via experiment_steps).
 drop policy if exists step_observations_insert on step_observations;
 create policy step_observations_insert on step_observations for insert to authenticated
-  with check (is_workspace_writer(workspace_id, auth.uid()));
+  with check (
+    is_workspace_writer(workspace_id, auth.uid())
+    and exists (
+      select 1 from experiment_steps es join experiments e on e.id = es.experiment_id
+      where es.id = experiment_step_id and e.owner_id = auth.uid()
+    )
+  );
 
 drop policy if exists step_deviations_read on step_deviations;
 create policy step_deviations_read on step_deviations for select to authenticated
   using (is_workspace_member(workspace_id, auth.uid()));
+-- D9: insertable only by the parent experiment's owner (via experiment_steps).
 drop policy if exists step_deviations_insert on step_deviations;
 create policy step_deviations_insert on step_deviations for insert to authenticated
-  with check (is_workspace_writer(workspace_id, auth.uid()));
+  with check (
+    is_workspace_writer(workspace_id, auth.uid())
+    and exists (
+      select 1 from experiment_steps es join experiments e on e.id = es.experiment_id
+      where es.id = experiment_step_id and e.owner_id = auth.uid()
+    )
+  );
 
 -- experiment_templates / experiment_template_versions
 drop policy if exists experiment_templates_read on experiment_templates;
