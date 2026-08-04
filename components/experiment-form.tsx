@@ -617,6 +617,7 @@ function ExperimentFormBody({
           <button
             type="submit"
             disabled={pending}
+            aria-busy={pending}
             className="btn btn-primary"
             style={{ width: "100%", justifyContent: "center" }}
           >

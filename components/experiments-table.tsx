@@ -57,6 +57,8 @@ export function ExperimentsTable({
   const sortKey = params.sort ?? "date";
   const dir = params.dir ?? "desc";
   const arrow = (key: ExperimentSortKey) => (sortKey === key ? <span className="sort-i">{dir === "asc" ? "▲" : "▼"}</span> : null);
+  const ariaSort = (key: ExperimentSortKey): "ascending" | "descending" | "none" =>
+    sortKey === key ? (dir === "asc" ? "ascending" : "descending") : "none";
 
   const projectLabel = Object.fromEntries(projects.map((p) => [p.id, p.label]));
 
@@ -222,22 +224,32 @@ export function ExperimentsTable({
           <table className="exp-table">
             <thead>
               <tr>
-                <th className="col-id" onClick={() => toggleSort("id")}>
-                  ID {arrow("id")}
+                <th className="col-id" aria-sort={ariaSort("id")}>
+                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("id")}>
+                    ID {arrow("id")}
+                  </button>
                 </th>
-                <th className="col-name" onClick={() => toggleSort("name")}>
-                  Name {arrow("name")}
+                <th className="col-name" aria-sort={ariaSort("name")}>
+                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("name")}>
+                    Name {arrow("name")}
+                  </button>
                 </th>
-                <th className="col-date" onClick={() => toggleSort("date")}>
-                  Date {arrow("date")}
+                <th className="col-date" aria-sort={ariaSort("date")}>
+                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("date")}>
+                    Date {arrow("date")}
+                  </button>
                 </th>
                 <th className="col-status">Status</th>
                 <th className="col-proj">Project</th>
-                <th className="col-ph" onClick={() => toggleSort("ph")}>
-                  pH {arrow("ph")}
+                <th className="col-ph" aria-sort={ariaSort("ph")}>
+                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("ph")}>
+                    pH {arrow("ph")}
+                  </button>
                 </th>
-                <th className="col-cyc" onClick={() => toggleSort("cycles")}>
-                  Cyc {arrow("cycles")}
+                <th className="col-cyc" aria-sort={ariaSort("cycles")}>
+                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("cycles")}>
+                    Cyc {arrow("cycles")}
+                  </button>
                 </th>
                 <th className="col-comp">Compounds</th>
                 <th className="col-meth">Methods</th>

@@ -187,6 +187,8 @@ export function AskClient({
       {phase === "loading" && (
         <div
           className="ai-summary-card"
+          role="status"
+          aria-live="polite"
           style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}
         >
           <svg
@@ -218,6 +220,8 @@ export function AskClient({
           {showAnswerCard && (
             <div
               className="ai-summary-card"
+              aria-live="polite"
+              aria-atomic="true"
               style={
                 meta.askMode === "context"
                   ? {

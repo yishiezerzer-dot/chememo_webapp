@@ -54,7 +54,7 @@
   --border-strong: rgba(10, 90, 80, 0.30);
   --ink: #0c2230;
   --ink-dim: #2f5560;
-  --ink-mute: #5d7a82;
+  --ink-mute: #4a6870; /* T1.10 D4: was #5d7a82 — ~3.85:1 against --bg-1, fails WCAG AA */
   --teal: #0c9b86;
   --teal-soft: #0a8a78;
   --emerald: #1aa97a;
@@ -594,6 +594,9 @@ table.exp-table {
 }
 .exp-table thead th:hover { color: var(--teal); }
 .exp-table thead th .sort-i { opacity: .45; font-size: 9px; margin-left: 2px; }
+.exp-table thead th .th-sort-btn {
+  all: unset; display: inline-flex; align-items: center; cursor: pointer; font: inherit; color: inherit;
+}
 
 .exp-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .exp-table tbody tr { cursor: pointer; transition: background .12s; }

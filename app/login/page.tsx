@@ -165,10 +165,9 @@ export default function LoginPage() {
           </form>
           <div className="auth-toggle">
             {signin ? "New to the lab? " : "Already have an account? "}
-            <a
-              role="button"
-              tabIndex={0}
-              style={{ color: "var(--teal)", cursor: "pointer" }}
+            <button
+              type="button"
+              style={{ all: "unset", color: "var(--teal)", cursor: "pointer" }}
               onClick={() => {
                 setMode(signin ? "signup" : "signin");
                 setError(null);
@@ -176,7 +175,7 @@ export default function LoginPage() {
               }}
             >
               {signin ? "Create an account" : "Sign in"}
-            </a>
+            </button>
           </div>
         </div>
       </section>

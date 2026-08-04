@@ -52,7 +52,7 @@ export function FileManager({
           />
         </label>
         {uploading && (
-          <p className="muted" style={{ fontSize: 12 }}>
+          <p className="muted" role="status" style={{ fontSize: 12 }}>
             Uploading…
           </p>
         )}
