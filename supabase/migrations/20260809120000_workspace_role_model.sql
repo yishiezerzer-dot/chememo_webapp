@@ -145,10 +145,11 @@ begin
     -- has no real history anyway.
     select id into owner_uid from auth.users order by created_at limit 1;
   end if;
-  if owner_uid is null then
-    -- No users at all yet — nothing to backfill.
-    return;
-  end if;
+  -- Note: owner_uid may still be null here (CI's fresh Postgres has zero
+  -- auth.users at migration-apply time — real users are only created later,
+  -- at test-runtime). The seed migration's fixed projects/experiments rows
+  -- still need a workspace_id before section 6's NOT NULL constraints apply,
+  -- so we press on with created_by left null rather than returning early.
 
   select id into ws_id from workspaces where name = 'MFP Lab' limit 1;
   if ws_id is null then
@@ -157,7 +158,8 @@ begin
 
   insert into workspace_members (workspace_id, user_id, role)
     select ws_id, owner_uid, 'owner'
-    where not exists (select 1 from workspace_members where workspace_id = ws_id and user_id = owner_uid);
+    where owner_uid is not null
+      and not exists (select 1 from workspace_members where workspace_id = ws_id and user_id = owner_uid);
 
   insert into workspace_members (workspace_id, user_id, role)
     select ws_id, u.id, 'researcher'
