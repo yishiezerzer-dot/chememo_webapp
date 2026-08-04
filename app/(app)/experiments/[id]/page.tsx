@@ -32,6 +32,7 @@ import { listComments } from "@/lib/comments/service";
 import { listTasks } from "@/lib/tasks/service";
 import { createCommentAction, resolveCommentAction, reopenCommentAction } from "@/app/(app)/comments-actions";
 import { createTaskAction, updateTaskStatusAction } from "@/app/(app)/tasks-actions";
+import { exportExperimentMarkdownAction } from "./export-actions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList } from "@/components/file-list";
@@ -44,6 +45,7 @@ import { LifecycleControls } from "@/components/lifecycle-controls";
 import { StepRunner } from "@/components/step-runner";
 import { CommentThread } from "@/components/comment-thread";
 import { TasksPanel } from "@/components/tasks-panel";
+import { ExportMarkdownButton } from "@/components/export-markdown-button";
 
 const fmtDateTime = (iso: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "—");
 
@@ -147,19 +149,22 @@ export default async function ExperimentDetailPage({
             ))}
           </div>
         </div>
-        {isOwner && (
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <Link href={`/experiments/${e.id}/edit`} className="btn btn-ghost btn-sm">
-              Edit
-            </Link>
-            <DeleteExperimentButton
-              status={e.status}
-              hasConclusion={!!e.conclusion?.trim()}
-              deleteAction={softDeleteExperiment.bind(null, e.id)}
-              archiveAction={archiveExperiment.bind(null, e.id)}
-            />
-          </div>
-        )}
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <ExportMarkdownButton experimentId={e.id} exportMarkdown={exportExperimentMarkdownAction.bind(null, e.id)} />
+          {isOwner && (
+            <>
+              <Link href={`/experiments/${e.id}/edit`} className="btn btn-ghost btn-sm">
+                Edit
+              </Link>
+              <DeleteExperimentButton
+                status={e.status}
+                hasConclusion={!!e.conclusion?.trim()}
+                deleteAction={softDeleteExperiment.bind(null, e.id)}
+                archiveAction={archiveExperiment.bind(null, e.id)}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {isOwner && (
