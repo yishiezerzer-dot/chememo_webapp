@@ -594,9 +594,18 @@ create policy protocol_versions_update on protocol_versions for update to authen
 drop policy if exists protocol_steps_read on protocol_steps;
 create policy protocol_steps_read on protocol_steps for select to authenticated
   using (is_workspace_member(workspace_id, auth.uid()));
+-- Writable only while the parent version is still unfrozen — workspace
+-- scoping narrows this, it doesn't replace the pre-T2.1 freeze check.
 drop policy if exists protocol_steps_write on protocol_steps;
 create policy protocol_steps_write on protocol_steps for all to authenticated
-  using (is_workspace_writer(workspace_id, auth.uid())) with check (is_workspace_writer(workspace_id, auth.uid()));
+  using (
+    is_workspace_writer(workspace_id, auth.uid())
+    and exists (select 1 from protocol_versions pv where pv.id = protocol_version_id and pv.frozen_at is null)
+  )
+  with check (
+    is_workspace_writer(workspace_id, auth.uid())
+    and exists (select 1 from protocol_versions pv where pv.id = protocol_version_id and pv.frozen_at is null)
+  );
 
 -- experiment_steps / step_observations / step_deviations
 drop policy if exists experiment_steps_read on experiment_steps;
