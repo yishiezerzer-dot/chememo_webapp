@@ -343,13 +343,13 @@ export default async function ExperimentDetailPage({
             sampleStatuses={sampleStatuses}
             quantityKinds={quantityKinds}
             createBatch={createBatchAction.bind(null, e.id)}
-            createSample={(batchId, fields) => createSampleAction(e.id, batchId, fields)}
+            createSample={createSampleAction.bind(null, e.id)}
             getDetail={getSampleDetailAction}
-            createRelationship={(sourceId, targetId, type) => createSampleRelationshipAction(e.id, sourceId, targetId, type)}
+            createRelationship={createSampleRelationshipAction.bind(null, e.id)}
             deleteRelationship={deleteSampleRelationshipAction.bind(null, e.id)}
-            recordEvent={(sampleId, type, details) => recordSampleEventAction(e.id, sampleId, type, details)}
-            addMeasurement={(sampleId, quantities, notes) => addMeasurementAction(e.id, sampleId, quantities, notes)}
-            addAlias={(sampleId, alias, note) => addAliasAction(e.id, sampleId, alias, note)}
+            recordEvent={recordSampleEventAction.bind(null, e.id)}
+            addMeasurement={addMeasurementAction.bind(null, e.id)}
+            addAlias={addAliasAction.bind(null, e.id)}
           />
 
           <Suspense fallback={<div className="obs-box glass"><h4>Tasks</h4><p className="muted">Loading…</p></div>}>
