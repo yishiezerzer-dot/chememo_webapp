@@ -519,3 +519,79 @@ export type ExperimentMaterialInput = Omit<ExperimentInputRow, "source_type" | "
 export type ExperimentMaterialOutput = Omit<ExperimentOutputRow, "quantities"> & {
   quantities: Record<string, Quantity>;
 };
+
+// T2.3 — samples & lineage.
+type BatchRow = Database["public"]["Tables"]["batches"]["Row"];
+type SampleRow = Database["public"]["Tables"]["samples"]["Row"];
+type SampleAliasRow = Database["public"]["Tables"]["sample_aliases"]["Row"];
+type SampleRelationshipRow = Database["public"]["Tables"]["sample_relationships"]["Row"];
+type SampleLocationRow = Database["public"]["Tables"]["sample_locations"]["Row"];
+type SampleEventRow = Database["public"]["Tables"]["sample_events"]["Row"];
+type SampleMeasurementRow = Database["public"]["Tables"]["sample_measurements"]["Row"];
+
+export type Batch = BatchRow;
+
+// D2 — sample_type/reaction_mode/status are controlled_vocabularies values,
+// checked against the live seed rows the same way material_role is (T2.2).
+// origin_type/origin_id mirrors ExperimentMaterialInput's source_type/
+// source_id polymorphic reference to a material_lot or stock_solution.
+export type Sample = SampleRow;
+
+export type SampleAlias = SampleAliasRow;
+
+export type SampleRelationshipType =
+  | "produced_from"
+  | "consumed_by"
+  | "split_into"
+  | "combined_from"
+  | "diluted_from"
+  | "dried_from"
+  | "transferred_from"
+  | "analyzed_in";
+export const SAMPLE_RELATIONSHIP_TYPES: SampleRelationshipType[] = [
+  "produced_from",
+  "consumed_by",
+  "split_into",
+  "combined_from",
+  "diluted_from",
+  "dried_from",
+  "transferred_from",
+  "analyzed_in",
+];
+export type SampleRelationship = Omit<SampleRelationshipRow, "relationship_type"> & {
+  relationship_type: SampleRelationshipType;
+};
+
+export type SampleLocation = SampleLocationRow;
+
+// D5 — G7's chain-of-custody transfer event is one event_type among
+// several here, not a dedicated table. `details` shape depends on
+// event_type: transfer carries {from_location_path, to_location_path,
+// reason, transport_temperature, courier, tracking_number,
+// condition_on_receipt, quantity_received, status}; reconstitution/dilution
+// carry their own §13.1/§13.3 field lists.
+export type SampleEventType =
+  | "transfer"
+  | "status_change"
+  | "aliquoted"
+  | "measured"
+  | "note"
+  | "reconstitution"
+  | "dilution";
+export const SAMPLE_EVENT_TYPES: SampleEventType[] = [
+  "transfer",
+  "status_change",
+  "aliquoted",
+  "measured",
+  "note",
+  "reconstitution",
+  "dilution",
+];
+export type SampleEvent = Omit<SampleEventRow, "event_type" | "details"> & {
+  event_type: SampleEventType;
+  details: Record<string, unknown>;
+};
+
+export type SampleMeasurement = Omit<SampleMeasurementRow, "quantities"> & {
+  quantities: Record<string, Quantity>;
+};

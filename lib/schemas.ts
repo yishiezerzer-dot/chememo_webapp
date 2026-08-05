@@ -199,6 +199,37 @@ export function validateSolubilityStatus(status: string, allowed: string[]): str
   return null;
 }
 
+// T2.3 D2/D6 — sample_type/reaction_mode/sample_status/storage_status are
+// all controlled_vocabularies values (§23.1-§23.3, §17.3), checked against
+// the live seed rows the same way material_role is above.
+export function validateSampleType(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized sample type.`;
+  }
+  return null;
+}
+
+export function validateReactionMode(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized reaction mode.`;
+  }
+  return null;
+}
+
+export function validateSampleStatus(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized sample status.`;
+  }
+  return null;
+}
+
+export function validateStorageStatus(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized storage status.`;
+  }
+  return null;
+}
+
 export const projectLabelSchema = z
   .string()
   .trim()

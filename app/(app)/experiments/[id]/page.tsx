@@ -17,6 +17,17 @@ import { listRelationships } from "@/lib/relationships/service";
 import { listSeries, listSeriesForExperiment } from "@/lib/series/service";
 import * as materialsService from "@/lib/materials/service";
 import { addInputAction, removeInputAction, addOutputAction, removeOutputAction } from "./inputs-actions";
+import * as samplesService from "@/lib/samples/service";
+import {
+  createBatchAction,
+  createSampleAction,
+  getSampleDetailAction,
+  createSampleRelationshipAction,
+  deleteSampleRelationshipAction,
+  recordSampleEventAction,
+  addMeasurementAction,
+  addAliasAction,
+} from "./samples-actions";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";
@@ -42,6 +53,7 @@ import { FileManager } from "@/components/file-manager";
 import { SummaryCard } from "@/components/summary-card";
 import { RelationshipsPanel } from "@/components/relationships-panel";
 import { InputsOutputsPanel } from "@/components/inputs-outputs-panel";
+import { SamplesPanel } from "@/components/samples-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { LifecycleControls } from "@/components/lifecycle-controls";
@@ -74,6 +86,10 @@ export default async function ExperimentDetailPage({
     materials,
     materialRoles,
     outputRoles,
+    batches,
+    sampleTypes,
+    reactionModes,
+    sampleStatuses,
   ] = await Promise.all([
     getExperiment(id),
     listProjects(),
@@ -90,7 +106,13 @@ export default async function ExperimentDetailPage({
     materialsService.listMaterials(),
     listControlledVocab("material_role"),
     listControlledVocab("output_role"),
+    samplesService.listBatches(id),
+    listControlledVocab("sample_type"),
+    listControlledVocab("reaction_mode"),
+    listControlledVocab("sample_status"),
   ]);
+  const samplesByBatchEntries = await Promise.all(batches.map(async (b) => [b.id, await samplesService.listSamples(b.id)] as const));
+  const samplesByBatch = Object.fromEntries(samplesByBatchEntries);
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
@@ -309,6 +331,25 @@ export default async function ExperimentDetailPage({
             removeInput={removeInputAction.bind(null, e.id)}
             addOutput={addOutputAction.bind(null, e.id)}
             removeOutput={removeOutputAction.bind(null, e.id)}
+          />
+
+          <SamplesPanel
+            experimentId={e.id}
+            batches={batches}
+            samplesByBatch={samplesByBatch}
+            lotStockOptions={lotStockOptions}
+            sampleTypes={sampleTypes}
+            reactionModes={reactionModes}
+            sampleStatuses={sampleStatuses}
+            quantityKinds={quantityKinds}
+            createBatch={createBatchAction.bind(null, e.id)}
+            createSample={(batchId, fields) => createSampleAction(e.id, batchId, fields)}
+            getDetail={getSampleDetailAction}
+            createRelationship={(sourceId, targetId, type) => createSampleRelationshipAction(e.id, sourceId, targetId, type)}
+            deleteRelationship={deleteSampleRelationshipAction.bind(null, e.id)}
+            recordEvent={(sampleId, type, details) => recordSampleEventAction(e.id, sampleId, type, details)}
+            addMeasurement={(sampleId, quantities, notes) => addMeasurementAction(e.id, sampleId, quantities, notes)}
+            addAlias={(sampleId, alias, note) => addAliasAction(e.id, sampleId, alias, note)}
           />
 
           <Suspense fallback={<div className="obs-box glass"><h4>Tasks</h4><p className="muted">Loading…</p></div>}>

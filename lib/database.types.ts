@@ -123,6 +123,48 @@ export type Database = {
           },
         ]
       }
+      batches: {
+        Row: {
+          created_at: string
+          experiment_id: string
+          id: string
+          label: string
+          notes: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          experiment_id: string
+          id?: string
+          label: string
+          notes?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          experiment_id?: string
+          id?: string
+          label?: string
+          notes?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batches_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comment_mentions: {
         Row: {
           comment_id: string
@@ -1723,6 +1765,304 @@ export type Database = {
           standard_field_name?: string
         }
         Relationships: []
+      }
+      sample_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          id: string
+          note: string | null
+          sample_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          sample_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          sample_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sample_aliases_sample_id_fkey"
+            columns: ["sample_id"]
+            isOneToOne: false
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sample_aliases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sample_events: {
+        Row: {
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          occurred_at: string
+          performed_by: string | null
+          sample_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          occurred_at?: string
+          performed_by?: string | null
+          sample_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          performed_by?: string | null
+          sample_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sample_events_sample_id_fkey"
+            columns: ["sample_id"]
+            isOneToOne: false
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sample_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sample_locations: {
+        Row: {
+          location_path: string | null
+          sample_id: string
+          status: string | null
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          location_path?: string | null
+          sample_id: string
+          status?: string | null
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          location_path?: string | null
+          sample_id?: string
+          status?: string | null
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sample_locations_sample_id_fkey"
+            columns: ["sample_id"]
+            isOneToOne: true
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sample_locations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sample_measurements: {
+        Row: {
+          created_at: string
+          id: string
+          measured_at: string
+          measured_by: string | null
+          notes: string | null
+          quantities: Json
+          sample_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          measured_at?: string
+          measured_by?: string | null
+          notes?: string | null
+          quantities?: Json
+          sample_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          measured_at?: string
+          measured_by?: string | null
+          notes?: string | null
+          quantities?: Json
+          sample_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sample_measurements_sample_id_fkey"
+            columns: ["sample_id"]
+            isOneToOne: false
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sample_measurements_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sample_relationships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          relationship_type: string
+          source_sample_id: string
+          target_sample_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relationship_type: string
+          source_sample_id: string
+          target_sample_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relationship_type?: string
+          source_sample_id?: string
+          target_sample_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sample_relationships_source_sample_id_fkey"
+            columns: ["source_sample_id"]
+            isOneToOne: false
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sample_relationships_target_sample_id_fkey"
+            columns: ["target_sample_id"]
+            isOneToOne: false
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sample_relationships_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      samples: {
+        Row: {
+          batch_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          legacy_code: string | null
+          notes: string | null
+          origin_id: string | null
+          origin_type: string | null
+          reaction_mode: string | null
+          replicate: number
+          sample_type: string | null
+          status: string
+          updated_at: string
+          vial_label: string
+          workspace_id: string | null
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legacy_code?: string | null
+          notes?: string | null
+          origin_id?: string | null
+          origin_type?: string | null
+          reaction_mode?: string | null
+          replicate?: number
+          sample_type?: string | null
+          status?: string
+          updated_at?: string
+          vial_label: string
+          workspace_id?: string | null
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legacy_code?: string | null
+          notes?: string | null
+          origin_id?: string | null
+          origin_type?: string | null
+          reaction_mode?: string | null
+          replicate?: number
+          sample_type?: string | null
+          status?: string
+          updated_at?: string
+          vial_label?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "samples_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "samples_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_views: {
         Row: {
