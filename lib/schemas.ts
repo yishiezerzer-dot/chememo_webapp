@@ -175,6 +175,30 @@ export function validateDeviationCategory(category: string, allowed: string[]): 
   return null;
 }
 
+// T2.2 D4/D3 — material_role, output_role, and solubility_status are all
+// controlled_vocabularies values (§7.6, §23.5), checked against the live
+// seed rows the same way deviation_category is above.
+export function validateMaterialRole(role: string, allowed: string[]): string | null {
+  if (!allowed.includes(role)) {
+    return `"${role}" is not a recognized material role.`;
+  }
+  return null;
+}
+
+export function validateOutputRole(role: string, allowed: string[]): string | null {
+  if (!allowed.includes(role)) {
+    return `"${role}" is not a recognized output role.`;
+  }
+  return null;
+}
+
+export function validateSolubilityStatus(status: string, allowed: string[]): string | null {
+  if (!allowed.includes(status)) {
+    return `"${status}" is not a recognized solubility status.`;
+  }
+  return null;
+}
+
 export const projectLabelSchema = z
   .string()
   .trim()

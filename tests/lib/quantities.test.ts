@@ -29,6 +29,29 @@ describe("convert", () => {
     expect(() => convert(1, "Cel", "mM")).toThrow();
     expect(() => convert(1, "made-up-unit", "Cel")).toThrow();
   });
+
+  // T2.2 D5 — mass/volume families, and molar_concentration gaining "M".
+  it("scales molar concentration to/from M (1 M = 1000 mM)", () => {
+    expect(convert(1, "M", "mM")).toBe(1000);
+    expect(convert(1000, "mM", "M")).toBe(1);
+  });
+
+  it("round-trips mass (g -> mg -> kg -> ug -> g)", () => {
+    expect(convert(1, "g", "mg")).toBe(1000);
+    expect(convert(1, "kg", "g")).toBe(1000);
+    expect(convert(1_000_000, "ug", "g")).toBeCloseTo(1, 5);
+    expect(convert(1, "mg", "g")).toBeCloseTo(0.001, 6);
+  });
+
+  it("round-trips volume (mL -> uL -> L -> mL)", () => {
+    expect(convert(1, "mL", "uL")).toBe(1000);
+    expect(convert(1, "L", "mL")).toBe(1000);
+    expect(convert(1000, "mL", "L")).toBe(1);
+  });
+
+  it("does not let mass and volume units convert into each other", () => {
+    expect(() => convert(1, "g", "mL")).toThrow();
+  });
 });
 
 describe("toStandardFieldName", () => {

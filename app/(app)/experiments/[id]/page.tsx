@@ -15,6 +15,8 @@ import { listVersionOptions } from "@/lib/protocols/service";
 import { listStepDetails } from "@/lib/experiment-steps/service";
 import { listRelationships } from "@/lib/relationships/service";
 import { listSeries, listSeriesForExperiment } from "@/lib/series/service";
+import * as materialsService from "@/lib/materials/service";
+import { addInputAction, removeInputAction, addOutputAction, removeOutputAction } from "./inputs-actions";
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";
@@ -39,6 +41,7 @@ import { FileList } from "@/components/file-list";
 import { FileManager } from "@/components/file-manager";
 import { SummaryCard } from "@/components/summary-card";
 import { RelationshipsPanel } from "@/components/relationships-panel";
+import { InputsOutputsPanel } from "@/components/inputs-outputs-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { LifecycleControls } from "@/components/lifecycle-controls";
@@ -65,6 +68,12 @@ export default async function ExperimentDetailPage({
     relationships,
     allSeries,
     memberSeries,
+    materialInputs,
+    materialOutputs,
+    lotStockOptions,
+    materials,
+    materialRoles,
+    outputRoles,
   ] = await Promise.all([
     getExperiment(id),
     listProjects(),
@@ -75,6 +84,12 @@ export default async function ExperimentDetailPage({
     listRelationships(id),
     listSeries(),
     listSeriesForExperiment(id),
+    materialsService.listInputs(id),
+    materialsService.listOutputs(id),
+    materialsService.listLotAndStockOptions(),
+    materialsService.listMaterials(),
+    listControlledVocab("material_role"),
+    listControlledVocab("output_role"),
   ]);
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
@@ -280,6 +295,20 @@ export default async function ExperimentDetailPage({
             deleteRelationship={deleteRelationshipAction.bind(null, e.id)}
             addToSeries={addExperimentToSeriesAction.bind(null, e.id)}
             removeFromSeries={removeExperimentFromSeriesAction.bind(null, e.id)}
+          />
+
+          <InputsOutputsPanel
+            inputs={materialInputs}
+            outputs={materialOutputs}
+            lotStockOptions={lotStockOptions}
+            materials={materials}
+            materialRoles={materialRoles}
+            outputRoles={outputRoles}
+            quantityKinds={quantityKinds}
+            addInput={addInputAction.bind(null, e.id)}
+            removeInput={removeInputAction.bind(null, e.id)}
+            addOutput={addOutputAction.bind(null, e.id)}
+            removeOutput={removeOutputAction.bind(null, e.id)}
           />
 
           <Suspense fallback={<div className="obs-box glass"><h4>Tasks</h4><p className="muted">Loading…</p></div>}>

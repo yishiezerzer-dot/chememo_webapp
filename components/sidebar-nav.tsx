@@ -51,6 +51,16 @@ const ITEMS = [
     ),
   },
   {
+    href: "/materials",
+    label: "Materials",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M9 3h6M10 3v5l-6 10a2 2 0 0 0 1.8 3h12.4a2 2 0 0 0 1.8-3l-6-10V3" />
+        <path d="M8 15h8" />
+      </svg>
+    ),
+  },
+  {
     href: "/ask",
     label: "Ask AI",
     icon: (

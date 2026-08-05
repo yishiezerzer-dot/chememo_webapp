@@ -6,6 +6,7 @@ import { listQuantityKinds } from "@/lib/quantities/service";
 import { listVersionOptions } from "@/lib/protocols/service";
 import { listProjects } from "@/lib/projects/service";
 import { getDraft } from "@/lib/drafts/service";
+import { listInputs } from "@/lib/materials/service";
 import { updateExperiment } from "@/app/(app)/new/actions";
 import { reopenExperiment } from "../lifecycle-actions";
 import { ExperimentForm } from "@/components/experiment-form";
@@ -19,7 +20,7 @@ export default async function EditExperimentPage({
 }) {
   const { id } = await params;
   const draftKey = { targetExperimentId: id } as const;
-  const [result, projects, vocab, sampleVocab, quantityKinds, protocolVersions, recoveredDraft] = await Promise.all([
+  const [result, projects, vocab, sampleVocab, quantityKinds, protocolVersions, recoveredDraft, materialInputs] = await Promise.all([
     getExperiment(id),
     listProjects(),
     listVocab(),
@@ -27,6 +28,7 @@ export default async function EditExperimentPage({
     listQuantityKinds(),
     listVersionOptions(),
     getDraft(draftKey),
+    listInputs(id),
   ]);
   if (!result) notFound();
 
@@ -80,6 +82,7 @@ export default async function EditExperimentPage({
         protocolVersions={protocolVersions}
         draftKey={draftKey}
         recoveredDraft={recoveredDraft}
+        hasMaterialInputs={materialInputs.length > 0}
       />
     </div>
   );

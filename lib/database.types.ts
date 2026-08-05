@@ -390,6 +390,60 @@ export type Database = {
           },
         ]
       }
+      experiment_inputs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          experiment_id: string
+          id: string
+          notes: string | null
+          quantities: Json
+          role: string
+          source_id: string
+          source_type: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          experiment_id: string
+          id?: string
+          notes?: string | null
+          quantities?: Json
+          role: string
+          source_id: string
+          source_type: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          experiment_id?: string
+          id?: string
+          notes?: string | null
+          quantities?: Json
+          role?: string
+          source_id?: string
+          source_type?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_inputs_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_inputs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experiment_lock_events: {
         Row: {
           actor_id: string | null
@@ -428,6 +482,67 @@ export type Database = {
           },
           {
             foreignKeyName: "experiment_lock_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experiment_outputs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          experiment_id: string
+          id: string
+          material_id: string | null
+          material_name: string | null
+          notes: string | null
+          quantities: Json
+          role: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          experiment_id: string
+          id?: string
+          material_id?: string | null
+          material_name?: string | null
+          notes?: string | null
+          quantities?: Json
+          role?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          experiment_id?: string
+          id?: string
+          material_id?: string | null
+          material_name?: string | null
+          notes?: string | null
+          quantities?: Json
+          role?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_outputs_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_outputs_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_outputs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1108,6 +1223,192 @@ export type Database = {
           },
         ]
       }
+      material_identifiers: {
+        Row: {
+          created_at: string
+          id: string
+          identifier_type: string
+          is_primary: boolean
+          material_id: string
+          value: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          identifier_type: string
+          is_primary?: boolean
+          material_id: string
+          value: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          identifier_type?: string
+          is_primary?: boolean
+          material_id?: string
+          value?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_identifiers_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_identifiers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_lots: {
+        Row: {
+          catalog_number: string | null
+          commercial_solution_quantities: Json
+          concentration_basis: string | null
+          created_at: string
+          created_by: string | null
+          date_opened: string | null
+          density: number | null
+          density_temperature: number | null
+          expiration_or_retest_date: string | null
+          id: string
+          lot_number: string | null
+          material_id: string
+          physical_form: string | null
+          purity: number | null
+          storage_location_id: string | null
+          supplier: string | null
+          updated_at: string
+          water_content_or_hydrate_form: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          catalog_number?: string | null
+          commercial_solution_quantities?: Json
+          concentration_basis?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_opened?: string | null
+          density?: number | null
+          density_temperature?: number | null
+          expiration_or_retest_date?: string | null
+          id?: string
+          lot_number?: string | null
+          material_id: string
+          physical_form?: string | null
+          purity?: number | null
+          storage_location_id?: string | null
+          supplier?: string | null
+          updated_at?: string
+          water_content_or_hydrate_form?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          catalog_number?: string | null
+          commercial_solution_quantities?: Json
+          concentration_basis?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_opened?: string | null
+          density?: number | null
+          density_temperature?: number | null
+          expiration_or_retest_date?: string | null
+          id?: string
+          lot_number?: string | null
+          material_id?: string
+          physical_form?: string | null
+          purity?: number | null
+          storage_location_id?: string | null
+          supplier?: string | null
+          updated_at?: string
+          water_content_or_hydrate_form?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_lots_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_lots_storage_location_id_fkey"
+            columns: ["storage_location_id"]
+            isOneToOne: false
+            referencedRelation: "storage_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_lots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      materials: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          exact_mass: number | null
+          formula: string | null
+          id: string
+          molecular_weight: number | null
+          preferred_name: string
+          safety_notes: string | null
+          short_code: string | null
+          stereochemistry: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          exact_mass?: number | null
+          formula?: string | null
+          id?: string
+          molecular_weight?: number | null
+          preferred_name: string
+          safety_notes?: string | null
+          short_code?: string | null
+          stereochemistry?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          exact_mass?: number | null
+          formula?: string | null
+          id?: string
+          molecular_weight?: number | null
+          preferred_name?: string
+          safety_notes?: string | null
+          short_code?: string | null
+          stereochemistry?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "materials_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           comment_id: string | null
@@ -1562,6 +1863,204 @@ export type Database = {
           },
           {
             foreignKeyName: "step_observations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_solubility_attempts: {
+        Row: {
+          attempt_number: number
+          attempted_at: string
+          attempted_by: string | null
+          id: string
+          notes: string | null
+          outcome: string
+          solvent: string | null
+          stock_solution_id: string
+          target_quantities: Json
+          workspace_id: string | null
+        }
+        Insert: {
+          attempt_number: number
+          attempted_at?: string
+          attempted_by?: string | null
+          id?: string
+          notes?: string | null
+          outcome: string
+          solvent?: string | null
+          stock_solution_id: string
+          target_quantities?: Json
+          workspace_id?: string | null
+        }
+        Update: {
+          attempt_number?: number
+          attempted_at?: string
+          attempted_by?: string | null
+          id?: string
+          notes?: string | null
+          outcome?: string
+          solvent?: string | null
+          stock_solution_id?: string
+          target_quantities?: Json
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_solubility_attempts_stock_solution_id_fkey"
+            columns: ["stock_solution_id"]
+            isOneToOne: false
+            referencedRelation: "stock_solutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_solubility_attempts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_solutions: {
+        Row: {
+          acid_or_base_added: string | null
+          acid_or_base_quantities: Json
+          actual_quantities: Json
+          calculation: Json
+          color_and_appearance: string | null
+          created_at: string
+          expiration_or_review_date: string | null
+          filtration_or_centrifugation: string | null
+          freeze_thaw_count: number
+          id: string
+          material_lot_id: string
+          ph_measured: number | null
+          ph_target: number | null
+          prepared_at: string | null
+          prepared_by: string | null
+          solubility_status: string | null
+          solvent: string | null
+          solvent_grade: string | null
+          storage_location_id: string | null
+          storage_temperature: number | null
+          target_quantities: Json
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          acid_or_base_added?: string | null
+          acid_or_base_quantities?: Json
+          actual_quantities?: Json
+          calculation?: Json
+          color_and_appearance?: string | null
+          created_at?: string
+          expiration_or_review_date?: string | null
+          filtration_or_centrifugation?: string | null
+          freeze_thaw_count?: number
+          id?: string
+          material_lot_id: string
+          ph_measured?: number | null
+          ph_target?: number | null
+          prepared_at?: string | null
+          prepared_by?: string | null
+          solubility_status?: string | null
+          solvent?: string | null
+          solvent_grade?: string | null
+          storage_location_id?: string | null
+          storage_temperature?: number | null
+          target_quantities?: Json
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          acid_or_base_added?: string | null
+          acid_or_base_quantities?: Json
+          actual_quantities?: Json
+          calculation?: Json
+          color_and_appearance?: string | null
+          created_at?: string
+          expiration_or_review_date?: string | null
+          filtration_or_centrifugation?: string | null
+          freeze_thaw_count?: number
+          id?: string
+          material_lot_id?: string
+          ph_measured?: number | null
+          ph_target?: number | null
+          prepared_at?: string | null
+          prepared_by?: string | null
+          solubility_status?: string | null
+          solvent?: string | null
+          solvent_grade?: string | null
+          storage_location_id?: string | null
+          storage_temperature?: number | null
+          target_quantities?: Json
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_solutions_material_lot_id_fkey"
+            columns: ["material_lot_id"]
+            isOneToOne: false
+            referencedRelation: "material_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_solutions_storage_location_id_fkey"
+            columns: ["storage_location_id"]
+            isOneToOne: false
+            referencedRelation: "storage_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_solutions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storage_locations: {
+        Row: {
+          conditions: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          workspace_id: string
+        }
+        Insert: {
+          conditions?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          workspace_id: string
+        }
+        Update: {
+          conditions?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_locations_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

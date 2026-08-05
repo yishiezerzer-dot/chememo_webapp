@@ -53,6 +53,10 @@ type Props = {
   // PasteNotes' current text (a sibling component, not a descendant of this
   // <form> — T1.3 D7). Only ever set on the new-experiment entry points.
   rawNote?: string;
+  // T2.2 D7 — true once this experiment has at least one real
+  // experiment_inputs row; only the edit page (never new-experiment flows,
+  // which can't have inputs yet) ever passes true.
+  hasMaterialInputs?: boolean;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -70,12 +74,19 @@ function TagField({
   metal,
   initial,
   suggestions = [],
+  readOnly = false,
 }: {
   name: string;
   label: string;
   metal?: boolean;
   initial: string[];
   suggestions?: string[];
+  // T2.2 D7 — once an experiment has real structured experiment_inputs, the
+  // old free-text compounds/metals fields become display-only: the value
+  // still submits (a hidden input still carries it), but a researcher can no
+  // longer add/remove tags here — new material use is expected to go
+  // through the Inputs & Outputs panel instead.
+  readOnly?: boolean;
 }) {
   const [tags, setTags] = useState<string[]>(initial);
   const [draft, setDraft] = useState("");
@@ -98,29 +109,31 @@ function TagField({
         {tags.map((t) => (
           <span key={t} className={`ti${metal ? " metal" : ""}`}>
             {t}
-            <b onClick={() => setTags(tags.filter((x) => x !== t))}>×</b>
+            {!readOnly && <b onClick={() => setTags(tags.filter((x) => x !== t))}>×</b>}
           </span>
         ))}
-        <input
-          value={draft}
-          list={options.length ? listId : undefined}
-          onChange={(e) => {
-            const v = e.target.value;
-            // Selecting a datalist option fires change with the full value.
-            if (options.includes(v)) add(v);
-            else setDraft(v);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === ",") {
-              e.preventDefault();
-              add();
-            } else if (e.key === "Backspace" && !draft && tags.length) {
-              setTags(tags.slice(0, -1));
-            }
-          }}
-          onBlur={() => add()}
-          placeholder="type and press Enter"
-        />
+        {!readOnly && (
+          <input
+            value={draft}
+            list={options.length ? listId : undefined}
+            onChange={(e) => {
+              const v = e.target.value;
+              // Selecting a datalist option fires change with the full value.
+              if (options.includes(v)) add(v);
+              else setDraft(v);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                add();
+              } else if (e.key === "Backspace" && !draft && tags.length) {
+                setTags(tags.slice(0, -1));
+              }
+            }}
+            onBlur={() => add()}
+            placeholder="type and press Enter"
+          />
+        )}
         {options.length > 0 && (
           <datalist id={listId}>
             {options.map((s) => (
@@ -129,6 +142,11 @@ function TagField({
           </datalist>
         )}
       </div>
+      {readOnly && (
+        <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
+          Display only — use Inputs &amp; outputs below for new materials.
+        </p>
+      )}
     </div>
   );
 }
@@ -243,6 +261,7 @@ function ExperimentFormBody({
   nameRequired = true,
   draftKey,
   rawNote,
+  hasMaterialInputs = false,
 }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [state, setState] = useState<ActionResult | null>(null);
@@ -486,9 +505,9 @@ function ExperimentFormBody({
             <span className="sec-num">03</span>Chemistry
           </h3>
           <p className="sec-sub">Compounds, metals and conditions.</p>
-          <TagField name="compounds" label="Compounds" initial={initial?.compounds ?? []} suggestions={vocab?.compounds} />
+          <TagField name="compounds" label="Compounds" initial={initial?.compounds ?? []} suggestions={vocab?.compounds} readOnly={hasMaterialInputs} />
           <FieldError message={fieldErrors?.compounds} />
-          <TagField name="metals" label="Metals" metal initial={initial?.metals ?? []} suggestions={vocab?.metals} />
+          <TagField name="metals" label="Metals" metal initial={initial?.metals ?? []} suggestions={vocab?.metals} readOnly={hasMaterialInputs} />
           <FieldError message={fieldErrors?.metals} />
           <div className="grid-2">
             <div className="field">

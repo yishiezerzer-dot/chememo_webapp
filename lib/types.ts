@@ -453,3 +453,69 @@ export const METHOD_OPTIONS = [
   "Microscopy",
   "UV-Vis",
 ] as const;
+
+// T2.2 — materials, lots & stock solutions.
+type MaterialRow = Database["public"]["Tables"]["materials"]["Row"];
+type MaterialIdentifierRow = Database["public"]["Tables"]["material_identifiers"]["Row"];
+type StorageLocationRow = Database["public"]["Tables"]["storage_locations"]["Row"];
+type MaterialLotRow = Database["public"]["Tables"]["material_lots"]["Row"];
+type StockSolutionRow = Database["public"]["Tables"]["stock_solutions"]["Row"];
+type StockSolubilityAttemptRow = Database["public"]["Tables"]["stock_solubility_attempts"]["Row"];
+type ExperimentInputRow = Database["public"]["Tables"]["experiment_inputs"]["Row"];
+type ExperimentOutputRow = Database["public"]["Tables"]["experiment_outputs"]["Row"];
+
+export type Material = MaterialRow;
+
+export type IdentifierType = "cas" | "pubchem_cid" | "inchikey" | "smiles" | "internal_code" | "alias";
+export type MaterialIdentifier = Omit<MaterialIdentifierRow, "identifier_type"> & { identifier_type: IdentifierType };
+
+export type StorageLocation = StorageLocationRow;
+
+export type ConcentrationBasis = "w/w" | "w/v" | "v/v" | "molarity";
+export type MaterialLot = Omit<MaterialLotRow, "concentration_basis" | "commercial_solution_quantities"> & {
+  concentration_basis: ConcentrationBasis | null;
+  commercial_solution_quantities: Record<string, Quantity>;
+};
+
+// D3a — {formula, inputs: {target_molarity, target_volume, molecular_weight,
+// purity_fraction}, calculated_mass_g, notes}. Every field optional since a
+// stock may be prepared without a full calculation on file.
+export type StockCalculation = {
+  formula?: string;
+  inputs?: Record<string, number>;
+  calculated_mass_g?: number;
+  notes?: string;
+};
+
+// D3 — solubility_status is a controlled_vocabularies value ("solubility_status"),
+// checked against the live seed rows the same way deviation_category is.
+export type StockSolution = Omit<
+  StockSolutionRow,
+  "target_quantities" | "actual_quantities" | "acid_or_base_quantities" | "calculation"
+> & {
+  target_quantities: Record<string, Quantity>;
+  actual_quantities: Record<string, Quantity>;
+  acid_or_base_quantities: Record<string, Quantity>;
+  calculation: StockCalculation;
+};
+
+// D3 — append-only (no update/delete path exists at the RLS level), same
+// shape as StepObservation/StepDeviation.
+export type StockSolubilityAttempt = Omit<StockSolubilityAttemptRow, "target_quantities"> & {
+  target_quantities: Record<string, Quantity>;
+};
+
+// D4 — polymorphic reference to an exact lot or stock, same shape as
+// comments/experiment_tasks' target_type/target_id. Named "Material"Input/
+// Output (not just "Experiment"Input/Output) to avoid colliding with T1.8's
+// pre-existing ExperimentInput (the writable form-submission shape of an
+// Experiment) — a different, unrelated concept that already owns that name.
+export type InputSourceType = "lot" | "stock";
+export type ExperimentMaterialInput = Omit<ExperimentInputRow, "source_type" | "quantities"> & {
+  source_type: InputSourceType;
+  quantities: Record<string, Quantity>;
+};
+
+export type ExperimentMaterialOutput = Omit<ExperimentOutputRow, "quantities"> & {
+  quantities: Record<string, Quantity>;
+};

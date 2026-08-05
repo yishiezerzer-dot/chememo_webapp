@@ -3,7 +3,11 @@
 // (§9.4, §13.2). Each unit belongs to exactly one family, converted via a
 // base unit (Cel / h / mM / mg per mL / percent) so this stays O(units),
 // not a pairwise O(units^2) formula table.
-type UnitFamily = "temperature" | "duration" | "molar_concentration" | "mass_concentration" | "percent";
+// T2.2 D5 adds "mass" and "volume", and "molar_concentration" gains "M" —
+// §7.2's stock preparations and §7.6's experiment_inputs need real
+// mass/volume units that didn't exist before (the pre-existing 'volume'
+// quantity_kind had no matching family here at all).
+type UnitFamily = "temperature" | "duration" | "molar_concentration" | "mass_concentration" | "percent" | "mass" | "volume";
 
 const UNIT_FAMILY: Record<string, UnitFamily> = {
   Cel: "temperature",
@@ -14,9 +18,17 @@ const UNIT_FAMILY: Record<string, UnitFamily> = {
   d: "duration",
   mM: "molar_concentration",
   uM: "molar_concentration",
+  M: "molar_concentration",
   "mg/mL": "mass_concentration",
   "ug/mL": "mass_concentration",
   "%": "percent",
+  g: "mass",
+  mg: "mass",
+  kg: "mass",
+  ug: "mass",
+  mL: "volume",
+  uL: "volume",
+  L: "volume",
 };
 
 function toBase(value: number, unit: string, family: UnitFamily): number {
@@ -34,6 +46,7 @@ function toBase(value: number, unit: string, family: UnitFamily): number {
     case "molar_concentration":
       if (unit === "mM") return value;
       if (unit === "uM") return value / 1000;
+      if (unit === "M") return value * 1000;
       break;
     case "mass_concentration":
       if (unit === "mg/mL") return value;
@@ -41,6 +54,17 @@ function toBase(value: number, unit: string, family: UnitFamily): number {
       break;
     case "percent":
       if (unit === "%") return value;
+      break;
+    case "mass":
+      if (unit === "g") return value;
+      if (unit === "mg") return value / 1000;
+      if (unit === "kg") return value * 1000;
+      if (unit === "ug") return value / 1_000_000;
+      break;
+    case "volume":
+      if (unit === "mL") return value;
+      if (unit === "uL") return value / 1000;
+      if (unit === "L") return value * 1000;
       break;
   }
   throw new Error(`Unsupported unit "${unit}" for conversion.`);
@@ -61,6 +85,7 @@ function fromBase(value: number, unit: string, family: UnitFamily): number {
     case "molar_concentration":
       if (unit === "mM") return value;
       if (unit === "uM") return value * 1000;
+      if (unit === "M") return value / 1000;
       break;
     case "mass_concentration":
       if (unit === "mg/mL") return value;
@@ -68,6 +93,17 @@ function fromBase(value: number, unit: string, family: UnitFamily): number {
       break;
     case "percent":
       if (unit === "%") return value;
+      break;
+    case "mass":
+      if (unit === "g") return value;
+      if (unit === "mg") return value * 1000;
+      if (unit === "kg") return value / 1000;
+      if (unit === "ug") return value * 1_000_000;
+      break;
+    case "volume":
+      if (unit === "mL") return value;
+      if (unit === "uL") return value * 1000;
+      if (unit === "L") return value / 1000;
       break;
   }
   throw new Error(`Unsupported unit "${unit}" for conversion.`);
