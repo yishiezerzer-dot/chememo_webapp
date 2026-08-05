@@ -434,10 +434,14 @@ export type Database = {
       }
       experiment_inputs: {
         Row: {
+          calculation: Json
           created_at: string
           created_by: string | null
+          equivalents: number | null
           experiment_id: string
           id: string
+          is_limiting_reagent: boolean
+          moles: number | null
           notes: string | null
           quantities: Json
           role: string
@@ -446,10 +450,14 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          calculation?: Json
           created_at?: string
           created_by?: string | null
+          equivalents?: number | null
           experiment_id: string
           id?: string
+          is_limiting_reagent?: boolean
+          moles?: number | null
           notes?: string | null
           quantities?: Json
           role: string
@@ -458,10 +466,14 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          calculation?: Json
           created_at?: string
           created_by?: string | null
+          equivalents?: number | null
           experiment_id?: string
           id?: string
+          is_limiting_reagent?: boolean
+          moles?: number | null
           notes?: string | null
           quantities?: Json
           role?: string
@@ -533,6 +545,7 @@ export type Database = {
       }
       experiment_outputs: {
         Row: {
+          calculation: Json
           created_at: string
           created_by: string | null
           experiment_id: string
@@ -540,11 +553,14 @@ export type Database = {
           material_id: string | null
           material_name: string | null
           notes: string | null
+          percent_yield: number | null
           quantities: Json
           role: string
+          theoretical_yield_mass: number | null
           workspace_id: string | null
         }
         Insert: {
+          calculation?: Json
           created_at?: string
           created_by?: string | null
           experiment_id: string
@@ -552,11 +568,14 @@ export type Database = {
           material_id?: string | null
           material_name?: string | null
           notes?: string | null
+          percent_yield?: number | null
           quantities?: Json
           role?: string
+          theoretical_yield_mass?: number | null
           workspace_id?: string | null
         }
         Update: {
+          calculation?: Json
           created_at?: string
           created_by?: string | null
           experiment_id?: string
@@ -564,8 +583,10 @@ export type Database = {
           material_id?: string | null
           material_name?: string | null
           notes?: string | null
+          percent_yield?: number | null
           quantities?: Json
           role?: string
+          theoretical_yield_mass?: number | null
           workspace_id?: string | null
         }
         Relationships: [

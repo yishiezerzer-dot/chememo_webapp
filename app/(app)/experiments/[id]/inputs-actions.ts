@@ -98,3 +98,16 @@ export async function removeOutputAction(experimentId: string, outputId: string)
   revalidatePath(`/experiments/${experimentId}`);
   return { ok: true };
 }
+
+// T2.4 D2 — explicit only, never automatic on read (§18.6/§19.2's "never
+// silently change a calculated value").
+export async function recalculateStoichiometryAction(experimentId: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  try {
+    await materialsService.recalculateStoichiometry(supabase, experimentId);
+  } catch (e) {
+    return toActionResult("recalculateStoichiometryAction", e);
+  }
+  revalidatePath(`/experiments/${experimentId}`);
+  return { ok: true };
+}

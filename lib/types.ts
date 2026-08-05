@@ -511,13 +511,18 @@ export type StockSolubilityAttempt = Omit<StockSolubilityAttemptRow, "target_qua
 // pre-existing ExperimentInput (the writable form-submission shape of an
 // Experiment) — a different, unrelated concept that already owns that name.
 export type InputSourceType = "lot" | "stock";
-export type ExperimentMaterialInput = Omit<ExperimentInputRow, "source_type" | "quantities"> & {
+// T2.4 D1 — moles/equivalents/is_limiting_reagent/calculation added by the
+// stoichiometry migration; calculation reuses StockCalculation's
+// {formula, inputs, notes} shape (defined below, alongside StockSolution).
+export type ExperimentMaterialInput = Omit<ExperimentInputRow, "source_type" | "quantities" | "calculation"> & {
   source_type: InputSourceType;
   quantities: Record<string, Quantity>;
+  calculation: StockCalculation;
 };
 
-export type ExperimentMaterialOutput = Omit<ExperimentOutputRow, "quantities"> & {
+export type ExperimentMaterialOutput = Omit<ExperimentOutputRow, "quantities" | "calculation"> & {
   quantities: Record<string, Quantity>;
+  calculation: StockCalculation;
 };
 
 // T2.3 — samples & lineage.

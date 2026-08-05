@@ -1,6 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { convert } from "@/lib/quantities/convert";
+import { deriveMoles, determineLimitingReagent, calculateYield } from "@/lib/stoichiometry/calculate";
+import type { Json } from "@/lib/database.types";
 import type {
   Material,
   MaterialIdentifier,
@@ -376,4 +379,149 @@ export async function addOutput(
 export async function removeOutput(supabase: Supabase, outputId: string): Promise<void> {
   const { error } = await supabase.from("experiment_outputs").delete().eq("id", outputId);
   if (error) throw new AppError("conflict", "Could not remove the experiment output.", { cause: error });
+}
+
+// ---------------------------------------------------------------------------
+// T2.4 — stoichiometry (D2, D3, D6). Runs only when explicitly triggered
+// (recalculateStoichiometryAction), never automatically on read — §18.6/
+// §19.2's "never silently change a calculated value."
+// ---------------------------------------------------------------------------
+
+type ResolvedOrigin = {
+  molecularWeight: number | null;
+  purityFraction: number | null;
+  densityGPerMl: number | null;
+  stockConcentrationMolarPerL: number | null;
+};
+
+async function resolveOrigin(supabase: Supabase, sourceType: InputSourceType, sourceId: string): Promise<ResolvedOrigin> {
+  if (sourceType === "lot") {
+    const { data } = await supabase
+      .from("material_lots")
+      .select("purity, density, materials!inner(molecular_weight)")
+      .eq("id", sourceId)
+      .maybeSingle();
+    const material = data ? (Array.isArray(data.materials) ? data.materials[0] : data.materials) : undefined;
+    return {
+      molecularWeight: material?.molecular_weight ?? null,
+      purityFraction: data?.purity != null ? data.purity / 100 : null,
+      densityGPerMl: data?.density ?? null,
+      stockConcentrationMolarPerL: null,
+    };
+  }
+  const { data } = await supabase
+    .from("stock_solutions")
+    .select("target_quantities, actual_quantities, material_lots!inner(purity, density, materials!inner(molecular_weight))")
+    .eq("id", sourceId)
+    .maybeSingle();
+  const lot = data ? (Array.isArray(data.material_lots) ? data.material_lots[0] : data.material_lots) : undefined;
+  const material = lot ? (Array.isArray(lot.materials) ? lot.materials[0] : lot.materials) : undefined;
+  const quantities = (data?.actual_quantities ?? data?.target_quantities ?? {}) as Record<string, Quantity>;
+  const concentration = quantities.stock_concentration;
+  let concentrationMolarPerL: number | null = null;
+  if (concentration) {
+    try {
+      concentrationMolarPerL = convert(concentration.value, concentration.unit_code, "M");
+    } catch {
+      concentrationMolarPerL = null;
+    }
+  }
+  return {
+    molecularWeight: material?.molecular_weight ?? null,
+    purityFraction: lot?.purity != null ? lot.purity / 100 : null,
+    densityGPerMl: lot?.density ?? null,
+    stockConcentrationMolarPerL: concentrationMolarPerL,
+  };
+}
+
+export async function recalculateStoichiometry(supabase: Supabase, experimentId: string): Promise<void> {
+  const inputs = await listInputs(experimentId);
+
+  const computed: { id: string; role: string; moles: number | null; calculation: StockCalculation }[] = [];
+  for (const input of inputs) {
+    const origin = await resolveOrigin(supabase, input.source_type, input.source_id);
+    const massQty = input.quantities.input_amount_mass;
+    const volumeQty = input.quantities.input_amount_volume;
+
+    let result: { moles: number; calculation: StockCalculation } | null = null;
+    if (origin.stockConcentrationMolarPerL !== null && volumeQty) {
+      try {
+        const volumeL = convert(volumeQty.value, volumeQty.unit_code, "L");
+        result = deriveMoles({ kind: "stock_concentration", volumeL, concentrationMolarPerL: origin.stockConcentrationMolarPerL });
+      } catch {
+        result = null;
+      }
+    } else if (massQty && origin.molecularWeight && origin.purityFraction) {
+      try {
+        const massG = convert(massQty.value, massQty.unit_code, "g");
+        result = deriveMoles({ kind: "solid_mass", massG, molecularWeight: origin.molecularWeight, purityFraction: origin.purityFraction });
+      } catch {
+        result = null;
+      }
+    } else if (volumeQty && origin.densityGPerMl && origin.molecularWeight && origin.purityFraction) {
+      try {
+        const volumeMl = convert(volumeQty.value, volumeQty.unit_code, "mL");
+        result = deriveMoles({
+          kind: "liquid_volume",
+          volumeMl,
+          densityGPerMl: origin.densityGPerMl,
+          molecularWeight: origin.molecularWeight,
+          purityFraction: origin.purityFraction,
+        });
+      } catch {
+        result = null;
+      }
+    }
+
+    computed.push({
+      id: input.id,
+      role: input.role,
+      moles: result?.moles ?? null,
+      calculation: result?.calculation ?? {},
+    });
+  }
+
+  const { limitingId, equivalents } = determineLimitingReagent(computed);
+
+  for (const c of computed) {
+    const { error } = await supabase
+      .from("experiment_inputs")
+      .update({
+        moles: c.moles,
+        equivalents: equivalents[c.id] ?? null,
+        is_limiting_reagent: c.id === limitingId,
+        calculation: c.calculation as unknown as Json,
+      })
+      .eq("id", c.id);
+    if (error) throw new AppError("conflict", "Could not save the recalculated stoichiometry.", { cause: error });
+  }
+
+  if (limitingId) {
+    const limitingMoles = computed.find((c) => c.id === limitingId)!.moles!;
+    const outputs = await listOutputs(experimentId);
+    for (const output of outputs) {
+      if (!output.material_id) continue;
+      const { data: material } = await supabase.from("materials").select("molecular_weight").eq("id", output.material_id).maybeSingle();
+      if (!material?.molecular_weight) continue;
+      const actualMassG = output.quantities.input_amount_mass
+        ? (() => {
+            try {
+              return convert(output.quantities.input_amount_mass!.value, output.quantities.input_amount_mass!.unit_code, "g");
+            } catch {
+              return null;
+            }
+          })()
+        : null;
+      const yieldResult = calculateYield(limitingMoles, material.molecular_weight, actualMassG);
+      const { error } = await supabase
+        .from("experiment_outputs")
+        .update({
+          theoretical_yield_mass: yieldResult.theoreticalYieldMass,
+          percent_yield: yieldResult.percentYield,
+          calculation: yieldResult.calculation as unknown as Json,
+        })
+        .eq("id", output.id);
+      if (error) throw new AppError("conflict", "Could not save the recalculated yield.", { cause: error });
+    }
+  }
 }

@@ -16,7 +16,7 @@ import { listStepDetails } from "@/lib/experiment-steps/service";
 import { listRelationships } from "@/lib/relationships/service";
 import { listSeries, listSeriesForExperiment } from "@/lib/series/service";
 import * as materialsService from "@/lib/materials/service";
-import { addInputAction, removeInputAction, addOutputAction, removeOutputAction } from "./inputs-actions";
+import { addInputAction, removeInputAction, addOutputAction, removeOutputAction, recalculateStoichiometryAction } from "./inputs-actions";
 import * as samplesService from "@/lib/samples/service";
 import {
   createBatchAction,
@@ -331,6 +331,7 @@ export default async function ExperimentDetailPage({
             removeInput={removeInputAction.bind(null, e.id)}
             addOutput={addOutputAction.bind(null, e.id)}
             removeOutput={removeOutputAction.bind(null, e.id)}
+            recalculate={recalculateStoichiometryAction.bind(null, e.id)}
           />
 
           <SamplesPanel

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { totalVolumeLiters } from "@/lib/stoichiometry/calculate";
 import type {
   ActionResult,
   ExperimentMaterialInput,
@@ -14,6 +15,22 @@ import type {
 } from "@/lib/types";
 
 type LotStockOption = { id: string; source_type: InputSourceType; label: string };
+
+// T2.4 D4 — molar ratio for the reactant/substrate-role inputs, e.g.
+// "L-Lac:L-Pro = 5:1 mol/mol" (§6.6). Computed live from each input's
+// already-stored moles, normalized against the smallest value — never
+// persisted, so there's no separate cache to keep in sync.
+function molarRatioLabel(inputs: ExperimentMaterialInput[], lotStockOptions: LotStockOption[]): string | null {
+  const consumed = inputs.filter((i) => (i.role === "reactant" || i.role === "substrate") && i.moles !== null && i.moles > 0);
+  if (consumed.length < 2) return null;
+  const minMoles = Math.min(...consumed.map((i) => i.moles!));
+  const parts = consumed.map((i) => {
+    const label = lotStockOptions.find((o) => o.id === i.source_id)?.label ?? i.source_id;
+    const shortLabel = label.split(" — ")[0];
+    return { shortLabel, ratio: i.moles! / minMoles };
+  });
+  return parts.map((p) => `${p.shortLabel}`).join(":") + " = " + parts.map((p) => p.ratio.toFixed(2)).join(":") + " mol/mol";
+}
 
 export function InputsOutputsPanel({
   inputs,
@@ -27,6 +44,7 @@ export function InputsOutputsPanel({
   removeInput,
   addOutput,
   removeOutput,
+  recalculate,
 }: {
   inputs: ExperimentMaterialInput[];
   outputs: ExperimentMaterialOutput[];
@@ -39,6 +57,7 @@ export function InputsOutputsPanel({
   removeInput: (inputId: string) => Promise<ActionResult>;
   addOutput: (materialId: string | null, materialName: string, role: string, quantities: Record<string, Quantity>, notes: string) => Promise<ActionResult>;
   removeOutput: (outputId: string) => Promise<ActionResult>;
+  recalculate: () => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
   const { showToast } = useToast();
@@ -76,9 +95,24 @@ export function InputsOutputsPanel({
     return { [isMass ? "input_amount_mass" : "input_amount_volume"]: { value: Number(value), unit_code: unit } };
   }
 
+  const ratioLabel = molarRatioLabel(inputs, lotStockOptions);
+  const totalVolumeL = totalVolumeLiters(inputs);
+
   return (
     <div className="obs-box glass">
-      <h4>Inputs &amp; outputs</h4>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h4 style={{ margin: 0 }}>Inputs &amp; outputs</h4>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => run(recalculate)}>
+          Recalculate stoichiometry
+        </button>
+      </div>
+      {(ratioLabel || totalVolumeL > 0) && (
+        <p className="muted" style={{ fontSize: 12.5, margin: "6px 0 12px" }}>
+          {ratioLabel && <>{ratioLabel}</>}
+          {ratioLabel && totalVolumeL > 0 && " · "}
+          {totalVolumeL > 0 && <>Total volume: {(totalVolumeL * 1000).toFixed(3)} mL</>}
+        </p>
+      )}
 
       {inputs.length === 0 ? (
         <p className="muted" style={{ margin: "0 0 12px" }}>
@@ -96,7 +130,10 @@ export function InputsOutputsPanel({
                   <b>{i.role}</b>: {option?.label ?? i.source_id}
                   {amount && ` — ${amount.value} ${amount.unit_code}`}
                   {i.quantities?.purity && ` (${i.quantities.purity.value}% purity)`}
+                  {i.moles !== null && ` — ${i.moles.toPrecision(4)} mol`}
+                  {i.equivalents !== null && ` (${i.equivalents.toFixed(2)} eq)`}
                 </span>
+                {i.is_limiting_reagent && <span className="chip">limiting reagent</span>}
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
@@ -176,6 +213,8 @@ export function InputsOutputsPanel({
                 <span style={{ fontSize: 13 }}>
                   <b>{o.role}</b>: {o.material_name ?? materials.find((m) => m.id === o.material_id)?.preferred_name ?? "Material"}
                   {amount && ` — ${amount.value} ${amount.unit_code}`}
+                  {o.theoretical_yield_mass !== null && ` — theoretical ${o.theoretical_yield_mass.toPrecision(4)} g`}
+                  {o.percent_yield !== null && ` (${o.percent_yield.toFixed(1)}% yield)`}
                 </span>
                 <button
                   type="button"
