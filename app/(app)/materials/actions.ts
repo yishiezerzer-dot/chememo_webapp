@@ -91,6 +91,17 @@ export async function createStorageLocationAction(name: string, conditions: stri
   return { ok: true };
 }
 
+export async function deleteStorageLocationAction(locationId: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  try {
+    await materialsService.deleteStorageLocation(supabase, locationId);
+  } catch (e) {
+    return toActionResult("deleteStorageLocationAction", e);
+  }
+  revalidatePath("/materials");
+  return { ok: true };
+}
+
 export async function createLotAction(materialId: string, fields: materialsService.MaterialLotFields): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   try {

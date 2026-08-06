@@ -286,6 +286,82 @@ export type Database = {
           },
         ]
       }
+      batch_condition_programs: {
+        Row: {
+          agitation: string | null
+          atmosphere: string | null
+          batch_id: string
+          created_at: string
+          created_by: string | null
+          cycle_count: number
+          humidity_or_drying_method: string | null
+          id: string
+          name: string
+          notes: string | null
+          quantities: Json
+          sampling_points: string | null
+          template_id: string | null
+          vessel: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          agitation?: string | null
+          atmosphere?: string | null
+          batch_id: string
+          created_at?: string
+          created_by?: string | null
+          cycle_count?: number
+          humidity_or_drying_method?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          quantities?: Json
+          sampling_points?: string | null
+          template_id?: string | null
+          vessel?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          agitation?: string | null
+          atmosphere?: string | null
+          batch_id?: string
+          created_at?: string
+          created_by?: string | null
+          cycle_count?: number
+          humidity_or_drying_method?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          quantities?: Json
+          sampling_points?: string | null
+          template_id?: string | null
+          vessel?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_condition_programs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: true
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_condition_programs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "condition_program_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_condition_programs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batches: {
         Row: {
           created_at: string
@@ -405,6 +481,125 @@ export type Database = {
           },
         ]
       }
+      condition_program_cycles: {
+        Row: {
+          batch_condition_program_id: string
+          created_at: string
+          created_by: string | null
+          cycle_index: number
+          deviation: Json
+          dry_end_at: string | null
+          dry_start_at: string | null
+          id: string
+          observation: string | null
+          quantities: Json
+          wet_end_at: string | null
+          wet_start_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          batch_condition_program_id: string
+          created_at?: string
+          created_by?: string | null
+          cycle_index: number
+          deviation?: Json
+          dry_end_at?: string | null
+          dry_start_at?: string | null
+          id?: string
+          observation?: string | null
+          quantities?: Json
+          wet_end_at?: string | null
+          wet_start_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          batch_condition_program_id?: string
+          created_at?: string
+          created_by?: string | null
+          cycle_index?: number
+          deviation?: Json
+          dry_end_at?: string | null
+          dry_start_at?: string | null
+          id?: string
+          observation?: string | null
+          quantities?: Json
+          wet_end_at?: string | null
+          wet_start_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "condition_program_cycles_batch_condition_program_id_fkey"
+            columns: ["batch_condition_program_id"]
+            isOneToOne: false
+            referencedRelation: "batch_condition_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "condition_program_cycles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      condition_program_templates: {
+        Row: {
+          agitation: string | null
+          atmosphere: string | null
+          created_at: string
+          created_by: string | null
+          cycle_count: number
+          humidity_or_drying_method: string | null
+          id: string
+          name: string
+          notes: string | null
+          quantities: Json
+          sampling_points: string | null
+          vessel: string | null
+          workspace_id: string
+        }
+        Insert: {
+          agitation?: string | null
+          atmosphere?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycle_count?: number
+          humidity_or_drying_method?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          quantities?: Json
+          sampling_points?: string | null
+          vessel?: string | null
+          workspace_id: string
+        }
+        Update: {
+          agitation?: string | null
+          atmosphere?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycle_count?: number
+          humidity_or_drying_method?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          quantities?: Json
+          sampling_points?: string | null
+          vessel?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "condition_program_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       controlled_vocabularies: {
         Row: {
           active: boolean
@@ -428,6 +623,141 @@ export type Database = {
           vocabulary?: string
         }
         Relationships: []
+      }
+      controls: {
+        Row: {
+          control_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          experiment_id: string
+          id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          control_type: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          experiment_id: string
+          id?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          control_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          experiment_id?: string
+          id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "controls_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "controls_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      environmental_conditions: {
+        Row: {
+          anaerobic: boolean | null
+          atmosphere_gas: string | null
+          batch_id: string
+          buffer_identity: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          final_ph: number | null
+          freeze_thaw_cycles: number | null
+          heating_method: string | null
+          id: string
+          initial_ph: number | null
+          ionic_strength: string | null
+          light_uv_exposure: string | null
+          light_uv_wavelength: number | null
+          mineral_surface_type: string | null
+          notes: string | null
+          pressure: string | null
+          quantities: Json
+          vessel_material: string | null
+          water_activity: number | null
+          workspace_id: string | null
+        }
+        Insert: {
+          anaerobic?: boolean | null
+          atmosphere_gas?: string | null
+          batch_id: string
+          buffer_identity?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          final_ph?: number | null
+          freeze_thaw_cycles?: number | null
+          heating_method?: string | null
+          id?: string
+          initial_ph?: number | null
+          ionic_strength?: string | null
+          light_uv_exposure?: string | null
+          light_uv_wavelength?: number | null
+          mineral_surface_type?: string | null
+          notes?: string | null
+          pressure?: string | null
+          quantities?: Json
+          vessel_material?: string | null
+          water_activity?: number | null
+          workspace_id?: string | null
+        }
+        Update: {
+          anaerobic?: boolean | null
+          atmosphere_gas?: string | null
+          batch_id?: string
+          buffer_identity?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          final_ph?: number | null
+          freeze_thaw_cycles?: number | null
+          heating_method?: string | null
+          id?: string
+          initial_ph?: number | null
+          ionic_strength?: string | null
+          light_uv_exposure?: string | null
+          light_uv_wavelength?: number | null
+          mineral_surface_type?: string | null
+          notes?: string | null
+          pressure?: string | null
+          quantities?: Json
+          vessel_material?: string | null
+          water_activity?: number | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "environmental_conditions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: true
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "environmental_conditions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       experiment_drafts: {
         Row: {

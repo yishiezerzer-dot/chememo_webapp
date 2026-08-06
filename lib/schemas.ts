@@ -262,6 +262,15 @@ export function validateAssignmentConfidence(value: string, allowed: string[]): 
   return null;
 }
 
+// T2.6 D4 — control_type (§8.5) is a controlled_vocabularies value, checked
+// against the live seed rows the same way material_role is above.
+export function validateControlType(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized control type.`;
+  }
+  return null;
+}
+
 export const projectLabelSchema = z
   .string()
   .trim()

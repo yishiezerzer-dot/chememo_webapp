@@ -20,6 +20,7 @@ import {
   deleteLotAction,
   addIdentifierAction,
   createStorageLocationAction,
+  deleteStorageLocationAction,
   createLotAction,
   createStockAction,
   verifyStockAction,
@@ -551,6 +552,18 @@ export function MaterialsClient({
           {storageLocations.map((s) => (
             <span key={s.id} className="chip" style={{ marginRight: 6, marginBottom: 6, display: "inline-block" }}>
               {s.name}
+              <b
+                onClick={() =>
+                  start(async () => {
+                    const res = await deleteStorageLocationAction(s.id);
+                    if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
+                    else router.refresh();
+                  })
+                }
+                style={{ marginLeft: 6, cursor: "pointer" }}
+              >
+                ×
+              </b>
             </span>
           ))}
         </div>

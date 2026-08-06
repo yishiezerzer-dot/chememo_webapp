@@ -662,3 +662,61 @@ export type AnalysisResult = Omit<AnalysisResultRow, "details"> & {
 // ("assignment_confidence", §14.1) from AnalysisResult's own result_confidence.
 export type IonMode = "positive" | "negative";
 export type PeakAssignment = Omit<PeakAssignmentRow, "ion_mode"> & { ion_mode: IonMode | null };
+
+// T2.6 — prebiotic condition programs & controls.
+type ConditionProgramTemplateRow = Database["public"]["Tables"]["condition_program_templates"]["Row"];
+type BatchConditionProgramRow = Database["public"]["Tables"]["batch_condition_programs"]["Row"];
+type ConditionProgramCycleRow = Database["public"]["Tables"]["condition_program_cycles"]["Row"];
+type EnvironmentalConditionsRow = Database["public"]["Tables"]["environmental_conditions"]["Row"];
+type ControlRow = Database["public"]["Tables"]["controls"]["Row"];
+
+// D1 — a reusable definition (quantities: wet_temperature/dry_temperature/
+// wet_duration/dry_duration/starting_volume/rehydration_volume).
+export type ConditionProgramTemplate = Omit<ConditionProgramTemplateRow, "quantities"> & {
+  quantities: Record<string, Quantity>;
+};
+
+// D1 — a frozen per-batch instance; editing the source template afterward
+// never changes an already-applied instance (mirrors T1.5's protocol
+// version freeze).
+export type BatchConditionProgram = Omit<BatchConditionProgramRow, "quantities"> & {
+  quantities: Record<string, Quantity>;
+};
+
+// D2 — one row per actual cycle (Standard §9.3's worked table). quantities
+// holds cycle_wet_volume/aliquot_volume; deviation is a documented-shape
+// jsonb (gap G1), same convention as sample_events.details.
+export type ConditionProgramCycle = Omit<ConditionProgramCycleRow, "quantities" | "deviation"> & {
+  quantities: Record<string, Quantity>;
+  deviation: Record<string, unknown>;
+};
+
+// D3 — one row per batch; quantities holds buffer_concentration.
+// custom_fields is the audit's explicit open-ended-fields instruction.
+export type EnvironmentalConditions = Omit<EnvironmentalConditionsRow, "quantities" | "custom_fields"> & {
+  quantities: Record<string, Quantity>;
+  custom_fields: Record<string, unknown>;
+};
+
+// D4 — control_type is a controlled_vocabularies value (§8.5, 7 values),
+// checked against the live seed rows the same way material_role is (T2.2).
+// Which experiment(s) this control validates is recorded via T1.7's
+// existing experiment_relationships 'control_for' type, not a new table.
+export type ControlType =
+  | "blank"
+  | "no_catalyst"
+  | "no_heat"
+  | "single_component"
+  | "positive"
+  | "technical_replicate"
+  | "independent_replicate";
+export const CONTROL_TYPES: ControlType[] = [
+  "blank",
+  "no_catalyst",
+  "no_heat",
+  "single_component",
+  "positive",
+  "technical_replicate",
+  "independent_replicate",
+];
+export type Control = Omit<ControlRow, "control_type"> & { control_type: ControlType };

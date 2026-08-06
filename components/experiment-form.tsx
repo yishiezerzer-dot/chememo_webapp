@@ -57,6 +57,9 @@ type Props = {
   // experiment_inputs row; only the edit page (never new-experiment flows,
   // which can't have inputs yet) ever passes true.
   hasMaterialInputs?: boolean;
+  // T2.6 D6 — true once this experiment has at least one real `controls`
+  // row; only the edit page passes true (mirrors hasMaterialInputs above).
+  hasControls?: boolean;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -262,6 +265,7 @@ function ExperimentFormBody({
   draftKey,
   rawNote,
   hasMaterialInputs = false,
+  hasControls = false,
 }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [state, setState] = useState<ActionResult | null>(null);
@@ -368,7 +372,7 @@ function ExperimentFormBody({
           </div>
           <div className="field">
             <label>Controls</label>
-            <ControlsChecklist name="controls" initial={initial?.controls ?? []} />
+            <ControlsChecklist name="controls" initial={initial?.controls ?? []} readOnly={hasControls} />
           </div>
           <div className="field">
             <label>Protocol version</label>

@@ -20,6 +20,7 @@ import type {
   SampleRelationshipType,
 } from "@/lib/types";
 import type { SampleFields } from "@/lib/samples/service";
+import type { ConditionProgramTemplate } from "@/lib/types";
 import {
   createRunAction,
   createResultAction,
@@ -28,9 +29,324 @@ import {
   getRunDetailAction,
   getResultPeaksAction,
 } from "@/app/(app)/experiments/[id]/analysis-actions";
+import {
+  applyConditionProgramTemplateAction,
+  createAdHocConditionProgramAction,
+  getBatchConditionsAction,
+  addConditionProgramCycleAction,
+  saveEnvironmentalConditionsAction,
+} from "@/app/(app)/experiments/[id]/conditions-actions";
 
 type LotStockOption = { id: string; source_type: InputSourceType; label: string };
 type MethodOption = { id: string; label: string };
+
+// T2.6 — self-contained, like T2.5's AnalysisRunsSection: fetches/mutates
+// its own data via the conditions actions directly rather than threading
+// callback props two component levels deep.
+function ConditionProgramSection({
+  batchId,
+  experimentId,
+  templates,
+  quantityKinds,
+}: {
+  batchId: string;
+  experimentId: string;
+  templates: ConditionProgramTemplate[];
+  quantityKinds: QuantityKind[];
+}) {
+  const [pending, start] = useTransition();
+  const { showToast } = useToast();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<Awaited<ReturnType<typeof getBatchConditionsAction>> | null>(null);
+  const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
+  const [showAdHoc, setShowAdHoc] = useState(false);
+  const [showCycle, setShowCycle] = useState(false);
+  const [showEnv, setShowEnv] = useState(false);
+  const [name, setName] = useState("");
+  const [cycleCount, setCycleCount] = useState("");
+  const [atmosphere, setAtmosphere] = useState("");
+  const [cycleIndex, setCycleIndex] = useState("");
+  const [wetVolume, setWetVolume] = useState<Quantity | undefined>();
+  const [aliquotVolume, setAliquotVolume] = useState<Quantity | undefined>();
+  const [observation, setObservation] = useState("");
+  const [atmosphereGas, setAtmosphereGas] = useState("");
+  const [initialPh, setInitialPh] = useState("");
+  const [finalPh, setFinalPh] = useState("");
+  const [anaerobic, setAnaerobic] = useState(false);
+
+  async function load() {
+    if (!open) setData(await getBatchConditionsAction(batchId));
+    setOpen((o) => !o);
+  }
+
+  function run(action: () => Promise<ActionResult>, after?: () => void) {
+    start(async () => {
+      const res = await action();
+      if (!res.ok) showToast(res.error, "error");
+      else {
+        router.refresh();
+        setData(await getBatchConditionsAction(batchId));
+        after?.();
+      }
+    });
+  }
+
+  const wetVolumeKind = quantityKinds.find((k) => k.key === "cycle_wet_volume");
+  const aliquotVolumeKind = quantityKinds.find((k) => k.key === "aliquot_volume");
+
+  return (
+    <div className="act-row" style={{ flexDirection: "column", alignItems: "stretch", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="act-dot"></span>
+        <span style={{ fontSize: 13 }}>Condition program &amp; environment</span>
+        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
+          {open ? "Hide" : "Show"}
+        </button>
+      </div>
+
+      {open && data && (
+        <div style={{ marginTop: 8, paddingLeft: 20 }}>
+          {!data.program ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+              {templates.length > 0 && (
+                <>
+                  <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={pending || !templateId}
+                    onClick={() => run(() => applyConditionProgramTemplateAction(experimentId, batchId, templateId))}
+                  >
+                    Apply template
+                  </button>
+                </>
+              )}
+              {!showAdHoc ? (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowAdHoc(true)}>
+                  + Ad hoc program
+                </button>
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <input placeholder="Program name" value={name} onChange={(e) => setName(e.target.value)} />
+                  <input placeholder="Cycle count" type="number" value={cycleCount} onChange={(e) => setCycleCount(e.target.value)} style={{ width: 100 }} />
+                  <input placeholder="Atmosphere" value={atmosphere} onChange={(e) => setAtmosphere(e.target.value)} />
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={pending || !name.trim()}
+                    onClick={() =>
+                      run(
+                        () =>
+                          createAdHocConditionProgramAction(
+                            experimentId,
+                            batchId,
+                            name,
+                            cycleCount ? Number(cycleCount) : 0,
+                            atmosphere,
+                            "",
+                            "",
+                            "",
+                            "",
+                            {},
+                            ""
+                          ),
+                        () => {
+                          setShowAdHoc(false);
+                          setName("");
+                          setCycleCount("");
+                          setAtmosphere("");
+                        }
+                      )
+                    }
+                  >
+                    Save program
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>
+                <b>{data.program.name}</b> <span className="chip">{data.program.cycle_count} cycles</span>
+                {data.program.atmosphere && ` — ${data.program.atmosphere}`}
+              </div>
+              {/* A lightweight visual timeline: one row per cycle, wet/dry
+                  phases as proportionally-sized colored bars. */}
+              {data.cycles.map((c) => {
+                const wetVal = c.quantities.cycle_wet_volume?.value ?? 1;
+                return (
+                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, fontSize: 12 }}>
+                    <span className="muted" style={{ minWidth: 60 }}>
+                      Cycle {c.cycle_index}
+                    </span>
+                    <div style={{ display: "flex", flex: 1, height: 10, borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ flex: 2, background: "var(--teal, #3ee0c4)" }} title="Wet phase" />
+                      <div style={{ flex: 1, background: "var(--amber, #ffd479)" }} title="Dry phase" />
+                    </div>
+                    {c.quantities.cycle_wet_volume && (
+                      <span className="muted">
+                        {wetVal} {c.quantities.cycle_wet_volume.unit_code}
+                      </span>
+                    )}
+                    {c.observation && <span className="muted">— {c.observation}</span>}
+                  </div>
+                );
+              })}
+              {!showCycle ? (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowCycle(true)}>
+                  + Add cycle
+                </button>
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                  <input placeholder="Cycle #" type="number" value={cycleIndex} onChange={(e) => setCycleIndex(e.target.value)} style={{ width: 80 }} />
+                  <QuantityRowSmall label="Wet volume" kind={wetVolumeKind} value={wetVolume} onChange={setWetVolume} />
+                  <QuantityRowSmall label="Aliquot removed" kind={aliquotVolumeKind} value={aliquotVolume} onChange={setAliquotVolume} />
+                  <input placeholder="Observation" value={observation} onChange={(e) => setObservation(e.target.value)} />
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={pending || !cycleIndex}
+                    onClick={() =>
+                      run(
+                        () => {
+                          const quantities: Record<string, Quantity> = {};
+                          if (wetVolume) quantities.cycle_wet_volume = wetVolume;
+                          if (aliquotVolume) quantities.aliquot_volume = aliquotVolume;
+                          return addConditionProgramCycleAction(
+                            experimentId,
+                            data.program!.id,
+                            Number(cycleIndex),
+                            "",
+                            "",
+                            "",
+                            "",
+                            quantities,
+                            observation,
+                            {}
+                          );
+                        },
+                        () => {
+                          setShowCycle(false);
+                          setCycleIndex("");
+                          setWetVolume(undefined);
+                          setAliquotVolume(undefined);
+                          setObservation("");
+                        }
+                      )
+                    }
+                  >
+                    Save cycle
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 8 }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowEnv((v) => !v)}>
+              {showEnv ? "Hide environmental conditions" : data.environmental ? "Edit environmental conditions" : "+ Environmental conditions"}
+            </button>
+            {data.environmental && !showEnv && (
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {data.environmental.atmosphere_gas && `${data.environmental.atmosphere_gas} · `}
+                {data.environmental.initial_ph != null && `pH ${data.environmental.initial_ph}`}
+                {data.environmental.final_ph != null && `→${data.environmental.final_ph} · `}
+                {data.environmental.anaerobic && "anaerobic"}
+              </div>
+            )}
+            {showEnv && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                <input placeholder="Atmosphere/gas" value={atmosphereGas} onChange={(e) => setAtmosphereGas(e.target.value)} />
+                <input placeholder="Initial pH" type="number" step="0.1" value={initialPh} onChange={(e) => setInitialPh(e.target.value)} style={{ width: 90 }} />
+                <input placeholder="Final pH" type="number" step="0.1" value={finalPh} onChange={(e) => setFinalPh(e.target.value)} style={{ width: 90 }} />
+                <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="checkbox" checked={anaerobic} onChange={(e) => setAnaerobic(e.target.checked)} /> Anaerobic
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={pending}
+                  onClick={() =>
+                    run(() =>
+                      saveEnvironmentalConditionsAction(experimentId, batchId, {
+                        atmosphere_gas: atmosphereGas.trim() || null,
+                        pressure: null,
+                        light_uv_exposure: null,
+                        light_uv_wavelength: null,
+                        mineral_surface_type: null,
+                        ionic_strength: null,
+                        buffer_identity: null,
+                        water_activity: null,
+                        heating_method: null,
+                        freeze_thaw_cycles: null,
+                        vessel_material: null,
+                        initial_ph: initialPh ? Number(initialPh) : null,
+                        final_ph: finalPh ? Number(finalPh) : null,
+                        anaerobic,
+                        quantities: {},
+                        custom_fields: {},
+                        notes: null,
+                      })
+                    )
+                  }
+                >
+                  Save
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuantityRowSmall({
+  label,
+  kind,
+  value,
+  onChange,
+}: {
+  label: string;
+  kind: QuantityKind | undefined;
+  value: Quantity | undefined;
+  onChange: (q: Quantity | undefined) => void;
+}) {
+  if (!kind) return null;
+  return (
+    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      <span className="muted" style={{ fontSize: 12 }}>
+        {label}
+      </span>
+      <input
+        type="number"
+        step="0.01"
+        value={value?.value ?? ""}
+        onChange={(e) =>
+          onChange(e.target.value === "" ? undefined : { value: Number(e.target.value), unit_code: value?.unit_code ?? kind.canonical_unit_code })
+        }
+        style={{ width: 80 }}
+      />
+      <select
+        value={value?.unit_code ?? kind.canonical_unit_code}
+        onChange={(e) => onChange(value ? { ...value, unit_code: e.target.value } : { value: 0, unit_code: e.target.value })}
+      >
+        {kind.compatible_units.map((u) => (
+          <option key={u} value={u}>
+            {u}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 // T2.5 — self-contained: fetches/mutates its own data via the analysis
 // actions directly, rather than requiring SamplesPanel to thread another
@@ -486,6 +802,7 @@ export function SamplesPanel({
   analysisStatuses,
   resultConfidences,
   assignmentConfidences,
+  conditionProgramTemplates,
 }: {
   experimentId: string;
   batches: Batch[];
@@ -516,6 +833,7 @@ export function SamplesPanel({
   analysisStatuses: string[];
   resultConfidences: string[];
   assignmentConfidences: string[];
+  conditionProgramTemplates: ConditionProgramTemplate[];
 }) {
   const [pending, start] = useTransition();
   const { showToast } = useToast();
@@ -552,6 +870,12 @@ export function SamplesPanel({
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
             {batches.length > 1 && <span className="chip" style={{ marginRight: 6 }}>{b.label}</span>}
           </div>
+          <ConditionProgramSection
+            batchId={b.id}
+            experimentId={experimentId}
+            templates={conditionProgramTemplates}
+            quantityKinds={quantityKinds}
+          />
           {(samplesByBatch[b.id] ?? []).map((s) => (
             <SampleRow
               key={s.id}

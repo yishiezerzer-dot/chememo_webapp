@@ -6,11 +6,24 @@ import type { ControlItem } from "@/lib/types";
 // §8.5's checklist shape (T1.2 D3) — a template's defaults seed this list,
 // but the experiment form always lets the user add ad hoc items beyond it,
 // since a real bench run turns up controls no template anticipated.
-export function ControlsChecklist({ name, initial }: { name: string; initial: ControlItem[] }) {
+export function ControlsChecklist({
+  name,
+  initial,
+  readOnly = false,
+}: {
+  name: string;
+  initial: ControlItem[];
+  // T2.6 D6 — once an experiment has real `controls` rows, this checklist
+  // becomes display-only (mirrors T2.2 D7's compounds/metals cutover): the
+  // value still submits via the hidden input, but new controls are expected
+  // to go through the Controls panel below instead.
+  readOnly?: boolean;
+}) {
   const [items, setItems] = useState<ControlItem[]>(initial);
   const [draft, setDraft] = useState("");
 
   function toggle(i: number) {
+    if (readOnly) return;
     setItems((cur) => cur.map((c, idx) => (idx === i ? { ...c, checked: !c.checked } : c)));
   }
 
@@ -34,34 +47,43 @@ export function ControlsChecklist({ name, initial }: { name: string; initial: Co
               </svg>
             </span>
             {item.label}
-            <b
-              onClick={(e) => {
-                e.preventDefault();
-                setItems((cur) => cur.filter((_, idx) => idx !== i));
-              }}
-              style={{ marginLeft: 6 }}
-            >
-              ×
-            </b>
+            {!readOnly && (
+              <b
+                onClick={(e) => {
+                  e.preventDefault();
+                  setItems((cur) => cur.filter((_, idx) => idx !== i));
+                }}
+                style={{ marginLeft: 6 }}
+              >
+                ×
+              </b>
+            )}
           </label>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-          placeholder="Add a control…"
-        />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={add}>
-          Add
-        </button>
-      </div>
+      {!readOnly && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            placeholder="Add a control…"
+          />
+          <button type="button" className="btn btn-ghost btn-sm" onClick={add}>
+            Add
+          </button>
+        </div>
+      )}
+      {readOnly && (
+        <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
+          Display only — use the Controls panel below to add real controls.
+        </p>
+      )}
     </div>
   );
 }

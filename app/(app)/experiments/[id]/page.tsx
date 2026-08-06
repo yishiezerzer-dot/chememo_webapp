@@ -19,6 +19,7 @@ import * as materialsService from "@/lib/materials/service";
 import { addInputAction, removeInputAction, addOutputAction, removeOutputAction, recalculateStoichiometryAction } from "./inputs-actions";
 import * as samplesService from "@/lib/samples/service";
 import * as analyticalService from "@/lib/analytical/service";
+import * as conditionsService from "@/lib/conditions/service";
 import {
   createBatchAction,
   createSampleAction,
@@ -55,6 +56,7 @@ import { SummaryCard } from "@/components/summary-card";
 import { RelationshipsPanel } from "@/components/relationships-panel";
 import { InputsOutputsPanel } from "@/components/inputs-outputs-panel";
 import { SamplesPanel } from "@/components/samples-panel";
+import { ControlsPanel } from "@/components/controls-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { LifecycleControls } from "@/components/lifecycle-controls";
@@ -95,6 +97,8 @@ export default async function ExperimentDetailPage({
     analysisStatuses,
     resultConfidences,
     assignmentConfidences,
+    conditionProgramTemplates,
+    controls,
   ] = await Promise.all([
     getExperiment(id),
     listProjects(),
@@ -119,9 +123,13 @@ export default async function ExperimentDetailPage({
     listControlledVocab("analysis_status"),
     listControlledVocab("result_confidence"),
     listControlledVocab("assignment_confidence"),
+    conditionsService.listConditionProgramTemplates(),
+    conditionsService.listControls(id),
   ]);
   const samplesByBatchEntries = await Promise.all(batches.map(async (b) => [b.id, await samplesService.listSamples(b.id)] as const));
   const samplesByBatch = Object.fromEntries(samplesByBatchEntries);
+  const batchConditionPrograms = await Promise.all(batches.map((b) => conditionsService.getBatchConditionProgram(b.id)));
+  const hasConditionProgram = batchConditionPrograms.some((p) => p !== null);
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
@@ -364,7 +372,10 @@ export default async function ExperimentDetailPage({
             analysisStatuses={analysisStatuses}
             resultConfidences={resultConfidences}
             assignmentConfidences={assignmentConfidences}
+            conditionProgramTemplates={conditionProgramTemplates}
           />
+
+          <ControlsPanel experimentId={e.id} controls={controls} hasConditionProgram={hasConditionProgram} />
 
           <Suspense fallback={<div className="obs-box glass"><h4>Tasks</h4><p className="muted">Loading…</p></div>}>
             <TasksSection experimentId={e.id} />

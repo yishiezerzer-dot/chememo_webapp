@@ -113,6 +113,15 @@ export async function createStorageLocation(
   return data.id as string;
 }
 
+// material_lots.storage_location_id/stock_solutions.storage_location_id are
+// real DB foreign keys with no `on delete` clause (RESTRICT), so a location
+// still in use fails at the DB level — surfaced here as a friendly message
+// rather than a raw constraint-violation error.
+export async function deleteStorageLocation(supabase: Supabase, locationId: string): Promise<void> {
+  const { error } = await supabase.from("storage_locations").delete().eq("id", locationId);
+  if (error) throw new AppError("conflict", "Could not delete the location — it may still be in use by a lot or stock.", { cause: error });
+}
+
 // The picker experiment_inputs' UI renders (D4) — one option per lot or
 // stock, labeled with its material's name so a researcher can tell them
 // apart, matching listVersionOptions()'s exact shape/purpose for protocols.
