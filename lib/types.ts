@@ -600,3 +600,65 @@ export type SampleEvent = Omit<SampleEventRow, "event_type" | "details"> & {
 export type SampleMeasurement = Omit<SampleMeasurementRow, "quantities"> & {
   quantities: Record<string, Quantity>;
 };
+
+// T2.5 — analytical run model.
+type InstrumentRow = Database["public"]["Tables"]["instruments"]["Row"];
+type InstrumentMethodRow = Database["public"]["Tables"]["instrument_methods"]["Row"];
+type AnalysisRunRow = Database["public"]["Tables"]["analysis_runs"]["Row"];
+type AnalysisFileRow = Database["public"]["Tables"]["analysis_files"]["Row"];
+type AnalysisResultRow = Database["public"]["Tables"]["analysis_results"]["Row"];
+type PeakAssignmentRow = Database["public"]["Tables"]["peak_assignments"]["Row"];
+
+export type Instrument = InstrumentRow;
+
+// D2 — method_type is a controlled_vocabularies value, checked against the
+// live seed rows the same way material_role is (T2.2).
+export type MethodType =
+  | "lc_ms"
+  | "nmr"
+  | "ftir"
+  | "microscopy"
+  | "plate_reader"
+  | "lumisizer"
+  | "hplc"
+  | "gc_ms"
+  | "cd"
+  | "epr"
+  | "tga";
+export const METHOD_TYPES: MethodType[] = [
+  "lc_ms",
+  "nmr",
+  "ftir",
+  "microscopy",
+  "plate_reader",
+  "lumisizer",
+  "hplc",
+  "gc_ms",
+  "cd",
+  "epr",
+  "tga",
+];
+export type InstrumentMethod = Omit<InstrumentMethodRow, "method_type" | "parameters"> & {
+  method_type: MethodType;
+  parameters: Record<string, unknown>;
+};
+
+// D3 — status is a controlled_vocabularies value ("analysis_status", §23.4).
+export type AnalysisRun = Omit<AnalysisRunRow, "run_parameters"> & {
+  run_parameters: Record<string, unknown>;
+};
+
+export type AnalysisFileRole = "raw" | "processed" | "report";
+export type AnalysisFile = Omit<AnalysisFileRow, "file_role"> & { file_role: AnalysisFileRole };
+
+// D5 — result_confidence is a controlled_vocabularies value ("result_confidence",
+// §23.6); details holds each method's interpreted-result fields, keyed by the
+// parent run's instrument_method.method_type.
+export type AnalysisResult = Omit<AnalysisResultRow, "details"> & {
+  details: Record<string, unknown>;
+};
+
+// D6 — confidence is a distinct, per-peak controlled_vocabularies value
+// ("assignment_confidence", §14.1) from AnalysisResult's own result_confidence.
+export type IonMode = "positive" | "negative";
+export type PeakAssignment = Omit<PeakAssignmentRow, "ion_mode"> & { ion_mode: IonMode | null };

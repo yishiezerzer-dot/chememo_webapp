@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast-provider";
 import { SAMPLE_RELATIONSHIP_TYPES, SAMPLE_EVENT_TYPES } from "@/lib/types";
 import type {
   ActionResult,
+  AnalysisRun,
   Batch,
   InputSourceType,
   Quantity,
@@ -19,8 +20,236 @@ import type {
   SampleRelationshipType,
 } from "@/lib/types";
 import type { SampleFields } from "@/lib/samples/service";
+import {
+  createRunAction,
+  createResultAction,
+  addPeakAction,
+  getSampleRunsAction,
+  getRunDetailAction,
+  getResultPeaksAction,
+} from "@/app/(app)/experiments/[id]/analysis-actions";
 
 type LotStockOption = { id: string; source_type: InputSourceType; label: string };
+type MethodOption = { id: string; label: string };
+
+// T2.5 — self-contained: fetches/mutates its own data via the analysis
+// actions directly, rather than requiring SamplesPanel to thread another
+// half-dozen callback props down two component levels.
+function AnalysisRunsSection({
+  sampleId,
+  experimentId,
+  methodOptions,
+  analysisStatuses,
+  resultConfidences,
+  assignmentConfidences,
+}: {
+  sampleId: string;
+  experimentId: string;
+  methodOptions: MethodOption[];
+  analysisStatuses: string[];
+  resultConfidences: string[];
+  assignmentConfidences: string[];
+}) {
+  const [pending, start] = useTransition();
+  const { showToast } = useToast();
+  const router = useRouter();
+  const [runs, setRuns] = useState<AnalysisRun[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [methodId, setMethodId] = useState("");
+  const [status, setStatus] = useState(analysisStatuses[0] ?? "planned");
+  const [operator, setOperator] = useState("");
+  const [expandedRun, setExpandedRun] = useState<string | null>(null);
+  const [runDetail, setRunDetail] = useState<Awaited<ReturnType<typeof getRunDetailAction>> | null>(null);
+  const [resultConfidence, setResultConfidence] = useState(resultConfidences[0] ?? "");
+  const [resultSummary, setResultSummary] = useState("");
+  const [peaksByResult, setPeaksByResult] = useState<Record<string, Awaited<ReturnType<typeof getResultPeaksAction>>>>({});
+  const [peakMz, setPeakMz] = useState("");
+  const [peakConfidence, setPeakConfidence] = useState(assignmentConfidences[0] ?? "");
+
+  async function load() {
+    if (!open) setRuns(await getSampleRunsAction(sampleId));
+    setOpen((o) => !o);
+  }
+
+  function run(action: () => Promise<ActionResult>, after?: () => void) {
+    start(async () => {
+      const res = await action();
+      if (!res.ok) showToast(res.error, "error");
+      else {
+        router.refresh();
+        after?.();
+      }
+    });
+  }
+
+  async function loadRunDetail(runId: string) {
+    if (expandedRun === runId) {
+      setExpandedRun(null);
+      return;
+    }
+    setRunDetail(await getRunDetailAction(runId));
+    setExpandedRun(runId);
+  }
+
+  async function loadPeaks(resultId: string) {
+    const peaks = await getResultPeaksAction(resultId);
+    setPeaksByResult((cur) => ({ ...cur, [resultId]: peaks }));
+  }
+
+  return (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line, #2a2a2a)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0 }}>Analysis runs</h4>
+        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
+          {open ? "Hide" : "Show"}
+        </button>
+      </div>
+
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          {(runs ?? []).map((r) => {
+            const method = methodOptions.find((m) => m.id === r.instrument_method_id);
+            return (
+              <div key={r.id} style={{ marginBottom: 8 }}>
+                <div className="act-row">
+                  <span className="act-dot"></span>
+                  <span style={{ fontSize: 13 }}>
+                    {method?.label ?? "Method"} <span className="chip">{r.status}</span>
+                  </span>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={() => loadRunDetail(r.id)}>
+                    {expandedRun === r.id ? "Hide" : "Details"}
+                  </button>
+                </div>
+                {expandedRun === r.id && runDetail && (
+                  <div style={{ paddingLeft: 20 }}>
+                    {runDetail.results.map((res) => (
+                      <div key={res.id} style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 12.5 }}>
+                          {res.summary || "(no summary)"} {res.result_confidence && <span className="chip">{res.result_confidence}</span>}
+                          <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => loadPeaks(res.id)}>
+                            Peaks
+                          </button>
+                        </div>
+                        {peaksByResult[res.id]?.map((p) => (
+                          <div key={p.id} className="muted" style={{ fontSize: 12 }}>
+                            m/z {p.observed_mz ?? p.expected_mz ?? "?"} — {p.assignment ?? "unassigned"} ({p.confidence ?? "?"})
+                          </div>
+                        ))}
+                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                          <input placeholder="m/z" value={peakMz} onChange={(e) => setPeakMz(e.target.value)} style={{ width: 80 }} />
+                          <select value={peakConfidence} onChange={(e) => setPeakConfidence(e.target.value)}>
+                            {assignmentConfidences.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={pending || !peakMz}
+                            onClick={() =>
+                              run(async () => {
+                                const res2 = await addPeakAction(experimentId, res.id, {
+                                  expected_mz: null,
+                                  observed_mz: Number(peakMz),
+                                  ion_mode: null,
+                                  adduct: null,
+                                  charge: null,
+                                  ppm_error: null,
+                                  retention_time_min: null,
+                                  ms_level: null,
+                                  intensity: null,
+                                  formula_candidate: null,
+                                  assignment: null,
+                                  confidence: peakConfidence || null,
+                                  notes: null,
+                                });
+                                if (res2.ok) {
+                                  setPeakMz("");
+                                  await loadPeaks(res.id);
+                                }
+                                return res2;
+                              })
+                            }
+                          >
+                            + Peak
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                      <select value={resultConfidence} onChange={(e) => setResultConfidence(e.target.value)}>
+                        {resultConfidences.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <input placeholder="Summary" value={resultSummary} onChange={(e) => setResultSummary(e.target.value)} style={{ minWidth: 160 }} />
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={pending}
+                        onClick={() =>
+                          run(
+                            () => createResultAction(experimentId, r.id, resultConfidence, resultSummary, {}),
+                            async () => {
+                              setResultSummary("");
+                              setRunDetail(await getRunDetailAction(r.id));
+                            }
+                          )
+                        }
+                      >
+                        + Add result
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+            <select value={methodId} onChange={(e) => setMethodId(e.target.value)}>
+              <option value="">Pick a method…</option>
+              {methodOptions.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              {analysisStatuses.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <input placeholder="Operator" value={operator} onChange={(e) => setOperator(e.target.value)} style={{ width: 100 }} />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={pending || !methodId}
+              onClick={() =>
+                run(
+                  () => createRunAction(experimentId, sampleId, methodId, status, operator),
+                  async () => {
+                    setMethodId("");
+                    setOperator("");
+                    setRuns(await getSampleRunsAction(sampleId));
+                  }
+                )
+              }
+            >
+              + New run
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SampleRow({
   sample,
@@ -32,6 +261,11 @@ function SampleRow({
   recordEvent,
   addMeasurement,
   addAlias,
+  experimentId,
+  methodOptions,
+  analysisStatuses,
+  resultConfidences,
+  assignmentConfidences,
 }: {
   sample: Sample;
   allSamples: Sample[];
@@ -48,6 +282,11 @@ function SampleRow({
   recordEvent: (sampleId: string, type: SampleEventType, details: Record<string, unknown>) => Promise<ActionResult>;
   addMeasurement: (sampleId: string, quantities: Record<string, Quantity>, notes: string) => Promise<ActionResult>;
   addAlias: (sampleId: string, alias: string, note: string) => Promise<ActionResult>;
+  experimentId: string;
+  methodOptions: MethodOption[];
+  analysisStatuses: string[];
+  resultConfidences: string[];
+  assignmentConfidences: string[];
 }) {
   const [pending, start] = useTransition();
   const { showToast } = useToast();
@@ -211,6 +450,15 @@ function SampleRow({
               ))}
             </div>
           )}
+
+          <AnalysisRunsSection
+            sampleId={sample.id}
+            experimentId={experimentId}
+            methodOptions={methodOptions}
+            analysisStatuses={analysisStatuses}
+            resultConfidences={resultConfidences}
+            assignmentConfidences={assignmentConfidences}
+          />
         </div>
       )}
     </div>
@@ -234,6 +482,10 @@ export function SamplesPanel({
   recordEvent,
   addMeasurement,
   addAlias,
+  methodOptions,
+  analysisStatuses,
+  resultConfidences,
+  assignmentConfidences,
 }: {
   experimentId: string;
   batches: Batch[];
@@ -260,6 +512,10 @@ export function SamplesPanel({
   recordEvent: (sampleId: string, type: SampleEventType, details: Record<string, unknown>) => Promise<ActionResult>;
   addMeasurement: (sampleId: string, quantities: Record<string, Quantity>, notes: string) => Promise<ActionResult>;
   addAlias: (sampleId: string, alias: string, note: string) => Promise<ActionResult>;
+  methodOptions: MethodOption[];
+  analysisStatuses: string[];
+  resultConfidences: string[];
+  assignmentConfidences: string[];
 }) {
   const [pending, start] = useTransition();
   const { showToast } = useToast();
@@ -308,6 +564,11 @@ export function SamplesPanel({
               recordEvent={recordEvent}
               addMeasurement={addMeasurement}
               addAlias={addAlias}
+              experimentId={experimentId}
+              methodOptions={methodOptions}
+              analysisStatuses={analysisStatuses}
+              resultConfidences={resultConfidences}
+              assignmentConfidences={assignmentConfidences}
             />
           ))}
 

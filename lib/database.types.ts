@@ -123,6 +123,169 @@ export type Database = {
           },
         ]
       }
+      analysis_files: {
+        Row: {
+          analysis_run_id: string
+          created_at: string
+          file_role: string
+          filename: string | null
+          id: string
+          uploaded_by: string | null
+          url: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          analysis_run_id: string
+          created_at?: string
+          file_role: string
+          filename?: string | null
+          id?: string
+          uploaded_by?: string | null
+          url?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          analysis_run_id?: string
+          created_at?: string
+          file_role?: string
+          filename?: string | null
+          id?: string
+          uploaded_by?: string | null
+          url?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_files_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_files_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      analysis_results: {
+        Row: {
+          analysis_run_id: string
+          created_at: string
+          details: Json
+          id: string
+          interpreted_by: string | null
+          quality_notes: string | null
+          result_confidence: string | null
+          summary: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          analysis_run_id: string
+          created_at?: string
+          details?: Json
+          id?: string
+          interpreted_by?: string | null
+          quality_notes?: string | null
+          result_confidence?: string | null
+          summary?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          analysis_run_id?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          interpreted_by?: string | null
+          quality_notes?: string | null
+          result_confidence?: string | null
+          summary?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_results_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_results_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      analysis_runs: {
+        Row: {
+          acquired_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          instrument_method_id: string
+          notes: string | null
+          operator: string | null
+          run_parameters: Json
+          sample_id: string
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          acquired_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instrument_method_id: string
+          notes?: string | null
+          operator?: string | null
+          run_parameters?: Json
+          sample_id: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          acquired_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instrument_method_id?: string
+          notes?: string | null
+          operator?: string | null
+          run_parameters?: Json
+          sample_id?: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_runs_instrument_method_id_fkey"
+            columns: ["instrument_method_id"]
+            isOneToOne: false
+            referencedRelation: "instrument_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_runs_sample_id_fkey"
+            columns: ["sample_id"]
+            isOneToOne: false
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batches: {
         Row: {
           created_at: string
@@ -1242,6 +1405,98 @@ export type Database = {
           },
         ]
       }
+      instrument_methods: {
+        Row: {
+          created_at: string
+          id: string
+          instrument_id: string
+          method_type: string
+          name: string
+          notes: string | null
+          parameters: Json
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instrument_id: string
+          method_type: string
+          name: string
+          notes?: string | null
+          parameters?: Json
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instrument_id?: string
+          method_type?: string
+          name?: string
+          notes?: string | null
+          parameters?: Json
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instrument_methods_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: false
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instrument_methods_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instruments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          location: string | null
+          model: string | null
+          name: string
+          notes: string | null
+          serial_number: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location?: string | null
+          model?: string | null
+          name: string
+          notes?: string | null
+          serial_number?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location?: string | null
+          model?: string | null
+          name?: string
+          notes?: string | null
+          serial_number?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instruments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -1513,6 +1768,91 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "experiment_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      peak_assignments: {
+        Row: {
+          adduct: string | null
+          analysis_result_id: string
+          assignment: string | null
+          charge: number | null
+          confidence: string | null
+          created_at: string
+          expected_mz: number | null
+          formula_candidate: string | null
+          id: string
+          intensity: number | null
+          ion_mode: string | null
+          linked_file_id: string | null
+          ms_level: number | null
+          notes: string | null
+          observed_mz: number | null
+          ppm_error: number | null
+          retention_time_min: number | null
+          workspace_id: string | null
+        }
+        Insert: {
+          adduct?: string | null
+          analysis_result_id: string
+          assignment?: string | null
+          charge?: number | null
+          confidence?: string | null
+          created_at?: string
+          expected_mz?: number | null
+          formula_candidate?: string | null
+          id?: string
+          intensity?: number | null
+          ion_mode?: string | null
+          linked_file_id?: string | null
+          ms_level?: number | null
+          notes?: string | null
+          observed_mz?: number | null
+          ppm_error?: number | null
+          retention_time_min?: number | null
+          workspace_id?: string | null
+        }
+        Update: {
+          adduct?: string | null
+          analysis_result_id?: string
+          assignment?: string | null
+          charge?: number | null
+          confidence?: string | null
+          created_at?: string
+          expected_mz?: number | null
+          formula_candidate?: string | null
+          id?: string
+          intensity?: number | null
+          ion_mode?: string | null
+          linked_file_id?: string | null
+          ms_level?: number | null
+          notes?: string | null
+          observed_mz?: number | null
+          ppm_error?: number | null
+          retention_time_min?: number | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peak_assignments_analysis_result_id_fkey"
+            columns: ["analysis_result_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_assignments_linked_file_id_fkey"
+            columns: ["linked_file_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_assignments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]

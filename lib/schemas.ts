@@ -230,6 +230,38 @@ export function validateStorageStatus(value: string, allowed: string[]): string 
   return null;
 }
 
+// T2.5 — method_type, analysis_status (§23.4), result_confidence (§23.6),
+// and assignment_confidence (§14.1, distinct from result_confidence) are all
+// controlled_vocabularies values, checked against the live seed rows the
+// same way material_role is above.
+export function validateMethodType(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized method type.`;
+  }
+  return null;
+}
+
+export function validateAnalysisStatus(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized analysis status.`;
+  }
+  return null;
+}
+
+export function validateResultConfidence(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized result confidence.`;
+  }
+  return null;
+}
+
+export function validateAssignmentConfidence(value: string, allowed: string[]): string | null {
+  if (!allowed.includes(value)) {
+    return `"${value}" is not a recognized assignment confidence.`;
+  }
+  return null;
+}
+
 export const projectLabelSchema = z
   .string()
   .trim()

@@ -18,6 +18,7 @@ import { listSeries, listSeriesForExperiment } from "@/lib/series/service";
 import * as materialsService from "@/lib/materials/service";
 import { addInputAction, removeInputAction, addOutputAction, removeOutputAction, recalculateStoichiometryAction } from "./inputs-actions";
 import * as samplesService from "@/lib/samples/service";
+import * as analyticalService from "@/lib/analytical/service";
 import {
   createBatchAction,
   createSampleAction,
@@ -90,6 +91,10 @@ export default async function ExperimentDetailPage({
     sampleTypes,
     reactionModes,
     sampleStatuses,
+    methodOptions,
+    analysisStatuses,
+    resultConfidences,
+    assignmentConfidences,
   ] = await Promise.all([
     getExperiment(id),
     listProjects(),
@@ -110,6 +115,10 @@ export default async function ExperimentDetailPage({
     listControlledVocab("sample_type"),
     listControlledVocab("reaction_mode"),
     listControlledVocab("sample_status"),
+    analyticalService.listAllMethodOptions(),
+    listControlledVocab("analysis_status"),
+    listControlledVocab("result_confidence"),
+    listControlledVocab("assignment_confidence"),
   ]);
   const samplesByBatchEntries = await Promise.all(batches.map(async (b) => [b.id, await samplesService.listSamples(b.id)] as const));
   const samplesByBatch = Object.fromEntries(samplesByBatchEntries);
@@ -351,6 +360,10 @@ export default async function ExperimentDetailPage({
             recordEvent={recordSampleEventAction.bind(null, e.id)}
             addMeasurement={addMeasurementAction.bind(null, e.id)}
             addAlias={addAliasAction.bind(null, e.id)}
+            methodOptions={methodOptions}
+            analysisStatuses={analysisStatuses}
+            resultConfidences={resultConfidences}
+            assignmentConfidences={assignmentConfidences}
           />
 
           <Suspense fallback={<div className="obs-box glass"><h4>Tasks</h4><p className="muted">Loading…</p></div>}>
