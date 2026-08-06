@@ -6,7 +6,7 @@ import * as analyticalService from "@/lib/analytical/service";
 import { listControlledVocab } from "@/lib/experiments/service";
 import { validateAnalysisStatus, validateResultConfidence, validateAssignmentConfidence } from "@/lib/schemas";
 import { toActionResult } from "@/lib/errors";
-import type { ActionResult, AnalysisFileRole, IonMode } from "@/lib/types";
+import type { ActionResult, AnalysisFileRole } from "@/lib/types";
 import type { PeakFields } from "@/lib/analytical/service";
 
 export async function createRunAction(
@@ -102,5 +102,3 @@ export async function getRunDetailAction(runId: string) {
 export async function getResultPeaksAction(resultId: string) {
   return analyticalService.listPeaks(resultId);
 }
-
-export type { IonMode };
