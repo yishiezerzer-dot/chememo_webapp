@@ -9,6 +9,28 @@ import { validateQuantityUnits, validateSolubilityStatus } from "@/lib/schemas";
 import { toActionResult } from "@/lib/errors";
 import type { ActionResult, IdentifierType, Quantity } from "@/lib/types";
 
+export async function deleteMaterialAction(materialId: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  try {
+    await materialsService.deleteMaterial(supabase, materialId);
+  } catch (e) {
+    return toActionResult("deleteMaterialAction", e);
+  }
+  revalidatePath("/materials");
+  return { ok: true };
+}
+
+export async function deleteLotAction(lotId: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  try {
+    await materialsService.deleteLot(supabase, lotId);
+  } catch (e) {
+    return toActionResult("deleteLotAction", e);
+  }
+  revalidatePath("/materials");
+  return { ok: true };
+}
+
 export async function createMaterialAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const str = (k: string) => ((formData.get(k) as string | null) ?? "").trim() || null;

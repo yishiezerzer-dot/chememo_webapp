@@ -188,6 +188,46 @@ export type MaterialLotFields = {
   expiration_or_retest_date: string | null;
 };
 
+// Blocks deletion if any experiment_inputs row references this lot directly,
+// or references a stock prepared from it — experiment_inputs.source_id has
+// no real DB foreign key (it's polymorphic, T2.2 D4), so nothing would stop
+// a dangling reference otherwise.
+export async function deleteLot(supabase: Supabase, lotId: string): Promise<void> {
+  const { count: directCount } = await supabase
+    .from("experiment_inputs")
+    .select("id", { count: "exact", head: true })
+    .eq("source_type", "lot")
+    .eq("source_id", lotId);
+  if (directCount) {
+    throw new AppError("conflict", "This lot is used by an experiment input — remove that input first.");
+  }
+
+  const { data: stocks } = await supabase.from("stock_solutions").select("id").eq("material_lot_id", lotId);
+  const stockIds = (stocks ?? []).map((s) => s.id as string);
+  if (stockIds.length > 0) {
+    const { count: stockUseCount } = await supabase
+      .from("experiment_inputs")
+      .select("id", { count: "exact", head: true })
+      .eq("source_type", "stock")
+      .in("source_id", stockIds);
+    if (stockUseCount) {
+      throw new AppError("conflict", "A stock prepared from this lot is used by an experiment input — remove that input first.");
+    }
+  }
+
+  const { error } = await supabase.from("material_lots").delete().eq("id", lotId);
+  if (error) throw new AppError("conflict", "Could not delete the lot.", { cause: error });
+}
+
+export async function deleteMaterial(supabase: Supabase, materialId: string): Promise<void> {
+  const { count } = await supabase.from("material_lots").select("id", { count: "exact", head: true }).eq("material_id", materialId);
+  if (count) {
+    throw new AppError("conflict", "This material still has lots — delete them first.");
+  }
+  const { error } = await supabase.from("materials").delete().eq("id", materialId);
+  if (error) throw new AppError("conflict", "Could not delete the material — it may still be referenced by an experiment output.", { cause: error });
+}
+
 export async function createLot(
   supabase: Supabase,
   userId: string,

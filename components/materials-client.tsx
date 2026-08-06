@@ -16,6 +16,8 @@ import type {
 } from "@/lib/types";
 import {
   createMaterialAction,
+  deleteMaterialAction,
+  deleteLotAction,
   addIdentifierAction,
   createStorageLocationAction,
   createLotAction,
@@ -189,12 +191,16 @@ function StockRow({
 
 function LotRow({
   lot,
+  storageLocations,
   quantityKinds,
   solubilityStatuses,
+  onDeleted,
 }: {
   lot: MaterialLot;
+  storageLocations: StorageLocation[];
   quantityKinds: QuantityKind[];
   solubilityStatuses: string[];
+  onDeleted: () => void;
 }) {
   const [pending, start] = useTransition();
   const { showToast } = useToast();
@@ -208,6 +214,7 @@ function LotRow({
   const [targetVolume, setTargetVolume] = useState<Quantity | undefined>();
   const [solvent, setSolvent] = useState("");
   const [solubilityStatus, setSolubilityStatus] = useState(solubilityStatuses[0] ?? "");
+  const location = storageLocations.find((s) => s.id === lot.storage_location_id);
 
   async function load() {
     if (!open) {
@@ -232,9 +239,24 @@ function LotRow({
         <span style={{ fontSize: 13 }}>
           {lot.lot_number || "Lot"} {lot.supplier && `— ${lot.supplier}`}
           {lot.purity != null && ` (${lot.purity}% purity)`}
+          {location && ` @ ${location.name}`}
         </span>
         <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
           {open ? "Hide stocks" : "Stocks"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const res = await deleteLotAction(lot.id);
+              if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
+              else onDeleted();
+            })
+          }
+        >
+          Delete
         </button>
       </div>
 
@@ -346,6 +368,11 @@ function MaterialRow({
     setOpen((o) => !o);
   }
 
+  async function refreshLots() {
+    const detail = await getMaterialDetailAction(material.id);
+    setLots(detail.lots as MaterialLot[]);
+  }
+
   function run(action: () => Promise<{ ok: boolean; error?: string }>) {
     start(async () => {
       const res = await action();
@@ -364,6 +391,14 @@ function MaterialRow({
         </div>
         <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
           {open ? "Collapse" : "Details"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={pending}
+          onClick={() => run(() => deleteMaterialAction(material.id))}
+        >
+          Delete
         </button>
       </div>
 
@@ -408,7 +443,14 @@ function MaterialRow({
 
           <h4 style={{ margin: "0 0 6px", fontSize: 13 }}>Lots</h4>
           {(lots ?? []).map((lot) => (
-            <LotRow key={lot.id} lot={lot} quantityKinds={quantityKinds} solubilityStatuses={solubilityStatuses} />
+            <LotRow
+              key={lot.id}
+              lot={lot}
+              storageLocations={storageLocations}
+              quantityKinds={quantityKinds}
+              solubilityStatuses={solubilityStatuses}
+              onDeleted={refreshLots}
+            />
           ))}
           {!showNewLot ? (
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(true)}>
