@@ -5,6 +5,9 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startIndexJobPoller } = await import("@/lib/index-jobs");
     startIndexJobPoller();
+    // T2.7 — file_jobs' safety-net poller, same startup pattern.
+    const { startFileJobsPoller } = await import("@/lib/file-jobs");
+    startFileJobsPoller();
   }
 }
 

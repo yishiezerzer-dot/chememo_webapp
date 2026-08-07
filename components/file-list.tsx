@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
-import type { ActionResult, ExperimentFile } from "@/lib/types";
+import { FILE_ROLES } from "@/lib/types";
+import type { ActionResult, ExperimentFile, FileRole, FileVersion } from "@/lib/types";
+import {
+  replaceFileAction,
+  listVersionsAction,
+  updateFileMetadataAction,
+  linkFileToRunAction,
+  unlinkFileFromRunAction,
+  listRunsForFileLinkAction,
+} from "@/app/(app)/experiments/[id]/file-actions";
 
 const FILE_ICONS: Record<string, string> = {
   excel: "M4 4h16v16H4z",
@@ -51,6 +61,153 @@ function RemoveButton({ action }: { action: () => Promise<ActionResult> }) {
   );
 }
 
+// T2.7 — self-contained (like T2.5/T2.6's *Section components): fetches/
+// mutates its own data via the file actions directly. Version history,
+// replace-with-new-version, classification/metadata, and link-to-run all
+// live behind one "Details" toggle per uploaded file to keep the base list
+// unchanged for link-only rows and for viewers who never expand it.
+function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwner: boolean; experimentId: string }) {
+  const [pending, start] = useTransition();
+  const { showToast } = useToast();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [versions, setVersions] = useState<FileVersion[] | null>(null);
+  const [runOptions, setRunOptions] = useState<{ id: string; label: string }[] | null>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [fileRole, setFileRole] = useState<FileRole | "">(file.file_role ?? "");
+  const [sourceInstrument, setSourceInstrument] = useState(file.source_instrument ?? "");
+  const [acquisitionTimestamp, setAcquisitionTimestamp] = useState(
+    file.acquisition_timestamp ? file.acquisition_timestamp.slice(0, 16) : ""
+  );
+  const [runId, setRunId] = useState("");
+
+  async function load() {
+    if (!open) {
+      const [v, r] = await Promise.all([listVersionsAction(file.id), listRunsForFileLinkAction(experimentId)]);
+      setVersions(v);
+      setRunOptions(r);
+    }
+    setOpen((o) => !o);
+  }
+
+  function run(action: () => Promise<ActionResult>, after?: () => void) {
+    start(async () => {
+      const res = await action();
+      if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
+      else {
+        router.refresh();
+        setVersions(await listVersionsAction(file.id));
+        after?.();
+      }
+    });
+  }
+
+  return (
+    <div style={{ marginLeft: 32, marginBottom: 4 }}>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={load}>
+        {open ? "Hide details" : "Details"}
+      </button>
+      {open && (
+        <div style={{ marginTop: 6, paddingLeft: 8, borderLeft: "2px solid var(--border)" }}>
+          {!file.analysis_run_id && (
+            <span className="chip" style={{ marginBottom: 6, display: "inline-block" }}>
+              Unlinked
+            </span>
+          )}
+
+          <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+            {(versions ?? []).map((v) => (
+              <div key={v.id}>
+                v{v.version_number} — {v.byte_size ? `${Math.round(v.byte_size / 1024)} KB` : "?"} — {v.sha256?.slice(0, 12)}… —{" "}
+                <span className="chip">{v.processing_state}</span>
+              </div>
+            ))}
+          </div>
+
+          {isOwner && (
+            <>
+              <form
+                action={(fd) =>
+                  run(() => replaceFileAction(experimentId, file.id, fd), () => {
+                    if (replaceInputRef.current) replaceInputRef.current.value = "";
+                  })
+                }
+                style={{ marginBottom: 8 }}
+              >
+                <input ref={replaceInputRef} type="file" name="file" required disabled={pending} />
+                <button type="submit" className="btn btn-ghost btn-sm" disabled={pending}>
+                  Replace with new version
+                </button>
+              </form>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                <select value={fileRole} onChange={(e) => setFileRole(e.target.value as FileRole)}>
+                  <option value="">Role: unset</option>
+                  {FILE_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <input placeholder="Source instrument" value={sourceInstrument} onChange={(e) => setSourceInstrument(e.target.value)} />
+                <input type="datetime-local" value={acquisitionTimestamp} onChange={(e) => setAcquisitionTimestamp(e.target.value)} />
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={pending}
+                  onClick={() =>
+                    run(() =>
+                      updateFileMetadataAction(
+                        experimentId,
+                        file.id,
+                        fileRole || null,
+                        sourceInstrument,
+                        acquisitionTimestamp ? new Date(acquisitionTimestamp).toISOString() : "",
+                        file.parsed_metadata
+                      )
+                    )
+                  }
+                >
+                  Save metadata
+                </button>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select value={runId} onChange={(e) => setRunId(e.target.value)}>
+                  <option value="">Link to analysis run…</option>
+                  {(runOptions ?? []).map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={pending || !runId}
+                  onClick={() => run(() => linkFileToRunAction(experimentId, file.id, runId))}
+                >
+                  Link
+                </button>
+                {file.analysis_run_id && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={pending}
+                    onClick={() => run(() => unlinkFileFromRunAction(experimentId, file.id))}
+                  >
+                    Unlink
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FileList({
   files,
   isOwner,
@@ -90,25 +247,28 @@ export function FileList({
           </>
         );
         return (
-          <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {f.href ? (
-              <a
-                href={f.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="file-item"
-                style={{ flex: 1, textDecoration: "none" }}
-              >
-                {inner}
-              </a>
-            ) : (
-              <div className="file-item" style={{ flex: 1, cursor: "default" }}>
-                {inner}
-              </div>
-            )}
-            {isOwner && removeAction && (
-              <RemoveButton action={() => removeAction(f.id, experimentId)} />
-            )}
+          <div key={f.id}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {f.href ? (
+                <a
+                  href={f.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="file-item"
+                  style={{ flex: 1, textDecoration: "none" }}
+                >
+                  {inner}
+                </a>
+              ) : (
+                <div className="file-item" style={{ flex: 1, cursor: "default" }}>
+                  {inner}
+                </div>
+              )}
+              {isOwner && removeAction && (
+                <RemoveButton action={() => removeAction(f.id, experimentId)} />
+              )}
+            </div>
+            {f.kind === "upload" && <FileDetailsSection file={f} isOwner={isOwner} experimentId={experimentId} />}
           </div>
         );
       })}

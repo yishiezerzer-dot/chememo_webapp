@@ -30,6 +30,8 @@ type CommentRow = Database["public"]["Tables"]["comments"]["Row"];
 type CommentMentionRow = Database["public"]["Tables"]["comment_mentions"]["Row"];
 type ExperimentTaskRow = Database["public"]["Tables"]["experiment_tasks"]["Row"];
 type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
+type FileVersionRow = Database["public"]["Tables"]["file_versions"]["Row"];
+type FileJobRow = Database["public"]["Tables"]["file_jobs"]["Row"];
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -172,13 +174,35 @@ export type ExperimentRevision = Omit<
 
 // `kind` is DB-checked to 'upload'|'link' but stored as plain `text`, so the
 // generated type only knows it's a string — narrowed here for the literal union.
+// T2.7 D3 — file_role/retention_state are controlled string unions;
+// parsed_metadata (§16.5's legacy-filename token decoding) is a jsonb map.
+export type FileRole = "raw" | "processed" | "report";
+export const FILE_ROLES: FileRole[] = ["raw", "processed", "report"];
+export type FileRetentionState = "active" | "archived";
 export type ExperimentFile = Omit<
   ExperimentFileRow,
-  "kind" | "experiment_id" | "created_at"
+  "kind" | "experiment_id" | "created_at" | "file_role" | "retention_state" | "parsed_metadata"
 > & {
   kind: "upload" | "link";
   experiment_id: string;
   created_at: string;
+  file_role: FileRole | null;
+  retention_state: FileRetentionState;
+  parsed_metadata: Record<string, unknown>;
+};
+
+// T2.7 D1/D4 — each physical upload; processing_state reflects the file_jobs
+// queue's outcome for this version (jobs themselves are internal bookkeeping
+// with no authenticated RLS, mirroring T0.5's index_jobs precedent).
+export type FileProcessingState = "pending" | "processing" | "done" | "failed" | "not_applicable";
+export type FileVersion = Omit<FileVersionRow, "processing_state"> & { processing_state: FileProcessingState };
+
+export type FileJobType = "text_extract" | "thumbnail";
+export type FileJobStatus = "pending" | "processing" | "done" | "failed" | "not_applicable";
+export type FileJob = Omit<FileJobRow, "job_type" | "status" | "result"> & {
+  job_type: FileJobType;
+  status: FileJobStatus;
+  result: Record<string, unknown>;
 };
 
 // A lock/reopen/restore event (T1.1, §10.2 append-only). `event` is

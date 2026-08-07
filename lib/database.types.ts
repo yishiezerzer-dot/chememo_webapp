@@ -854,54 +854,89 @@ export type Database = {
       }
       experiment_files: {
         Row: {
+          acquisition_timestamp: string | null
+          analysis_run_id: string | null
           byte_size: number | null
           created_at: string | null
+          current_version_id: string | null
           experiment_id: string | null
           experiment_step_id: string | null
+          file_role: string | null
           file_type: string | null
           id: string
           kind: string | null
           label: string | null
           mime_type: string | null
+          parsed_metadata: Json
+          retention_state: string
           sha256: string | null
+          source_instrument: string | null
           storage_path: string | null
           uploaded_by: string | null
           url: string | null
           workspace_id: string | null
         }
         Insert: {
+          acquisition_timestamp?: string | null
+          analysis_run_id?: string | null
           byte_size?: number | null
           created_at?: string | null
+          current_version_id?: string | null
           experiment_id?: string | null
           experiment_step_id?: string | null
+          file_role?: string | null
           file_type?: string | null
           id?: string
           kind?: string | null
           label?: string | null
           mime_type?: string | null
+          parsed_metadata?: Json
+          retention_state?: string
           sha256?: string | null
+          source_instrument?: string | null
           storage_path?: string | null
           uploaded_by?: string | null
           url?: string | null
           workspace_id?: string | null
         }
         Update: {
+          acquisition_timestamp?: string | null
+          analysis_run_id?: string | null
           byte_size?: number | null
           created_at?: string | null
+          current_version_id?: string | null
           experiment_id?: string | null
           experiment_step_id?: string | null
+          file_role?: string | null
           file_type?: string | null
           id?: string
           kind?: string | null
           label?: string | null
           mime_type?: string | null
+          parsed_metadata?: Json
+          retention_state?: string
           sha256?: string | null
+          source_instrument?: string | null
           storage_path?: string | null
           uploaded_by?: string | null
           url?: string | null
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "experiment_files_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_files_current_version_id_fkey"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "file_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "experiment_files_experiment_id_fkey"
             columns: ["experiment_id"]
@@ -1687,6 +1722,113 @@ export type Database = {
           },
           {
             foreignKeyName: "experiments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      file_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          file_version_id: string
+          id: string
+          job_type: string
+          last_error: string | null
+          next_attempt_at: string
+          result: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          file_version_id: string
+          id?: string
+          job_type: string
+          last_error?: string | null
+          next_attempt_at?: string
+          result?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          file_version_id?: string
+          id?: string
+          job_type?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          result?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_jobs_file_version_id_fkey"
+            columns: ["file_version_id"]
+            isOneToOne: false
+            referencedRelation: "file_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      file_versions: {
+        Row: {
+          byte_size: number | null
+          created_at: string
+          experiment_file_id: string
+          id: string
+          mime_type: string | null
+          original_filename: string | null
+          processing_state: string
+          sha256: string | null
+          storage_path: string
+          uploaded_by: string | null
+          version_number: number
+          workspace_id: string | null
+        }
+        Insert: {
+          byte_size?: number | null
+          created_at?: string
+          experiment_file_id: string
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          processing_state?: string
+          sha256?: string | null
+          storage_path: string
+          uploaded_by?: string | null
+          version_number: number
+          workspace_id?: string | null
+        }
+        Update: {
+          byte_size?: number | null
+          created_at?: string
+          experiment_file_id?: string
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          processing_state?: string
+          sha256?: string | null
+          storage_path?: string
+          uploaded_by?: string | null
+          version_number?: number
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_versions_experiment_file_id_fkey"
+            columns: ["experiment_file_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_versions_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

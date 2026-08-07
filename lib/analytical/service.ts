@@ -95,6 +95,28 @@ export async function listRuns(sampleId: string): Promise<AnalysisRun[]> {
   return (data ?? []) as AnalysisRun[];
 }
 
+// T2.7 D5 — runs are per-sample (T2.5), so linking an experiment-level file
+// to "a run" needs every run across every sample/batch under this
+// experiment. Two-step query rather than a nested Supabase select, since
+// analysis_runs has no direct experiment_id column.
+export async function listRunsForExperiment(experimentId: string): Promise<{ id: string; label: string }[]> {
+  const supabase = await createClient();
+  const { data: batches } = await supabase.from("batches").select("id, label").eq("experiment_id", experimentId);
+  const batchIds = (batches ?? []).map((b) => b.id);
+  if (batchIds.length === 0) return [];
+  const { data: samples } = await supabase.from("samples").select("id, vial_label, batch_id").in("batch_id", batchIds);
+  const sampleIds = (samples ?? []).map((s) => s.id);
+  if (sampleIds.length === 0) return [];
+  const { data: runs, error } = await supabase
+    .from("analysis_runs")
+    .select("id, created_at, sample_id")
+    .in("sample_id", sampleIds)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const sampleLabel = new Map((samples ?? []).map((s) => [s.id, s.vial_label]));
+  return (runs ?? []).map((r) => ({ id: r.id, label: `${sampleLabel.get(r.sample_id) ?? r.sample_id} — ${new Date(r.created_at).toLocaleDateString()}` }));
+}
+
 export async function createRun(
   supabase: Supabase,
   userId: string,
