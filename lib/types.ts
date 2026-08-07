@@ -490,7 +490,7 @@ type ExperimentOutputRow = Database["public"]["Tables"]["experiment_outputs"]["R
 
 export type Material = MaterialRow;
 
-export type IdentifierType = "cas" | "pubchem_cid" | "inchikey" | "smiles" | "internal_code" | "alias";
+export type IdentifierType = "cas" | "pubchem_cid" | "inchikey" | "inchi" | "smiles" | "internal_code" | "alias";
 export type MaterialIdentifier = Omit<MaterialIdentifierRow, "identifier_type"> & { identifier_type: IdentifierType };
 
 export type StorageLocation = StorageLocationRow;

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useToast } from "@/components/toast-provider";
 import type {
   Material,
@@ -30,7 +31,14 @@ import {
   getStockAttemptsAction,
 } from "@/app/(app)/materials/actions";
 
-const IDENTIFIER_TYPES: IdentifierType[] = ["cas", "pubchem_cid", "inchikey", "smiles", "internal_code", "alias"];
+const IDENTIFIER_TYPES: IdentifierType[] = ["cas", "pubchem_cid", "inchikey", "inchi", "smiles", "internal_code", "alias"];
+
+// T2.8 D2 — smiles-drawer touches the DOM at draw time, so it's loaded
+// client-only (first use of this pattern in the codebase; no SSR fallback
+// needed since a plain loading state is fine for a small inline structure).
+const MoleculeStructure = dynamic(() => import("@/components/molecule-structure").then((m) => m.MoleculeStructure), {
+  ssr: false,
+});
 
 function QuantityRow({
   label,
@@ -412,6 +420,10 @@ function MaterialRow({
                 {id.identifier_type}: {id.value}
               </div>
             ))}
+            {(() => {
+              const smiles = (identifiers ?? []).find((id) => id.identifier_type === "smiles");
+              return smiles ? <MoleculeStructure smiles={smiles.value} /> : null;
+            })()}
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
               <select value={identifierType} onChange={(e) => setIdentifierType(e.target.value as IdentifierType)}>
                 {IDENTIFIER_TYPES.map((t) => (

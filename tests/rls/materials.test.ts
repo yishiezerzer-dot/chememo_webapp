@@ -166,4 +166,33 @@ describe.skipIf(!ready)("materials, lots & stock solutions (local Supabase)", ()
     expect(error).toBeNull();
     expect(input!.workspace_id).toBe(workspaceId);
   });
+
+  // T2.8 D1 — 'inchi' was added to the identifier_type allow-list alongside
+  // the pre-existing 'smiles'/'inchikey' (T2.2); prove both the new value and
+  // an already-shipped value are still accepted, matching the plan's own
+  // "existing identifier_type values keep working unchanged" regression ask.
+  it("accepts 'inchi' and 'smiles' material identifiers", async () => {
+    const { data: material } = await admin
+      .from("materials")
+      .insert({ preferred_name: "Structure identifiers test material", workspace_id: workspaceId })
+      .select()
+      .single();
+    materialIds.push(material!.id);
+
+    const { data: inchi, error: inchiErr } = await memberClient
+      .from("material_identifiers")
+      .insert({ material_id: material!.id, identifier_type: "inchi", value: "InChI=1S/C2H4O2/c1-2(3)4/h1H3,(H,3,4)" })
+      .select()
+      .single();
+    expect(inchiErr).toBeNull();
+    expect(inchi!.identifier_type).toBe("inchi");
+
+    const { data: smiles, error: smilesErr } = await memberClient
+      .from("material_identifiers")
+      .insert({ material_id: material!.id, identifier_type: "smiles", value: "CC(=O)O" })
+      .select()
+      .single();
+    expect(smilesErr).toBeNull();
+    expect(smiles!.identifier_type).toBe("smiles");
+  });
 });
