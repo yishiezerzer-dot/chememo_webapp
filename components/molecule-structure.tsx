@@ -12,25 +12,29 @@ export function MoleculeStructure({ smiles }: { smiles: string }) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    setError(false);
     if (!svgRef.current) return;
     const drawer = new SmilesDrawer.SvgDrawer({ width: 160, height: 120 });
     SmilesDrawer.parse(
       smiles,
       (tree) => {
         if (svgRef.current) drawer.draw(tree, svgRef.current, "dark");
+        setError(false);
       },
       () => setError(true)
     );
   }, [smiles]);
 
-  if (error) {
-    return (
-      <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-        Could not render this structure.
-      </p>
-    );
-  }
-
-  return <svg ref={svgRef} width={160} height={120} />;
+  // The <svg> stays mounted even on error (just hidden) so its ref is never
+  // torn down — otherwise a later smiles change couldn't re-attach and
+  // retry drawing once a prior parse had failed.
+  return (
+    <div>
+      <svg ref={svgRef} width={160} height={120} style={error ? { display: "none" } : undefined} />
+      {error && (
+        <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+          Could not render this structure.
+        </p>
+      )}
+    </div>
+  );
 }
