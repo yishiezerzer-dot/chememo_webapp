@@ -12,6 +12,7 @@ import {
   linkFileToRunAction,
   unlinkFileFromRunAction,
   listRunsForFileLinkAction,
+  listUnlinkedFilesAction,
 } from "@/app/(app)/experiments/[id]/file-actions";
 
 const FILE_ICONS: Record<string, string> = {
@@ -79,6 +80,12 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
   const [acquisitionTimestamp, setAcquisitionTimestamp] = useState(
     file.acquisition_timestamp ? file.acquisition_timestamp.slice(0, 16) : ""
   );
+  const [retentionState, setRetentionState] = useState(file.retention_state);
+  const [metadataEntries, setMetadataEntries] = useState<[string, string][]>(
+    Object.entries(file.parsed_metadata as Record<string, string>)
+  );
+  const [metaKey, setMetaKey] = useState("");
+  const [metaValue, setMetaValue] = useState("");
   const [runId, setRunId] = useState("");
 
   async function load() {
@@ -151,26 +158,66 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                 </select>
                 <input placeholder="Source instrument" value={sourceInstrument} onChange={(e) => setSourceInstrument(e.target.value)} />
                 <input type="datetime-local" value={acquisitionTimestamp} onChange={(e) => setAcquisitionTimestamp(e.target.value)} />
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  disabled={pending}
-                  onClick={() =>
-                    run(() =>
-                      updateFileMetadataAction(
-                        experimentId,
-                        file.id,
-                        fileRole || null,
-                        sourceInstrument,
-                        acquisitionTimestamp ? new Date(acquisitionTimestamp).toISOString() : "",
-                        file.parsed_metadata
-                      )
-                    )
-                  }
-                >
-                  Save metadata
-                </button>
+                <select value={retentionState} onChange={(e) => setRetentionState(e.target.value as typeof retentionState)}>
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                </select>
               </div>
+
+              {/* §16.5 legacy-filename token decoding (D3) — an open-ended
+                  key/value map, same convention as T2.6's environmental
+                  custom_fields, since the audit anticipates fields not yet named. */}
+              <div style={{ marginBottom: 8 }}>
+                {metadataEntries.map(([k, v], i) => (
+                  <span key={k} className="chip" style={{ marginRight: 6, marginBottom: 6, display: "inline-block" }}>
+                    {k}: {v}
+                    <b
+                      onClick={() => setMetadataEntries((cur) => cur.filter((_, idx) => idx !== i))}
+                      style={{ marginLeft: 6, cursor: "pointer" }}
+                    >
+                      ×
+                    </b>
+                  </span>
+                ))}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                  <input placeholder="Metadata key (e.g. instrument_code)" value={metaKey} onChange={(e) => setMetaKey(e.target.value)} />
+                  <input placeholder="Value" value={metaValue} onChange={(e) => setMetaValue(e.target.value)} />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={!metaKey.trim()}
+                    onClick={() => {
+                      setMetadataEntries((cur) => [...cur.filter(([k]) => k !== metaKey.trim()), [metaKey.trim(), metaValue]]);
+                      setMetaKey("");
+                      setMetaValue("");
+                    }}
+                  >
+                    + Add field
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={pending}
+                style={{ marginBottom: 8 }}
+                onClick={() =>
+                  run(() =>
+                    updateFileMetadataAction(
+                      experimentId,
+                      file.id,
+                      fileRole || null,
+                      sourceInstrument,
+                      acquisitionTimestamp ? new Date(acquisitionTimestamp).toISOString() : "",
+                      Object.fromEntries(metadataEntries),
+                      retentionState
+                    )
+                  )
+                }
+              >
+                Save metadata
+              </button>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <select value={runId} onChange={(e) => setRunId(e.target.value)}>
@@ -272,6 +319,46 @@ export function FileList({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// T2.7 D6 — "unlinked file inbox": the acceptance criterion asks for a real
+// list, not just the per-file "Unlinked" chip inside FileDetailsSection.
+// Self-contained, same convention as FileDetailsSection above.
+export function UnlinkedFilesInbox({ experimentId }: { experimentId: string }) {
+  const [open, setOpen] = useState(false);
+  const [files, setFiles] = useState<ExperimentFile[] | null>(null);
+
+  async function load() {
+    if (!open) setFiles(await listUnlinkedFilesAction(experimentId));
+    setOpen((o) => !o);
+  }
+
+  return (
+    <div className="obs-box glass" style={{ marginTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h4 style={{ margin: 0, fontSize: 14 }}>Unlinked files</h4>
+        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
+          {open ? "Hide" : "Show"}
+        </button>
+      </div>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          {(files ?? []).length === 0 ? (
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              Every uploaded file is linked to an analysis run.
+            </p>
+          ) : (
+            (files ?? []).map((f) => (
+              <div key={f.id} className="act-row">
+                <span className="act-dot"></span>
+                <span style={{ fontSize: 13 }}>{f.label ?? "(unnamed)"}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

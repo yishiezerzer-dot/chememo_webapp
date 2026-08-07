@@ -50,7 +50,7 @@ import { createTaskAction, updateTaskStatusAction } from "@/app/(app)/tasks-acti
 import { exportExperimentMarkdownAction } from "./export-actions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
-import { FileList } from "@/components/file-list";
+import { FileList, UnlinkedFilesInbox } from "@/components/file-list";
 import { FileManager } from "@/components/file-manager";
 import { SummaryCard } from "@/components/summary-card";
 import { RelationshipsPanel } from "@/components/relationships-panel";
@@ -465,6 +465,8 @@ export default async function ExperimentDetailPage({
               removeAction={isOwner ? removeFile : undefined}
             />
           </div>
+
+          <UnlinkedFilesInbox experimentId={e.id} />
 
           {isOwner && (
             <FileManager

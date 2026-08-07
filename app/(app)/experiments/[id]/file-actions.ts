@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/authorization/policies";
 import * as filesService from "@/lib/files/service";
 import * as analyticalService from "@/lib/analytical/service";
 import { toActionResult } from "@/lib/errors";
-import type { ActionResult, FileRole } from "@/lib/types";
+import type { ActionResult, FileRole, FileRetentionState } from "@/lib/types";
 
 export async function uploadFile(
   experimentId: string,
@@ -87,7 +87,8 @@ export async function updateFileMetadataAction(
   fileRole: FileRole | null,
   sourceInstrument: string,
   acquisitionTimestamp: string,
-  parsedMetadata: Record<string, unknown>
+  parsedMetadata: Record<string, unknown>,
+  retentionState: FileRetentionState
 ): Promise<ActionResult> {
   const { supabase } = await requireUser();
   try {
@@ -96,12 +97,17 @@ export async function updateFileMetadataAction(
       source_instrument: sourceInstrument.trim() || null,
       acquisition_timestamp: acquisitionTimestamp || null,
       parsed_metadata: parsedMetadata,
+      retention_state: retentionState,
     });
   } catch (e) {
     return toActionResult("updateFileMetadataAction", e);
   }
   revalidatePath(`/experiments/${experimentId}`);
   return { ok: true };
+}
+
+export async function listUnlinkedFilesAction(experimentId: string) {
+  return filesService.listUnlinkedFiles(experimentId);
 }
 
 export async function linkFileToRunAction(experimentId: string, fileId: string, analysisRunId: string): Promise<ActionResult> {

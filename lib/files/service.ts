@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import type { Json } from "@/lib/database.types";
-import type { FileRole, FileVersion } from "@/lib/types";
+import type { ExperimentFile, FileRole, FileRetentionState, FileVersion } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -198,6 +198,7 @@ export type FileMetadataFields = {
   source_instrument: string | null;
   acquisition_timestamp: string | null;
   parsed_metadata: Record<string, unknown>;
+  retention_state: FileRetentionState;
 };
 
 export async function updateFileMetadata(supabase: Supabase, fileId: string, fields: FileMetadataFields): Promise<void> {
@@ -221,7 +222,7 @@ export async function unlinkFileFromRun(supabase: Supabase, fileId: string): Pro
 }
 
 // T2.7 D6 — "unlinked file inbox": a computed view, not a stored flag.
-export async function listUnlinkedFiles(experimentId: string) {
+export async function listUnlinkedFiles(experimentId: string): Promise<ExperimentFile[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("experiment_files")
@@ -231,7 +232,7 @@ export async function listUnlinkedFiles(experimentId: string) {
     .is("analysis_run_id", null)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as ExperimentFile[];
 }
 
 export async function addFileLink(
