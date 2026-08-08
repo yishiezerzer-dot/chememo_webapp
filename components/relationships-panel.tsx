@@ -8,6 +8,7 @@ import type { ActionResult, ExperimentSeries, RelationshipType } from "@/lib/typ
 import type { RelationshipView } from "@/lib/relationships/service";
 
 export function RelationshipsPanel({
+  experimentId,
   relationships,
   allSeries,
   memberSeries,
@@ -16,6 +17,7 @@ export function RelationshipsPanel({
   addToSeries,
   removeFromSeries,
 }: {
+  experimentId: string;
   relationships: RelationshipView[];
   allSeries: ExperimentSeries[];
   memberSeries: ExperimentSeries[];
@@ -50,21 +52,39 @@ export function RelationshipsPanel({
         </p>
       ) : (
         <div style={{ marginBottom: 12 }}>
-          {relationships.map((r) => (
-            <div key={r.relationship.id} className="act-row">
-              <span className="act-dot"></span>
-              <span style={{ fontSize: 13 }}>
-                {r.label} <a href={`/experiments/${r.otherExperiment.id}`}>{r.otherExperiment.id} — {r.otherExperiment.name}</a>
-              </span>
-              <button
-                type="button"
+          {Object.entries(
+            relationships.reduce<Record<string, RelationshipView[]>>((groups, r) => {
+              (groups[r.relationship.relationship_type] ??= []).push(r);
+              return groups;
+            }, {})
+          ).map(([type, group]) => (
+            <div key={type} style={{ marginBottom: 8 }}>
+              {group.map((r) => (
+                <div key={r.relationship.id} className="act-row">
+                  <span className="act-dot"></span>
+                  <span style={{ fontSize: 13 }}>
+                    {r.label} <a href={`/experiments/${r.otherExperiment.id}`}>{r.otherExperiment.id} — {r.otherExperiment.name}</a>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ marginLeft: "auto" }}
+                    disabled={pending}
+                    onClick={() => run(() => deleteRelationship(r.relationship.id))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {/* T2.9 D4 — compare this experiment against every related
+                  experiment of this one type, side by side. */}
+              <a
+                href={`/experiments/compare?ids=${[experimentId, ...group.map((r) => r.otherExperiment.id)].join(",")}`}
                 className="btn btn-ghost btn-sm"
-                style={{ marginLeft: "auto" }}
-                disabled={pending}
-                onClick={() => run(() => deleteRelationship(r.relationship.id))}
+                style={{ marginTop: 4 }}
               >
-                Remove
-              </button>
+                Compare {RELATIONSHIP_LABEL[type as RelationshipType]} ({group.length + 1})
+              </a>
             </div>
           ))}
         </div>

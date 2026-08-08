@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSeries, listSeriesMembers } from "@/lib/series/service";
+import { listControls } from "@/lib/conditions/service";
 import { addMemberAction, removeMemberAction } from "../actions";
 import { SeriesDetailClient } from "@/components/series-detail-client";
 
@@ -11,6 +12,10 @@ export default async function SeriesDetailPage({
   const { id } = await params;
   const [series, members] = await Promise.all([getSeries(id), listSeriesMembers(id)]);
   if (!series) notFound();
+
+  // T2.9 D3 — a controls count per member for the comparison table.
+  const controlsEntries = await Promise.all(members.map(async (m) => [m.id, (await listControls(m.id)).length] as const));
+  const controlsCounts = Object.fromEntries(controlsEntries);
 
   return (
     <div>
@@ -25,6 +30,7 @@ export default async function SeriesDetailPage({
       )}
       <SeriesDetailClient
         members={members}
+        controlsCounts={controlsCounts}
         addMember={addMemberAction.bind(null, id)}
         removeMember={removeMemberAction.bind(null, id)}
       />

@@ -31,6 +31,15 @@ const ITEMS = [
     ),
   },
   {
+    href: "/experiments/matrix",
+    label: "Matrix",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 3v18M9 3v18M15 3v18M3 9h18M3 15h18" />
+      </svg>
+    ),
+  },
+  {
     href: "/new",
     label: "New experiment",
     icon: (

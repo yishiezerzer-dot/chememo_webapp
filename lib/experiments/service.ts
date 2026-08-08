@@ -158,6 +158,16 @@ export async function getExperimentSummary(
   return (data as StoredSummary | null) ?? null;
 }
 
+// T2.9 D4 — one batch query for the relationship-based "Compare" view,
+// rather than N getExperiment calls for N related experiments.
+export async function listExperimentsByIds(ids: string[]): Promise<Experiment[]> {
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("experiments").select("*").in("id", ids).is("deleted_at", null);
+  if (error) throw error;
+  return (data ?? []) as Experiment[];
+}
+
 export async function getExperiment(
   id: string
 ): Promise<{ experiment: Experiment; files: ExperimentFile[] } | null> {

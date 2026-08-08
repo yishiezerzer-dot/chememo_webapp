@@ -327,6 +327,7 @@ export default async function ExperimentDetailPage({
           )}
 
           <RelationshipsPanel
+            experimentId={e.id}
             relationships={relationships}
             allSeries={allSeries}
             memberSeries={memberSeries}

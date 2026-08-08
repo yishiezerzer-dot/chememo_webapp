@@ -3,15 +3,17 @@
 import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
-import { StatusBadge } from "@/components/status-badge";
+import { ComparisonTable } from "@/components/comparison-table";
 import type { ActionResult, Experiment } from "@/lib/types";
 
 export function SeriesDetailClient({
   members,
+  controlsCounts,
   addMember,
   removeMember,
 }: {
   members: Experiment[];
+  controlsCounts: Record<string, number>;
   addMember: (experimentId: string) => Promise<ActionResult>;
   removeMember: (experimentId: string) => Promise<ActionResult>;
 }) {
@@ -27,6 +29,17 @@ export function SeriesDetailClient({
       else router.refresh();
     });
   }
+
+  // T2.9 D2 — "timeline" ordering: experiment_series_members has no real
+  // sequence field (only an insertion-time added_at), so the comparison
+  // table orders by each member's own `date` instead, falling back to
+  // created_at for records with no date set — a derived ordering, not a
+  // stored one.
+  const timelineOrdered = [...members].sort((a, b) => {
+    const aKey = a.date ?? a.created_at;
+    const bKey = b.date ?? b.created_at;
+    return aKey.localeCompare(bKey);
+  });
 
   return (
     <div>
@@ -50,53 +63,7 @@ export function SeriesDetailClient({
         </button>
       </div>
 
-      {members.length === 0 ? (
-        <p className="muted">No members yet.</p>
-      ) : (
-        <div className="table-scroll">
-          <div className="table-scroll-inner" tabIndex={0} role="region" aria-label="Series members, scrollable">
-            <table className="exp-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th>pH</th>
-                  <th>Cycles</th>
-                  <th>Compounds</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((e) => (
-                  <tr key={e.id}>
-                    <td className="td-id">{e.id}</td>
-                    <td>{e.name}</td>
-                    <td>
-                      <StatusBadge status={e.status} />
-                    </td>
-                    <td className="muted">{e.date ?? "—"}</td>
-                    <td className="td-ph">{e.ph ?? "—"}</td>
-                    <td className="td-center muted">{e.cycles ?? "—"}</td>
-                    <td>{e.compounds.join(", ") || "—"}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={pending}
-                        onClick={() => run(() => removeMember(e.id))}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <ComparisonTable experiments={timelineOrdered} controlsCounts={controlsCounts} onRemove={removeMember} />
     </div>
   );
 }
