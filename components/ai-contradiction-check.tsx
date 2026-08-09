@@ -11,7 +11,11 @@ import { CitedAnswerView } from "@/components/cited-answer";
 // simplification of T2.6's full per-program-type requiredControlsPresent,
 // which needs a hasConditionProgram signal neither page currently plumbs);
 // (b) contradictions, an opt-in AI pass over the same experiment set,
-// reusing T3.2's exact citation scheme/validation.
+// reusing T3.2's exact citation scheme/validation. Both are gated behind the
+// same "checked" click (not shown ambiently on load) — consistent with D4's
+// "opt-in, nothing renders automatically" design, and avoids duplicating an
+// experiment ID's exact visible text that ComparisonTable's own ID column
+// already renders on the same page.
 export function AiContradictionCheck({
   experiments,
   controlsCounts,
@@ -30,7 +34,7 @@ export function AiContradictionCheck({
 
   return (
     <div style={{ margin: "4px 0 18px" }}>
-      {missingControls.length > 0 && (
+      {checked && missingControls.length > 0 && (
         <div className="ai-summary-card" style={{ marginBottom: 12, borderColor: "var(--amber)" }}>
           <div className="ai-head">
             <span className="eyebrow" style={{ color: "var(--amber)" }}>
@@ -77,7 +81,7 @@ export function AiContradictionCheck({
             })
           }
         >
-          {pending ? "Checking…" : "Check for contradictions"}
+          {pending ? "Checking…" : "Check for contradictions & missing controls"}
         </button>
       )}
     </div>
