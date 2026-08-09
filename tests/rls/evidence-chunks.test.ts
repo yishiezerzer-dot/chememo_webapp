@@ -93,9 +93,9 @@ describe.skipIf(!ready)("evidence chunks (local Supabase)", () => {
     // Simulate the poller having already embedded this chunk.
     await admin.from("evidence_chunks").update({ status: "done", indexed_at: new Date().toISOString() }).eq("id", before!.id);
 
-    // Touch an unrelated column — narrative content (name/observations/notes/
-    // date/researcher/project) is unchanged.
-    await memberClient.from("experiments").update({ researcher: "Dr. Same" }).eq("id", expId);
+    // Touch a column outside the chunk's content header (name/date/
+    // researcher/project/observations/notes) — narrative content unchanged.
+    await memberClient.from("experiments").update({ temperature: "25C" }).eq("id", expId);
 
     const { data: afterUnrelated } = await admin
       .from("evidence_chunks")
