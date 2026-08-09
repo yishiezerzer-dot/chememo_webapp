@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { isLlmEnabled, type CitedAnswer } from "@/lib/llm";
-import { acquireAiSlot, summarizeExperimentGroup } from "@/lib/ai/service";
+import { acquireAiSlot, summarizeExperimentGroup, submitAiFeedback as submitAiFeedbackService } from "@/lib/ai/service";
 
 // Summarise a set of experiments (the grounded results of an Ask). Reads via
 // the user's session so RLS applies; returns null when AI is off, rate/
@@ -30,4 +30,20 @@ export async function generateGroupSummary(ids: string[]): Promise<CitedAnswer |
   } finally {
     slot.release();
   }
+}
+
+// T3.4 D4 — thumbs up/down + optional note on a specific Ask answer. Reads
+// the caller's own session so the feedback row is attributed to whoever is
+// actually signed in, not whatever the client claims.
+export async function submitAiFeedback(
+  requestId: string,
+  rating: "up" | "down",
+  note?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+  return submitAiFeedbackService(user.id, requestId, rating, note);
 }

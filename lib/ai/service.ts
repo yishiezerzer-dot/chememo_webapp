@@ -2,7 +2,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { acquireConcurrency, checkRate } from "@/lib/rate-limit";
-import { activeChatModel, summarizeExperiment, summarizeGroup, type CitedAnswer } from "@/lib/llm";
+import { activeChatModel, chatProvider, summarizeExperiment, summarizeGroup, type CitedAnswer } from "@/lib/llm";
+import { embeddingModel, EMBEDDING_DIM, isEmbeddingEnabled } from "@/lib/embeddings";
 import { AppError } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import type { Experiment } from "@/lib/types";
@@ -22,6 +23,8 @@ export async function acquireAiSlot(userId: string): Promise<{ release: () => vo
   return { release: slot.release };
 }
 
+// Returns the inserted row's id (for T3.4's ai_retrieval_events/ai_feedback
+// to reference), or null if the insert itself failed.
 export async function logAiRequest(row: {
   userId: string;
   endpoint: AiEndpoint;
@@ -29,17 +32,67 @@ export async function logAiRequest(row: {
   sourceCount: number;
   latencyMs: number;
   estTokens: number | null;
-}): Promise<void> {
-  const { error } = await createAdminClient().from("ai_requests").insert({
-    user_id: row.userId,
-    endpoint: row.endpoint,
-    status: row.status,
-    source_count: row.sourceCount,
-    model: activeChatModel(),
-    est_tokens: row.estTokens,
-    latency_ms: row.latencyMs,
+}): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("ai_requests")
+    .insert({
+      user_id: row.userId,
+      endpoint: row.endpoint,
+      status: row.status,
+      source_count: row.sourceCount,
+      model: activeChatModel(),
+      est_tokens: row.estTokens,
+      latency_ms: row.latencyMs,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    logError("ai-service", "failed to log ai_requests row", { error });
+    return null;
+  }
+  void recordModelVersion(admin);
+  return data.id;
+}
+
+// T3.4 D2 — a distinct (provider, chat_model, embedding_model, dims) tuple is
+// recorded once, at first sight; the unique constraint + ignoreDuplicates
+// makes repeated calls a no-op without a separate select-then-insert check.
+async function recordModelVersion(admin: ReturnType<typeof createAdminClient>): Promise<void> {
+  const { error } = await admin.from("ai_model_versions").upsert(
+    {
+      provider: chatProvider(),
+      chat_model: activeChatModel(),
+      embedding_model: isEmbeddingEnabled() ? embeddingModel() : null,
+      embedding_dimensions: isEmbeddingEnabled() ? EMBEDDING_DIM : null,
+    },
+    { onConflict: "provider,chat_model,embedding_model,embedding_dimensions", ignoreDuplicates: true }
+  );
+  if (error) logError("ai-service", "failed to record model version", { error });
+}
+
+// T3.4 D4 — thumbs up/down + optional note on a specific ai_requests row.
+// Writes via the service role, same trust boundary as ai_summaries' writes.
+// Does not verify requestId belongs to userId — RLS still scopes every read
+// to the submitting user's own rows, so a mismatched id can't leak data,
+// only create a mislabeled feedback row (not worth a lookup query to prevent).
+export async function submitAiFeedback(
+  userId: string,
+  requestId: string,
+  rating: "up" | "down",
+  note?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await createAdminClient().from("ai_feedback").insert({
+    ai_request_id: requestId,
+    user_id: userId,
+    rating,
+    note: note?.trim() || null,
   });
-  if (error) logError("ai-service", "failed to log ai_requests row", { error });
+  if (error) {
+    logError("ai-service", "failed to record ai feedback", { error });
+    return { ok: false, error: "Could not save feedback." };
+  }
+  return { ok: true };
 }
 
 // Group summary of a set of experiments (Ask's grounded results). Reads via

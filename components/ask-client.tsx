@@ -7,7 +7,9 @@ import type { CitedAnswer } from "@/lib/llm";
 import type { MatchExplanation } from "@/lib/rag";
 import { GroupSummary } from "@/components/group-summary";
 import { CitedAnswerView } from "@/components/cited-answer";
-import { generateGroupSummary } from "@/app/(app)/ask/actions";
+import { EvidenceInspector } from "@/components/evidence-inspector";
+import { AiFeedback } from "@/components/ai-feedback";
+import { generateGroupSummary, submitAiFeedback } from "@/app/(app)/ask/actions";
 
 type AskMode = "lab" | "context";
 
@@ -24,6 +26,8 @@ type AskMeta = {
   emptyReason: string | null;
   // T3.3 D2 — per-experiment "why it matched", keyed by experiment id.
   explanations: Record<string, MatchExplanation>;
+  // T3.4 D4 — the ai_requests row id for this answer, when one exists.
+  requestId: string | null;
 };
 
 function explainMatch(e: MatchExplanation): string {
@@ -278,6 +282,10 @@ export function AskClient({
                   )}
                 </p>
               )}
+              {citedAnswer && meta.grounded && (
+                <EvidenceInspector results={meta.results} explanations={meta.explanations} />
+              )}
+              {meta.requestId && <AiFeedback requestId={meta.requestId} action={submitAiFeedback} />}
             </div>
           )}
 

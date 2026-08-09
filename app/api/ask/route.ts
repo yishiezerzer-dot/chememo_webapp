@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { keylessSearch } from "@/lib/search";
 import { retrieveRecords, type MatchExplanation } from "@/lib/rag";
 import { isLlmEnabled, generateCitedAnswer, streamGeneralAnswer, type CitedAnswer } from "@/lib/llm";
@@ -32,10 +33,37 @@ type AskMeta = {
   // T3.3 D2 — per-experiment "why it matched" (audit §11.4), keyed by
   // experiment id. A plain object, not a Map — Maps don't serialize to JSON.
   explanations: Record<string, MatchExplanation>;
+  // T3.4 D4 — the ai_requests row id for this answer, so the client can
+  // submit feedback against it. Null when no such row exists (keyless mode,
+  // or the empty-results early return before any generation was attempted).
+  requestId: string | null;
 };
 
 function explanationsObject(map: Map<string, MatchExplanation>): Record<string, MatchExplanation> {
   return Object.fromEntries(map);
+}
+
+// T3.4 D2 — persists T3.3's already-computed match explanations for the
+// evidence inspector + eval, alongside whichever ai_requests row (if any)
+// this retrieval fed into. Best-effort — a logging failure never blocks the
+// answer itself.
+async function logRetrievalEvent(row: {
+  requestId: string | null;
+  userId: string;
+  query: string;
+  askMode: "lab" | "context";
+  routerMode: "filter" | "semantic" | "both" | null;
+  explanations: Map<string, MatchExplanation>;
+}): Promise<void> {
+  const { error } = await createAdminClient().from("ai_retrieval_events").insert({
+    ai_request_id: row.requestId,
+    user_id: row.userId,
+    query: row.query,
+    ask_mode: row.askMode,
+    router_mode: row.routerMode,
+    retrieved: [...row.explanations.values()],
+  });
+  if (error) logError("api/ask", "failed to log ai_retrieval_events row", { error });
 }
 
 export async function POST(req: Request) {
@@ -64,7 +92,7 @@ export async function POST(req: Request) {
 
   if (!query) {
     return new Response(
-      line({ mode: "keyless", askMode, grounded: false, streaming: false, interpretation: [], results: [], emptyReason: null, explanations: {} }),
+      line({ mode: "keyless", askMode, grounded: false, streaming: false, interpretation: [], results: [], emptyReason: null, explanations: {}, requestId: null }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );
   }
@@ -82,6 +110,7 @@ export async function POST(req: Request) {
         results: ks.results,
         emptyReason: ks.emptyReason,
         explanations: {},
+        requestId: null,
       }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );
@@ -102,7 +131,7 @@ export async function POST(req: Request) {
   const retrieved =
     askMode === "lab"
       ? await retrieveRecords(query)
-      : { records: [], routerFailed: false, evidence: new Map(), explanations: new Map() };
+      : { records: [], routerFailed: false, evidence: new Map(), explanations: new Map(), routerMode: null };
   const records = retrieved.records;
 
   if (askMode === "lab" && records.length === 0) {
@@ -119,6 +148,7 @@ export async function POST(req: Request) {
           ? "Couldn't parse that question for lab search — try rephrasing it."
           : "No matching experiments found in your lab.",
         explanations: {},
+        requestId: null,
       }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );
@@ -139,13 +169,21 @@ export async function POST(req: Request) {
 
     if (cited) {
       slot.release();
-      void logAiRequest({
+      const requestId = await logAiRequest({
         userId: user.id,
         endpoint: "ask_grounded",
         status,
         sourceCount: records.length,
         latencyMs: Date.now() - startedAt,
         estTokens: Math.ceil((query.length + JSON.stringify(cited).length) / 4),
+      });
+      void logRetrievalEvent({
+        requestId,
+        userId: user.id,
+        query,
+        askMode,
+        routerMode: retrieved.routerMode,
+        explanations: retrieved.explanations,
       });
       const meta: AskMeta = {
         mode: "ai",
@@ -156,6 +194,7 @@ export async function POST(req: Request) {
         results: records,
         emptyReason: null,
         explanations: explanationsObject(retrieved.explanations),
+        requestId,
       };
       return new Response(
         new Blob([line(meta), enc.encode(JSON.stringify(cited))]),
@@ -166,13 +205,23 @@ export async function POST(req: Request) {
     // The records didn't actually answer the question (or generation
     // failed/is disabled) — fall through to a general-knowledge answer,
     // clearly marked as not grounded, exactly like askMode "context" below.
-    void logAiRequest({
+    // Still log the retrieval attempt for observability, tagged to this
+    // (failed-to-ground) request row.
+    const fallthroughRequestId = await logAiRequest({
       userId: user.id,
       endpoint: "ask_grounded",
       status,
       sourceCount: records.length,
       latencyMs: Date.now() - startedAt,
       estTokens: null,
+    });
+    void logRetrievalEvent({
+      requestId: fallthroughRequestId,
+      userId: user.id,
+      query,
+      askMode,
+      routerMode: retrieved.routerMode,
+      explanations: retrieved.explanations,
     });
   }
 
@@ -187,6 +236,12 @@ export async function POST(req: Request) {
     results: [],
     emptyReason: null,
     explanations: {},
+    // T3.4 D4 — no request id available yet at this point: the visible
+    // general-knowledge answer's own ai_requests row isn't written until the
+    // stream finishes (see the finally block below), so feedback isn't
+    // offered on streamed answers this pass (frontend hides the widget when
+    // requestId is null).
+    requestId: null,
   };
 
   let answerChars = 0;

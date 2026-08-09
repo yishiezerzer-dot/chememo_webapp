@@ -2,6 +2,19 @@ import { z } from "zod";
 import { resolveMetalAlias, resolveReactionAlias, type SearchFilters } from "@/lib/search";
 import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/types";
 
+// T3.4 D5 — version tag for each system prompt below, registered in
+// prompt_versions (migration 20260819120000). Bump the relevant entry by
+// hand alongside any prompt-text change so eval/feedback data stays
+// correlatable across prompt revisions — not a live-editable CMS.
+export const PROMPT_VERSIONS = {
+  route_query: 1,
+  cited_answer: 1,
+  general_answer: 1,
+  extract_fields: 1,
+  summarize_experiment: 1,
+  summarize_group: 1,
+} as const;
+
 // Provider-agnostic LLM layer. Switch via AI_PROVIDER (gemini | openai |
 // anthropic); each provider's code path is kept so you can flip back instantly.
 // INERT when the selected provider has no key: every entry point returns null
@@ -9,7 +22,7 @@ import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/typ
 
 type ChatProvider = "gemini" | "openai" | "anthropic";
 
-function chatProvider(): ChatProvider {
+export function chatProvider(): ChatProvider {
   const p = (process.env.AI_PROVIDER || "gemini").toLowerCase();
   return p === "openai" ? "openai" : p === "anthropic" ? "anthropic" : "gemini";
 }

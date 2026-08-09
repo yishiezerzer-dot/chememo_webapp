@@ -208,10 +208,11 @@ export async function retrieveRecords(query: string): Promise<{
   routerFailed: boolean;
   evidence: Map<string, EvidenceSource>;
   explanations: Map<string, MatchExplanation>;
+  routerMode: "filter" | "semantic" | "both" | null;
 }> {
   const intent = await routeQuery(query);
   if (!intent) {
-    return { records: [], routerFailed: true, evidence: new Map(), explanations: new Map() };
+    return { records: [], routerFailed: true, evidence: new Map(), explanations: new Map(), routerMode: null };
   }
 
   const byId = new Map<string, Experiment>();
@@ -256,7 +257,7 @@ export async function retrieveRecords(query: string): Promise<{
     });
   }
 
-  return { records, routerFailed: false, evidence, explanations };
+  return { records, routerFailed: false, evidence, explanations, routerMode: intent.mode };
 }
 
 async function keylessAsk(query: string): Promise<AskResult> {

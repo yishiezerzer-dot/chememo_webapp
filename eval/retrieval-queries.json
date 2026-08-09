@@ -3,43 +3,50 @@
     "id": "q01",
     "query": "Which samples produced droplets?",
     "expected_ids": ["EXP-004", "EXP-006", "EXP-012"],
-    "mode": "semantic"
+    "mode": "semantic",
+    "category": "semantic"
   },
   {
     "id": "q02",
     "query": "coacervate formation after rehydration",
     "expected_ids": ["EXP-004", "EXP-006", "EXP-012"],
-    "mode": "semantic"
+    "mode": "semantic",
+    "category": "semantic"
   },
   {
     "id": "q03",
     "query": "fiber and fibril formation under the microscope",
     "expected_ids": ["EXP-007"],
-    "mode": "semantic"
+    "mode": "semantic",
+    "category": "semantic"
   },
   {
     "id": "q04",
     "query": "depsipeptide ester-amide oligomerization",
     "expected_ids": ["EXP-002", "EXP-006", "EXP-010"],
-    "mode": "semantic"
+    "mode": "semantic",
+    "category": "semantic"
   },
   {
     "id": "q05",
     "query": "blue crystalline needles metal coordination",
     "expected_ids": ["EXP-003"],
-    "mode": "semantic"
+    "mode": "semantic",
+    "category": "semantic"
   },
   {
     "id": "q06",
     "query": "high pH coacervate droplet phase",
     "expected_ids": ["EXP-004", "EXP-012"],
-    "mode": "semantic"
+    "mode": "semantic",
+    "category": "semantic"
   },
   {
     "id": "q07",
     "query": "experiments with m/z 297",
     "expected_ids": ["EXP-001", "EXP-004", "EXP-008", "EXP-009", "EXP-011"],
     "mode": "filter",
+    "category": "filter_range",
     "filter": { "mz": 297 }
   },
   {
@@ -47,6 +54,7 @@
     "query": "iron-containing experiments",
     "expected_ids": ["EXP-005", "EXP-011"],
     "mode": "filter",
+    "category": "filter_range",
     "filter": { "metals": ["Fe"] }
   },
   {
@@ -54,6 +62,7 @@
     "query": "copper coordination experiments",
     "expected_ids": ["EXP-003", "EXP-009"],
     "mode": "filter",
+    "category": "filter_range",
     "filter": { "metals": ["Cu"] }
   },
   {
@@ -61,6 +70,31 @@
     "query": "reactions run above pH 8",
     "expected_ids": ["EXP-004", "EXP-009"],
     "mode": "filter",
+    "category": "filter_range",
     "filter": { "ph_gt": 8 }
+  },
+  {
+    "id": "q11",
+    "query": "m/z 297 experiments above pH 8 (exact intersection)",
+    "expected_ids": ["EXP-004"],
+    "mode": "filter",
+    "category": "exact_lookup",
+    "filter": { "mz": 297, "ph_gt": 8 }
+  },
+  {
+    "id": "q12",
+    "query": "fe2+ (must resolve the same as canonical 'iron', q08)",
+    "expected_ids": ["EXP-005", "EXP-011"],
+    "mode": "synonym",
+    "category": "synonym",
+    "aliasTerm": "fe2+"
+  },
+  {
+    "id": "q13",
+    "query": "praseodymium-catalyzed experiments",
+    "expected_ids": [],
+    "mode": "no_answer",
+    "category": "no_answer",
+    "filter": { "metals": ["Pr"] }
   }
 ]

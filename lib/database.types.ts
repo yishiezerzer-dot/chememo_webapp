@@ -39,6 +39,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_feedback: {
+        Row: {
+          ai_request_id: string
+          created_at: string
+          id: string
+          note: string | null
+          rating: string
+          user_id: string | null
+        }
+        Insert: {
+          ai_request_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          rating: string
+          user_id?: string | null
+        }
+        Update: {
+          ai_request_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          rating?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_feedback_ai_request_id_fkey"
+            columns: ["ai_request_id"]
+            isOneToOne: false
+            referencedRelation: "ai_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_model_versions: {
+        Row: {
+          chat_model: string
+          embedding_dimensions: number | null
+          embedding_model: string | null
+          first_seen_at: string
+          id: string
+          provider: string
+        }
+        Insert: {
+          chat_model: string
+          embedding_dimensions?: number | null
+          embedding_model?: string | null
+          first_seen_at?: string
+          id?: string
+          provider: string
+        }
+        Update: {
+          chat_model?: string
+          embedding_dimensions?: number | null
+          embedding_model?: string | null
+          first_seen_at?: string
+          id?: string
+          provider?: string
+        }
+        Relationships: []
+      }
       ai_requests: {
         Row: {
           created_at: string | null
@@ -74,6 +136,47 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      ai_retrieval_events: {
+        Row: {
+          ai_request_id: string | null
+          ask_mode: string
+          created_at: string
+          id: string
+          query: string
+          retrieved: Json
+          router_mode: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ai_request_id?: string | null
+          ask_mode: string
+          created_at?: string
+          id?: string
+          query: string
+          retrieved?: Json
+          router_mode?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ai_request_id?: string | null
+          ask_mode?: string
+          created_at?: string
+          id?: string
+          query?: string
+          retrieved?: Json
+          router_mode?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_retrieval_events_ai_request_id_fkey"
+            columns: ["ai_request_id"]
+            isOneToOne: false
+            referencedRelation: "ai_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_summaries: {
         Row: {
@@ -2481,6 +2584,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      prompt_versions: {
+        Row: {
+          id: string
+          prompt_key: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          id?: string
+          prompt_key: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          id?: string
+          prompt_key?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
       }
       protocol_steps: {
         Row: {
