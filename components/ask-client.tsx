@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Experiment } from "@/lib/types";
 import type { CitedAnswer } from "@/lib/llm";
+import type { MatchExplanation } from "@/lib/rag";
 import { GroupSummary } from "@/components/group-summary";
 import { CitedAnswerView } from "@/components/cited-answer";
 import { generateGroupSummary } from "@/app/(app)/ask/actions";
@@ -21,7 +22,19 @@ type AskMeta = {
   interpretation: string[];
   results: Experiment[];
   emptyReason: string | null;
+  // T3.3 D2 — per-experiment "why it matched", keyed by experiment id.
+  explanations: Record<string, MatchExplanation>;
 };
+
+function explainMatch(e: MatchExplanation): string {
+  const parts: string[] = [];
+  if (e.appliedFilters.length) parts.push(e.appliedFilters.join(", "));
+  if (e.semanticScore !== null) {
+    const via = e.sourceType ? `${e.sourceType}/${e.sectionType}` : "semantic";
+    parts.push(`${via} match, score ${e.semanticScore.toFixed(2)}`);
+  }
+  return parts.join(" + ");
+}
 
 type Phase = "idle" | "loading" | "streaming" | "done";
 
@@ -308,6 +321,11 @@ export function AskClient({
                       {e.cycles !== null && <span>{e.cycles} cyc</span>}
                       {e.date && <span>{e.date}</span>}
                     </div>
+                    {meta.explanations[e.id] && explainMatch(meta.explanations[e.id]) && (
+                      <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+                        Why it matched: {explainMatch(meta.explanations[e.id])}
+                      </p>
+                    )}
                   </Link>
                 ))}
               </div>

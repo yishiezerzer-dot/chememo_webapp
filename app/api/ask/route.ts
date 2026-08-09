@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { keylessSearch } from "@/lib/search";
-import { retrieveRecords } from "@/lib/rag";
+import { retrieveRecords, type MatchExplanation } from "@/lib/rag";
 import { isLlmEnabled, generateCitedAnswer, streamGeneralAnswer, type CitedAnswer } from "@/lib/llm";
 import { MAX_BODY_BYTES, MAX_QUERY_CHARS } from "@/lib/rate-limit";
 import { acquireAiSlot, logAiRequest } from "@/lib/ai/service";
@@ -29,7 +29,14 @@ type AskMeta = {
   interpretation: string[];
   results: Experiment[];
   emptyReason: string | null;
+  // T3.3 D2 — per-experiment "why it matched" (audit §11.4), keyed by
+  // experiment id. A plain object, not a Map — Maps don't serialize to JSON.
+  explanations: Record<string, MatchExplanation>;
 };
+
+function explanationsObject(map: Map<string, MatchExplanation>): Record<string, MatchExplanation> {
+  return Object.fromEntries(map);
+}
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -57,7 +64,7 @@ export async function POST(req: Request) {
 
   if (!query) {
     return new Response(
-      line({ mode: "keyless", askMode, grounded: false, streaming: false, interpretation: [], results: [], emptyReason: null }),
+      line({ mode: "keyless", askMode, grounded: false, streaming: false, interpretation: [], results: [], emptyReason: null, explanations: {} }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );
   }
@@ -74,6 +81,7 @@ export async function POST(req: Request) {
         interpretation: ks.interpretation,
         results: ks.results,
         emptyReason: ks.emptyReason,
+        explanations: {},
       }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );
@@ -91,7 +99,10 @@ export async function POST(req: Request) {
 
   // Lab mode: retrieve first. If nothing matches, say so explicitly — never
   // fall back to general knowledge, which could read as a lab conclusion.
-  const retrieved = askMode === "lab" ? await retrieveRecords(query) : { records: [], routerFailed: false, evidence: new Map() };
+  const retrieved =
+    askMode === "lab"
+      ? await retrieveRecords(query)
+      : { records: [], routerFailed: false, evidence: new Map(), explanations: new Map() };
   const records = retrieved.records;
 
   if (askMode === "lab" && records.length === 0) {
@@ -107,6 +118,7 @@ export async function POST(req: Request) {
         emptyReason: retrieved.routerFailed
           ? "Couldn't parse that question for lab search — try rephrasing it."
           : "No matching experiments found in your lab.",
+        explanations: {},
       }),
       { headers: { "content-type": "text/plain; charset=utf-8" } }
     );
@@ -143,6 +155,7 @@ export async function POST(req: Request) {
         interpretation: [],
         results: records,
         emptyReason: null,
+        explanations: explanationsObject(retrieved.explanations),
       };
       return new Response(
         new Blob([line(meta), enc.encode(JSON.stringify(cited))]),
@@ -173,6 +186,7 @@ export async function POST(req: Request) {
     interpretation: [],
     results: [],
     emptyReason: null,
+    explanations: {},
   };
 
   let answerChars = 0;

@@ -107,6 +107,14 @@ describe("routeQuery (zod validation regression)", () => {
     expect(intent!.filters.compounds).toEqual([]);
     expect(intent!.filters.metals).toEqual(["Zn"]);
   });
+
+  it("resolves the model's free-typed metal/reaction aliases the same way the keyless parser does (T3.3 D3)", async () => {
+    mockGeminiText(JSON.stringify({ mode: "filter", metals: ["zinc"], reaction: "wet-dry cycling" }));
+    const intent = await routeQuery("zinc wet-dry cycling experiments");
+    expect(intent).not.toBeNull();
+    expect(intent!.filters.metals).toEqual(["Zn"]);
+    expect(intent!.filters.reactionLike).toBe("%cycling%");
+  });
 });
 
 describe("extractExperimentFields (zod validation regression)", () => {

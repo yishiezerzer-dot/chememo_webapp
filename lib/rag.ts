@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { keylessSearch, executeFilters } from "@/lib/search";
+import { keylessSearch, executeFilters, describeFilters } from "@/lib/search";
 import {
   isLlmEnabled,
   routeQuery,
@@ -10,6 +10,36 @@ import {
 } from "@/lib/llm";
 import { embedText } from "@/lib/embeddings";
 import type { Experiment } from "@/lib/types";
+
+// T3.3 D1 — RRF's standard damping constant: large enough that rank 1 vs
+// rank 2 in a single list isn't wildly different, small enough that a record
+// found by BOTH retrieval methods clearly outranks one found by only one.
+const RRF_K = 60;
+
+function rrfFuse(idLists: string[][]): string[] {
+  const scores = new Map<string, number>();
+  for (const ids of idLists) {
+    ids.forEach((id, i) => {
+      scores.set(id, (scores.get(id) ?? 0) + 1 / (RRF_K + i + 1));
+    });
+  }
+  return [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
+// T3.3 D2 — per-record "why it matched" (audit §11.4), returned alongside
+// retrieveRecords' fused records so the Ask screen can show it under each
+// Source card. matchedVia/appliedFilters come from which retrieval list(s)
+// produced the record; sourceType/sectionType/snippet/semanticScore come
+// straight from the evidence map (T3.1/T3.2), null when the record was
+// filter-only (no chunk search performed for it).
+export type MatchExplanation = {
+  matchedVia: "filter" | "semantic" | "both";
+  appliedFilters: string[];
+  semanticScore: number | null;
+  sourceType: string | null;
+  sectionType: string | null;
+  snippet: string | null;
+};
 
 // Only semantic hits at/above this cosine similarity count as a real match.
 // Empirically: on-topic chemistry ≈ 0.59–0.70, off-topic ≈ 0.41–0.43.
@@ -115,7 +145,10 @@ export async function semanticSearch(semanticQuery: string, k = 8): Promise<Chun
   const experimentIds = await resolveChunkExperimentIds(hits, supabase);
   const orderedIds: string[] = [];
   const seen = new Set<string>();
-  const bestChunkByExperiment = new Map<string, { chunkId: string; sourceType: string; sectionType: string }>();
+  const bestChunkByExperiment = new Map<
+    string,
+    { chunkId: string; sourceType: string; sectionType: string; similarity: number }
+  >();
   for (let i = 0; i < hits.length; i++) {
     const id = experimentIds[i];
     if (id && !seen.has(id)) {
@@ -125,6 +158,7 @@ export async function semanticSearch(semanticQuery: string, k = 8): Promise<Chun
         chunkId: hits[i].id,
         sourceType: hits[i].source_type,
         sectionType: hits[i].section_type,
+        similarity: hits[i].similarity,
       });
       if (orderedIds.length >= k) break;
     }
@@ -143,7 +177,14 @@ export async function semanticSearch(semanticQuery: string, k = 8): Promise<Chun
   const evidence = new Map<string, EvidenceSource>();
   for (const [expId, chunk] of bestChunkByExperiment) {
     const content = contentByChunkId.get(chunk.chunkId);
-    if (content) evidence.set(expId, { sourceType: chunk.sourceType, sectionType: chunk.sectionType, content });
+    if (content) {
+      evidence.set(expId, {
+        sourceType: chunk.sourceType,
+        sectionType: chunk.sectionType,
+        content,
+        similarity: chunk.similarity,
+      });
+    }
   }
 
   const order = new Map(orderedIds.map((id, i) => [id, i]));
@@ -155,29 +196,67 @@ export async function semanticSearch(semanticQuery: string, k = 8): Promise<Chun
 }
 
 // Retrieval only (no answer generation) — routes the query, runs filters and/or
-// semantic search, returns the deduped records plus chunk-level evidence for
-// T3.2's citation engine. Used by the /api/ask route, which generates the
-// answer itself. `routerFailed` lets the caller tell "the router genuinely
-// found nothing" apart from "the router itself was unavailable/unparseable"
-// (audit §3 — these read as the same silent "no matches" to the user otherwise).
-export async function retrieveRecords(
-  query: string
-): Promise<{ records: Experiment[]; routerFailed: boolean; evidence: Map<string, EvidenceSource> }> {
+// semantic search, fuses them via RRF (T3.3 D1), returns the fused records
+// plus chunk-level evidence for T3.2's citation engine and per-record match
+// explanations for T3.3's "why it matched" (D2). Used by the /api/ask route,
+// which generates the answer itself. `routerFailed` lets the caller tell "the
+// router genuinely found nothing" apart from "the router itself was
+// unavailable/unparseable" (audit §3 — these read as the same silent "no
+// matches" to the user otherwise).
+export async function retrieveRecords(query: string): Promise<{
+  records: Experiment[];
+  routerFailed: boolean;
+  evidence: Map<string, EvidenceSource>;
+  explanations: Map<string, MatchExplanation>;
+}> {
   const intent = await routeQuery(query);
-  if (!intent) return { records: [], routerFailed: true, evidence: new Map() };
-  const seen = new Map<string, Experiment>();
-  let evidence = new Map<string, EvidenceSource>();
-  if (intent.mode !== "semantic") {
-    for (const e of await executeFilters(intent.filters)) seen.set(e.id, e);
+  if (!intent) {
+    return { records: [], routerFailed: true, evidence: new Map(), explanations: new Map() };
   }
+
+  const byId = new Map<string, Experiment>();
+  let filterIds: string[] = [];
+  if (intent.mode !== "semantic") {
+    const filterRecords = await executeFilters(intent.filters);
+    filterIds = filterRecords.map((e) => e.id);
+    for (const e of filterRecords) byId.set(e.id, e);
+  }
+
+  let semanticIds: string[] = [];
+  let evidence = new Map<string, EvidenceSource>();
   if (intent.mode !== "filter" && intent.semanticQuery) {
     const semantic = await semanticSearch(intent.semanticQuery);
+    semanticIds = semantic.experiments.map((e) => e.id);
     for (const e of semantic.experiments) {
-      if (!seen.has(e.id)) seen.set(e.id, e);
+      if (!byId.has(e.id)) byId.set(e.id, e);
     }
     evidence = semantic.evidence;
   }
-  return { records: [...seen.values()], routerFailed: false, evidence };
+
+  // Single-mode queries (only one non-empty list) trivially preserve that
+  // list's original order — RRF only changes anything when both lists exist.
+  const fusedIds = rrfFuse([filterIds, semanticIds].filter((ids) => ids.length > 0));
+  const records = fusedIds.map((id) => byId.get(id)).filter((e): e is Experiment => !!e);
+
+  const appliedFilters = intent.mode !== "semantic" ? describeFilters(intent.filters) : [];
+  const filterIdSet = new Set(filterIds);
+  const semanticIdSet = new Set(semanticIds);
+  const explanations = new Map<string, MatchExplanation>();
+  for (const id of fusedIds) {
+    const inFilter = filterIdSet.has(id);
+    const inSemantic = semanticIdSet.has(id);
+    const ev = evidence.get(id);
+    explanations.set(id, {
+      matchedVia: inFilter && inSemantic ? "both" : inFilter ? "filter" : "semantic",
+      appliedFilters: inFilter ? appliedFilters : [],
+      semanticScore: ev?.similarity ?? null,
+      sourceType: ev?.sourceType ?? null,
+      sectionType: ev?.sectionType ?? null,
+      snippet: ev?.content ?? null,
+    });
+  }
+
+  return { records, routerFailed: false, evidence, explanations };
 }
 
 async function keylessAsk(query: string): Promise<AskResult> {

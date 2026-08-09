@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SearchFilters } from "@/lib/search";
+import { resolveMetalAlias, resolveReactionAlias, type SearchFilters } from "@/lib/search";
 import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/types";
 
 // Provider-agnostic LLM layer. Switch via AI_PROVIDER (gemini | openai |
@@ -252,14 +252,17 @@ Use "filter" for exact/parametric questions (pH, compound, metal, method, m/z), 
   if (!parsed.success) return null;
   const d = parsed.data;
 
+  // T3.3 D3 — resolve the model's free-typed metals/reaction through the same
+  // canonical aliases the keyless parser uses, deterministically (not a
+  // prompt hint the model might ignore): "zinc"/"Zn"/"Zn2+" all become "Zn".
   const filters: SearchFilters = {
     ...EMPTY_FILTERS,
     compounds: d.compounds,
-    metals: d.metals,
+    metals: d.metals.map(resolveMetalAlias),
     methods: d.methods,
     mz: d.mz,
     ph: d.ph,
-    reactionLike: d.reaction ? `%${d.reaction}%` : null,
+    reactionLike: d.reaction ? resolveReactionAlias(d.reaction) : null,
   };
   return { mode: d.mode, filters, semanticQuery: d.semanticQuery };
 }
@@ -294,6 +297,9 @@ export type EvidenceSource = {
   sourceType: string;
   sectionType: string;
   content: string;
+  // T3.3 D2 — the raw cosine similarity from match_evidence_chunks, kept for
+  // the Ask screen's "why it matched" explainability (not used by citations).
+  similarity?: number;
 };
 
 export type ResolvedCitation = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseQuery } from "@/lib/search";
+import { parseQuery, resolveMetalAlias, resolveReactionAlias, describeFilters } from "@/lib/search";
 
 const vocab = {
   compounds: ["Histidine", "Thioglycolic acid", "Glycine"],
@@ -50,5 +50,44 @@ describe("parseQuery", () => {
     expect(filters.metals).toEqual([]);
     expect(filters.compounds).toEqual([]);
     expect(filters.ph).toBeNull();
+  });
+
+  it("parses a metal's charge-state alias the same as its plain name/symbol (§11.2)", () => {
+    expect(parseQuery("experiments with zn2+", vocab).filters.metals).toEqual(["Zn"]);
+  });
+});
+
+// T3.3 D3 — resolveMetalAlias/resolveReactionAlias are the same resolvers
+// lib/llm.ts's routeQuery applies to the AI router's own free-typed output,
+// so "zinc"/"Zn"/"Zn2+" resolve to the same canonical value regardless of
+// which retrieval path (keyless parser or AI router) produced them.
+describe("resolveMetalAlias", () => {
+  it("resolves plain names, symbols, and charge-state variants to the same canonical symbol", () => {
+    expect(resolveMetalAlias("zinc")).toBe("Zn");
+    expect(resolveMetalAlias("Zn")).toBe("Zn");
+    expect(resolveMetalAlias("zn2+")).toBe("Zn");
+    expect(resolveMetalAlias("ZN2+")).toBe("Zn");
+  });
+
+  it("passes through an unrecognized value unchanged", () => {
+    expect(resolveMetalAlias("Mercury")).toBe("Mercury");
+  });
+});
+
+describe("resolveReactionAlias", () => {
+  it("resolves loose phrasing to the same canonical ilike pattern the keyless parser produces", () => {
+    expect(resolveReactionAlias("wet-dry cycling")).toBe("%cycling%");
+    expect(resolveReactionAlias("depsipeptide formation")).toBe("%depsi%");
+  });
+
+  it("falls through to a raw ilike wrap for an unrecognized phrase", () => {
+    expect(resolveReactionAlias("polymerization")).toBe("%polymerization%");
+  });
+});
+
+describe("describeFilters", () => {
+  it("produces the same human-readable strings parseQuery's own interpretation already did", () => {
+    const { filters, interpretation } = parseQuery("zinc experiments at pH > 8", vocab);
+    expect(describeFilters(filters)).toEqual(interpretation);
   });
 });

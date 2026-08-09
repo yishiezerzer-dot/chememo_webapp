@@ -6,16 +6,68 @@ import type { Experiment } from "@/lib/types";
 // filters over the typed columns and run them as Postgres queries. No LLM —
 // every result is a real row, fully citable by EXP-###.
 
-const METAL_ALIASES: Record<string, string> = {
+// T3.3 D3 — canonical metal aliases, shared by the keyless parser's raw-text
+// scan (below) and lib/llm.ts's AI router (which resolves its own free-typed
+// metals through resolveMetalAlias, deterministically, not via a prompt hint
+// the model might ignore). Expanded with the ionic forms actually relevant to
+// this lab's catalysis chemistry (audit §11.2's own literal example: "zinc"/
+// "Zn"/"Zn2+" should all resolve to the same canonical value).
+export const METAL_ALIASES: Record<string, string> = {
   zinc: "Zn",
   zn: "Zn",
+  "zn2+": "Zn",
   copper: "Cu",
   cu: "Cu",
+  "cu2+": "Cu",
+  "cu+": "Cu",
   iron: "Fe",
   fe: "Fe",
+  "fe2+": "Fe",
+  "fe3+": "Fe",
   calcium: "Ca",
   ca: "Ca",
+  "ca2+": "Ca",
 };
+
+// A single already-identified token (e.g. one element of the AI router's own
+// metals: string[]) resolves via a plain lookup — no text-scanning needed.
+export function resolveMetalAlias(raw: string): string {
+  return METAL_ALIASES[raw.trim().toLowerCase()] ?? raw;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Word-boundary-safe even for aliases ending in a non-word character (e.g.
+// "zn2+") — \b only makes sense on a side that's actually a word character.
+function aliasRegex(alias: string): RegExp {
+  const escaped = escapeRegExp(alias);
+  const prefix = /^\w/.test(alias) ? "\\b" : "";
+  const suffix = /\w$/.test(alias) ? "\\b" : "";
+  return new RegExp(`${prefix}${escaped}${suffix}`);
+}
+
+// T3.3 D3 — the reaction-type keyword chain, extracted from parseQuery's
+// former inline if/else so lib/llm.ts's AI router can resolve the model's own
+// free-typed reaction phrase (e.g. "wet-dry cycling") to the SAME canonical
+// ilike pattern the keyless parser produces from raw query text.
+const REACTION_ALIASES: { pattern: RegExp; canonical: string; consumedWords: string[] }[] = [
+  { pattern: /cycling/, canonical: "%cycling%", consumedWords: ["cycling"] },
+  { pattern: /wet.{0,3}dry|wet[\s-]?dry/, canonical: "%wet%dry%", consumedWords: ["wet", "dry"] },
+  { pattern: /depsi/, canonical: "%depsi%", consumedWords: ["depsipeptide", "depsi"] },
+  { pattern: /coacerv/, canonical: "%coacerv%", consumedWords: ["coacervate", "coacervation"] },
+  { pattern: /fibr|fiber/, canonical: "%fibr%", consumedWords: [] },
+  { pattern: /self.?assembl|assembly/, canonical: "%assembly%", consumedWords: [] },
+];
+
+export function resolveReactionAlias(raw: string): string {
+  const lower = raw.toLowerCase();
+  for (const { pattern, canonical } of REACTION_ALIASES) {
+    if (pattern.test(lower)) return canonical;
+  }
+  return `%${raw}%`;
+}
 
 // words that carry no discriminating signal for free-text / compound matching
 const STOP = new Set([
@@ -104,7 +156,7 @@ export function parseQuery(
   // metals
   const metals = new Set<string>();
   for (const [alias, sym] of Object.entries(METAL_ALIASES)) {
-    if (new RegExp(`\\b${alias}\\b`).test(lower)) {
+    if (aliasRegex(alias).test(lower)) {
       metals.add(sym);
       consumed.add(alias);
     }
@@ -148,22 +200,12 @@ export function parseQuery(
 
   // reaction type (single best keyword)
   let reactionLike: string | null = null;
-  if (/cycling/.test(lower)) {
-    reactionLike = "%cycling%";
-    consumed.add("cycling");
-  } else if (/wet.{0,3}dry|wet[\s-]?dry/.test(lower)) {
-    reactionLike = "%wet%dry%";
-    consumed.add("wet"); consumed.add("dry");
-  } else if (/depsi/.test(lower)) {
-    reactionLike = "%depsi%";
-    consumed.add("depsipeptide"); consumed.add("depsi");
-  } else if (/coacerv/.test(lower)) {
-    reactionLike = "%coacerv%";
-    consumed.add("coacervate"); consumed.add("coacervation");
-  } else if (/fibr|fiber/.test(lower)) {
-    reactionLike = "%fibr%";
-  } else if (/self.?assembl|assembly/.test(lower)) {
-    reactionLike = "%assembly%";
+  for (const alias of REACTION_ALIASES) {
+    if (alias.pattern.test(lower)) {
+      reactionLike = alias.canonical;
+      alias.consumedWords.forEach((w) => consumed.add(w));
+      break;
+    }
   }
 
   // free text — leftover meaningful words (e.g. "droplets", "precipitate")
@@ -176,27 +218,36 @@ export function parseQuery(
     if (!freeText.includes(w)) freeText.push(w);
   }
 
-  // build interpretation
-  if (compounds.size) interpretation.push(`compounds include ${[...compounds].join(" + ")}`);
-  if (metals.size) interpretation.push(`metal ${[...metals].join(", ")}`);
-  if (ph) interpretation.push(`pH ${PH_LABEL[ph.op]} ${ph.value}`);
-  if (mz.length) interpretation.push(`m/z ${mz.join(", ")}`);
-  if (methods.size) interpretation.push(`method ${[...methods].join(", ")}`);
-  if (reactionLike) interpretation.push(`reaction ~ "${reactionLike.replace(/%/g, "").replace(/wetdry/, "wet-dry")}"`);
-  if (freeText.length) interpretation.push(`text mentions "${freeText.join(", ")}"`);
-
-  return {
-    filters: {
-      compounds: [...compounds],
-      metals: [...metals],
-      methods: [...methods],
-      mz,
-      ph,
-      reactionLike,
-      freeText,
-    },
-    interpretation,
+  const filters: SearchFilters = {
+    compounds: [...compounds],
+    metals: [...metals],
+    methods: [...methods],
+    mz,
+    ph,
+    reactionLike,
+    freeText,
   };
+  interpretation.push(...describeFilters(filters));
+
+  return { filters, interpretation };
+}
+
+// T3.3 D2 — extracted from parseQuery's former inline "build interpretation"
+// block so the AI router path (which builds a SearchFilters directly from the
+// model's JSON, never through parseQuery) can describe its own filters the
+// same human-readable way, for the Ask screen's per-source "why it matched" line.
+export function describeFilters(filters: SearchFilters): string[] {
+  const interpretation: string[] = [];
+  if (filters.compounds.length) interpretation.push(`compounds include ${filters.compounds.join(" + ")}`);
+  if (filters.metals.length) interpretation.push(`metal ${filters.metals.join(", ")}`);
+  if (filters.ph) interpretation.push(`pH ${PH_LABEL[filters.ph.op]} ${filters.ph.value}`);
+  if (filters.mz.length) interpretation.push(`m/z ${filters.mz.join(", ")}`);
+  if (filters.methods.length) interpretation.push(`method ${filters.methods.join(", ")}`);
+  if (filters.reactionLike) {
+    interpretation.push(`reaction ~ "${filters.reactionLike.replace(/%/g, "").replace(/wetdry/, "wet-dry")}"`);
+  }
+  if (filters.freeText.length) interpretation.push(`text mentions "${filters.freeText.join(", ")}"`);
+  return interpretation;
 }
 
 // Build one ilike condition for an .or() group. Double-quotes the value so

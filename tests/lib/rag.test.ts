@@ -53,15 +53,23 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-vi.mock("@/lib/search", () => ({ keylessSearch: vi.fn(), executeFilters: vi.fn() }));
+const executeFiltersMock = vi.fn();
+vi.mock("@/lib/search", () => ({
+  keylessSearch: vi.fn(),
+  executeFilters: executeFiltersMock,
+  describeFilters: (filters: { compounds: string[] }) =>
+    filters.compounds.length ? [`compounds include ${filters.compounds.join(" + ")}`] : [],
+}));
+
+const routeQueryMock = vi.fn();
 vi.mock("@/lib/llm", () => ({
   isLlmEnabled: () => true,
-  routeQuery: vi.fn(),
+  routeQuery: routeQueryMock,
   generateCitedAnswer: vi.fn(),
   generateGeneralAnswer: vi.fn(),
 }));
 
-const { semanticSearch } = await import("@/lib/rag");
+const { semanticSearch, retrieveRecords } = await import("@/lib/rag");
 
 describe("semanticSearch", () => {
   it("returns empty experiments/evidence when embeddings are disabled", async () => {
@@ -94,11 +102,13 @@ describe("semanticSearch", () => {
       sourceType: "step_observation",
       sectionType: "observations",
       content: "Droplets observed at 40C.",
+      similarity: 0.9,
     });
     expect(result.evidence.get("EXP-2")).toEqual({
       sourceType: "comment",
       sectionType: "discussion",
       content: "Nice result!",
+      similarity: 0.7,
     });
   });
 
@@ -123,6 +133,7 @@ describe("semanticSearch", () => {
       sourceType: "protocol_step",
       sectionType: "protocol_step",
       content: "Step 1: mix reagents.",
+      similarity: 0.8,
     });
   });
 
@@ -141,5 +152,64 @@ describe("semanticSearch", () => {
     const result = await semanticSearch("query");
     expect(result.experiments).toEqual([]);
     expect(result.evidence.size).toBe(0);
+  });
+});
+
+// T3.3 D1/D2 — retrieveRecords fuses the filter list and the semantic-search
+// list via reciprocal-rank fusion instead of a naive "filters always first"
+// union, and returns a per-record match explanation.
+describe("retrieveRecords (RRF fusion)", () => {
+  it("ranks a record found by both filter and semantic search above one found by only one method, even when its raw rank was lower in each", async () => {
+    routeQueryMock.mockResolvedValueOnce({
+      mode: "both",
+      filters: { compounds: [], metals: [], methods: [], mz: [], ph: null, reactionLike: null, freeText: [] },
+      semanticQuery: "some query",
+    });
+    executeFiltersMock.mockResolvedValueOnce([
+      { id: "EXP-A", name: "A" },
+      { id: "EXP-B", name: "B" },
+    ]);
+    embedTextMock.mockResolvedValueOnce([0.1, 0.2]);
+    rpcResult = {
+      data: [
+        { id: "c1", source_type: "comment", source_id: "cm1", section_type: "discussion", metadata: { experiment_id: "EXP-C" }, similarity: 0.9 },
+        { id: "c2", source_type: "comment", source_id: "cm2", section_type: "discussion", metadata: { experiment_id: "EXP-B" }, similarity: 0.8 },
+      ],
+      error: null,
+    };
+    experimentRows.length = 0;
+    experimentRows.push({ id: "EXP-C", name: "C" }, { id: "EXP-B", name: "B (semantic hydration)" });
+    chunkContentRows.length = 0;
+    chunkContentRows.push({ id: "c1", content: "C content" }, { id: "c2", content: "B content" });
+
+    const result = await retrieveRecords("some query");
+    // EXP-B is rank 2 in BOTH lists (not the top hit in either) but appearing
+    // in both still outranks EXP-A/EXP-C, each the top hit in only one list.
+    expect(result.records.map((e) => e.id)).toEqual(["EXP-B", "EXP-A", "EXP-C"]);
+    expect(result.explanations.get("EXP-B")?.matchedVia).toBe("both");
+    expect(result.explanations.get("EXP-A")?.matchedVia).toBe("filter");
+    expect(result.explanations.get("EXP-C")?.matchedVia).toBe("semantic");
+    expect(result.explanations.get("EXP-C")?.semanticScore).toBe(0.9);
+  });
+
+  it("single-mode queries preserve the original list order (RRF is a no-op)", async () => {
+    routeQueryMock.mockResolvedValueOnce({
+      mode: "filter",
+      filters: { compounds: ["Histidine"], metals: [], methods: [], mz: [], ph: null, reactionLike: null, freeText: [] },
+      semanticQuery: null,
+    });
+    executeFiltersMock.mockResolvedValueOnce([
+      { id: "EXP-1", name: "First" },
+      { id: "EXP-2", name: "Second" },
+      { id: "EXP-3", name: "Third" },
+    ]);
+
+    const result = await retrieveRecords("histidine experiments");
+    expect(result.records.map((e) => e.id)).toEqual(["EXP-1", "EXP-2", "EXP-3"]);
+    expect(result.explanations.get("EXP-1")).toMatchObject({
+      matchedVia: "filter",
+      appliedFilters: ["compounds include Histidine"],
+      semanticScore: null,
+    });
   });
 });
