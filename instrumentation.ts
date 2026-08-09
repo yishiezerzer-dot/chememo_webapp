@@ -8,6 +8,9 @@ export async function register() {
     // T2.7 — file_jobs' safety-net poller, same startup pattern.
     const { startFileJobsPoller } = await import("@/lib/file-jobs");
     startFileJobsPoller();
+    // T3.1 — evidence_chunks' safety-net poller, same startup pattern.
+    const { startEvidenceChunkPoller } = await import("@/lib/evidence-chunks");
+    startEvidenceChunkPoller();
   }
 }
 

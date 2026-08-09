@@ -2,6 +2,8 @@ import {
   getHealthSnapshot,
   getFailedIndexJobs,
   getIndexVersionStatus,
+  getEvidenceChunkIndexStatus,
+  getFailedEvidenceChunks,
   getRecentAiErrors,
   BACKUP_TEST_STATUS,
 } from "@/lib/health/service";
@@ -9,10 +11,12 @@ import {
 // T0.10 — any authenticated user can see this (no admin/role concept exists
 // yet; that's T2.1's job). Gated by the (app) layout's existing auth check.
 export default async function HealthPage() {
-  const [snapshot, failedJobs, indexVersion, aiErrors] = await Promise.all([
+  const [snapshot, failedJobs, indexVersion, chunkIndex, failedChunks, aiErrors] = await Promise.all([
     getHealthSnapshot(),
     getFailedIndexJobs(),
     getIndexVersionStatus(),
+    getEvidenceChunkIndexStatus(),
+    getFailedEvidenceChunks(),
     getRecentAiErrors(),
   ]);
 
@@ -37,23 +41,71 @@ export default async function HealthPage() {
           <div className="lbl">Index jobs failed</div>
         </div>
         <div className="stat glass">
+          <div className="num">{snapshot.evidenceChunks.pending}</div>
+          <div className="lbl">Evidence chunks pending</div>
+        </div>
+        <div className="stat glass">
+          <div className="num">{snapshot.evidenceChunks.failed}</div>
+          <div className="lbl">Evidence chunks failed</div>
+        </div>
+        <div className="stat glass">
           <div className="num">{Math.round(snapshot.ai.recentErrorRate * 100)}%</div>
           <div className="lbl">Recent AI error rate ({snapshot.ai.recentSampleSize} sampled)</div>
         </div>
       </div>
 
       <div className="obs-box glass" style={{ marginTop: 20 }}>
-        <h4>Embedding index</h4>
+        <h4>Evidence chunk index</h4>
+        <p>
+          Model: {chunkIndex.model ?? "—"} · Dimensions: {chunkIndex.dimensions ?? "—"} · Version:{" "}
+          {chunkIndex.embeddingVersion ?? "—"}
+        </p>
+        <p>
+          {chunkIndex.totalChunks} chunks total —{" "}
+          {Object.entries(chunkIndex.byStatus)
+            .map(([status, count]) => `${count} ${status}`)
+            .join(", ") || "none yet"}
+        </p>
+        <p className="muted">
+          By source:{" "}
+          {Object.entries(chunkIndex.bySourceType)
+            .map(([type, count]) => `${type}: ${count}`)
+            .join(", ") || "—"}
+        </p>
+        <p className="muted">
+          Indexed range: {chunkIndex.indexedAtRange.earliest ?? "—"} →{" "}
+          {chunkIndex.indexedAtRange.latest ?? "—"}
+        </p>
+      </div>
+
+      <div className="obs-box glass" style={{ marginTop: 20 }}>
+        <h4>Failed evidence chunks</h4>
+        {failedChunks.length === 0 ? (
+          <p className="muted">None.</p>
+        ) : (
+          <ul>
+            {failedChunks.map((c) => (
+              <li key={c.id}>
+                {c.sourceType}/{c.sourceId} — {c.attempts} attempts — {c.lastError ?? "no error message"}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="obs-box glass" style={{ marginTop: 20 }}>
+        <h4>Embedding index (legacy, retired by T3.1)</h4>
         <p>
           Model: {indexVersion.model ?? "—"} · Dimensions: {indexVersion.dimensions ?? "—"}
         </p>
         <p>
           {indexVersion.indexedCount} / {indexVersion.totalExperiments} experiments indexed
         </p>
+        <p className="muted">Historical snapshot only — no longer written to; superseded by the evidence chunk index above.</p>
       </div>
 
       <div className="obs-box glass" style={{ marginTop: 20 }}>
-        <h4>Failed index jobs</h4>
+        <h4>Failed index jobs (legacy, retired by T3.1)</h4>
         {failedJobs.length === 0 ? (
           <p className="muted">None.</p>
         ) : (

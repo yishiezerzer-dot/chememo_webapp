@@ -7,15 +7,17 @@ export type HealthSnapshot = {
   timestamp: string;
   db: { ok: boolean };
   indexJobs: { pending: number; failed: number };
+  evidenceChunks: { pending: number; failed: number };
   ai: { recentSampleSize: number; recentErrorRate: number };
 };
 
 export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   const admin = createAdminClient();
 
-  const [dbCheck, jobsCheck, aiCheck] = await Promise.all([
+  const [dbCheck, jobsCheck, chunksCheck, aiCheck] = await Promise.all([
     admin.from("experiments").select("id").limit(1),
     admin.from("index_jobs").select("status").neq("status", "done"),
+    admin.from("evidence_chunks").select("status").neq("status", "done"),
     admin
       .from("ai_requests")
       .select("status")
@@ -30,14 +32,19 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   const pendingJobs = jobs.filter((j) => j.status === "pending" || j.status === "processing").length;
   const failedJobs = jobs.filter((j) => j.status === "failed").length;
 
+  const chunks = chunksCheck.data ?? [];
+  const pendingChunks = chunks.filter((c) => c.status === "pending" || c.status === "processing").length;
+  const failedChunks = chunks.filter((c) => c.status === "failed").length;
+
   const aiRows = aiCheck.data ?? [];
   const aiErrors = aiRows.filter((r) => r.status === "error").length;
 
   return {
-    status: !dbOk ? "down" : failedJobs > 0 ? "degraded" : "ok",
+    status: !dbOk ? "down" : failedJobs > 0 || failedChunks > 0 ? "degraded" : "ok",
     timestamp: new Date().toISOString(),
     db: { ok: dbOk },
     indexJobs: { pending: pendingJobs, failed: failedJobs },
+    evidenceChunks: { pending: pendingChunks, failed: failedChunks },
     ai: {
       recentSampleSize: aiRows.length,
       recentErrorRate: aiRows.length ? aiErrors / aiRows.length : 0,
@@ -75,11 +82,10 @@ export type IndexVersionStatus = {
   totalExperiments: number;
 };
 
-// "Version" here means the embedding model/dims of the most recently
-// completed job — good enough signal until T3.1 formally versions the index.
-// indexedCount comes from experiment_embeddings directly (the real coverage
-// signal), not index_jobs — older experiments that predate the T0.5 job
-// queue and haven't been re-saved since have a real embedding but no job row.
+// T3.1 retired new writes to index_jobs/experiment_embeddings (superseded by
+// evidence_chunks below) — this function and its backing tables are now a
+// frozen historical snapshot, not deleted. See getEvidenceChunkIndexStatus
+// for the real, currently-updating index status.
 export async function getIndexVersionStatus(): Promise<IndexVersionStatus> {
   const admin = createAdminClient();
   const [{ data: latest }, { count: indexedCount }, { count: totalExperiments }] = await Promise.all([
@@ -120,6 +126,83 @@ export async function getRecentAiErrors(): Promise<RecentAiError[]> {
     .order("created_at", { ascending: false })
     .limit(20);
   return (data ?? []).map((r) => ({ endpoint: r.endpoint, model: r.model, createdAt: r.created_at }));
+}
+
+export type EvidenceChunkIndexStatus = {
+  totalChunks: number;
+  byStatus: Record<string, number>;
+  bySourceType: Record<string, number>;
+  model: string | null;
+  dimensions: number | null;
+  embeddingVersion: number | null;
+  indexedAtRange: { earliest: string | null; latest: string | null };
+};
+
+// T3.1 D6 — the real, currently-updating index status, replacing
+// getIndexVersionStatus's now-frozen index_jobs-derived placeholder above.
+export async function getEvidenceChunkIndexStatus(): Promise<EvidenceChunkIndexStatus> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("evidence_chunks")
+    .select("status, source_type, embedding_model, embedding_dimensions, embedding_version, indexed_at");
+  const rows = data ?? [];
+
+  const byStatus: Record<string, number> = {};
+  const bySourceType: Record<string, number> = {};
+  let model: string | null = null;
+  let dimensions: number | null = null;
+  let embeddingVersion: number | null = null;
+  let earliest: string | null = null;
+  let latest: string | null = null;
+
+  for (const r of rows) {
+    byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+    bySourceType[r.source_type] = (bySourceType[r.source_type] ?? 0) + 1;
+    if (r.indexed_at) {
+      if (!earliest || r.indexed_at < earliest) earliest = r.indexed_at;
+      if (!latest || r.indexed_at > latest) latest = r.indexed_at;
+      model = r.embedding_model ?? model;
+      dimensions = r.embedding_dimensions ?? dimensions;
+      embeddingVersion = r.embedding_version ?? embeddingVersion;
+    }
+  }
+
+  return {
+    totalChunks: rows.length,
+    byStatus,
+    bySourceType,
+    model,
+    dimensions,
+    embeddingVersion,
+    indexedAtRange: { earliest, latest },
+  };
+}
+
+export type FailedEvidenceChunk = {
+  id: string;
+  sourceType: string;
+  sourceId: string;
+  attempts: number;
+  lastError: string | null;
+  nextAttemptAt: string;
+};
+
+export async function getFailedEvidenceChunks(): Promise<FailedEvidenceChunk[]> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("evidence_chunks")
+    .select("id, source_type, source_id, attempts, last_error, next_attempt_at")
+    .eq("status", "failed")
+    .order("next_attempt_at", { ascending: false })
+    .limit(20);
+  return (data ?? []).map((c) => ({
+    id: c.id,
+    sourceType: c.source_type,
+    sourceId: c.source_id,
+    attempts: c.attempts,
+    lastError: c.last_error,
+    nextAttemptAt: c.next_attempt_at,
+  }));
 }
 
 // T0.10 — manual entry, not auto-detected: chememo (prod) currently has zero

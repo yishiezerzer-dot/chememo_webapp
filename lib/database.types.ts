@@ -759,6 +759,80 @@ export type Database = {
           },
         ]
       }
+      evidence_chunks: {
+        Row: {
+          attempts: number
+          content: string
+          content_hash: string
+          created_at: string
+          embedding: string | null
+          embedding_dimensions: number | null
+          embedding_model: string | null
+          embedding_version: number
+          id: string
+          indexed_at: string | null
+          last_error: string | null
+          metadata: Json
+          next_attempt_at: string
+          section_type: string
+          source_id: string
+          source_type: string
+          status: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          content: string
+          content_hash: string
+          created_at?: string
+          embedding?: string | null
+          embedding_dimensions?: number | null
+          embedding_model?: string | null
+          embedding_version?: number
+          id?: string
+          indexed_at?: string | null
+          last_error?: string | null
+          metadata?: Json
+          next_attempt_at?: string
+          section_type: string
+          source_id: string
+          source_type: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          content?: string
+          content_hash?: string
+          created_at?: string
+          embedding?: string | null
+          embedding_dimensions?: number | null
+          embedding_model?: string | null
+          embedding_version?: number
+          id?: string
+          indexed_at?: string | null
+          last_error?: string | null
+          metadata?: Json
+          next_attempt_at?: string
+          section_type?: string
+          source_id?: string
+          source_type?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_chunks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experiment_drafts: {
         Row: {
           base_updated_at: string | null
@@ -3316,6 +3390,17 @@ export type Database = {
         Args: { uid: string; ws_id: string }
         Returns: boolean
       }
+      match_evidence_chunks: {
+        Args: { match_count?: number; query_embedding: string }
+        Returns: {
+          id: string
+          metadata: Json
+          section_type: string
+          similarity: number
+          source_id: string
+          source_type: string
+        }[]
+      }
       match_experiments: {
         Args: { match_count?: number; query_embedding: string }
         Returns: {
@@ -3328,6 +3413,17 @@ export type Database = {
       next_protocol_id: { Args: never; Returns: string }
       reopen_experiment: {
         Args: { p_id: string; p_reason: string }
+        Returns: undefined
+      }
+      upsert_evidence_chunk: {
+        Args: {
+          p_content: string
+          p_metadata: Json
+          p_section_type: string
+          p_source_id: string
+          p_source_type: string
+          p_workspace_id: string
+        }
         Returns: undefined
       }
     }

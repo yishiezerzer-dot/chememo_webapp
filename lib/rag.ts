@@ -26,33 +26,97 @@ export type AskResult = {
   emptyReason: string | null;
 };
 
-// Semantic retrieval: embed the query, keep only nearest experiments above the
-// similarity threshold, hydrate full rows in similarity order. [] when disabled.
-async function semanticSearch(semanticQuery: string, k = 8): Promise<Experiment[]> {
+// T3.1 D5 — semantic retrieval now matches at chunk granularity (a single
+// step observation or analysis result can surface the right experiment even
+// when the rest of its content is noisy) instead of one whole-experiment
+// vector. Each chunk hit resolves to its parent experiment id — directly via
+// metadata.experiment_id for 8 of the 10 source types, or via a live fan-out
+// against experiments.protocol_version_id for the two protocol-level source
+// types (protocol_version/protocol_step have no single parent experiment —
+// protocols are reusable across many). Hits are deduped to distinct
+// experiment ids in similarity order, then hydrated exactly as before —
+// lib/llm.ts's formatRecord()/generateAnswer() are unchanged.
+async function resolveChunkExperimentIds(
+  hits: { source_type: string; metadata: Record<string, unknown> }[],
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<(string | null)[]> {
+  const protocolVersionIds = [
+    ...new Set(
+      hits
+        .filter((h) => h.source_type === "protocol_version" || h.source_type === "protocol_step")
+        .map((h) => h.metadata.protocol_version_id as string)
+        .filter(Boolean)
+    ),
+  ];
+
+  const experimentsByProtocolVersion = new Map<string, string[]>();
+  if (protocolVersionIds.length > 0) {
+    const { data: linked } = await supabase
+      .from("experiments")
+      .select("id, protocol_version_id")
+      .in("protocol_version_id", protocolVersionIds)
+      .is("deleted_at", null);
+    for (const row of linked ?? []) {
+      const list = experimentsByProtocolVersion.get(row.protocol_version_id!) ?? [];
+      list.push(row.id);
+      experimentsByProtocolVersion.set(row.protocol_version_id!, list);
+    }
+  }
+
+  return hits.map((h) => {
+    if (h.source_type === "protocol_version" || h.source_type === "protocol_step") {
+      const pvId = h.metadata.protocol_version_id as string | undefined;
+      return pvId ? experimentsByProtocolVersion.get(pvId)?.[0] ?? null : null;
+    }
+    return (h.metadata.experiment_id as string | undefined) ?? null;
+  });
+}
+
+// Semantic retrieval: embed the query, chunk-search, resolve to distinct
+// parent experiments above the similarity threshold, hydrate full rows in
+// similarity order. [] when disabled. Exported (only) so tests can exercise
+// the chunk-to-experiment resolution/dedup logic directly.
+export async function semanticSearch(semanticQuery: string, k = 8): Promise<Experiment[]> {
   const embedding = await embedText(semanticQuery);
   if (!embedding) return [];
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("match_experiments", {
+  const { data, error } = await supabase.rpc("match_evidence_chunks", {
     // pgvector expects the vector as its text form, e.g. "[0.1,0.2,…]".
     query_embedding: JSON.stringify(embedding),
-    match_count: k,
+    // Over-fetch chunks since many can collapse onto the same experiment.
+    match_count: k * 4,
   });
   if (error) throw error;
 
-  const hits = ((data ?? []) as { id: string; similarity: number }[]).filter(
-    (r) => r.similarity >= MIN_SIM
-  );
-  const ids = hits.map((r) => r.id);
-  if (ids.length === 0) return [];
+  const hits = ((data ?? []) as {
+    id: string;
+    source_type: string;
+    source_id: string;
+    metadata: Record<string, unknown>;
+    similarity: number;
+  }[]).filter((r) => r.similarity >= MIN_SIM);
+  if (hits.length === 0) return [];
+
+  const experimentIds = await resolveChunkExperimentIds(hits, supabase);
+  const orderedIds: string[] = [];
+  const seen = new Set<string>();
+  for (const id of experimentIds) {
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      orderedIds.push(id);
+      if (orderedIds.length >= k) break;
+    }
+  }
+  if (orderedIds.length === 0) return [];
 
   const { data: rows } = await supabase
     .from("experiments")
     .select("*")
-    .in("id", ids)
+    .in("id", orderedIds)
     .is("deleted_at", null);
 
-  const order = new Map(ids.map((id, i) => [id, i]));
+  const order = new Map(orderedIds.map((id, i) => [id, i]));
   // See the narrowing note in lib/types.ts for why this cast is safe.
   return ((rows ?? []) as Experiment[]).sort(
     (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
