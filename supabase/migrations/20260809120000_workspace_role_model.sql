@@ -4,6 +4,14 @@
 -- Every statement is idempotent (IF NOT EXISTS / DROP-then-CREATE) per this
 -- session's established convention for migrations that apply to real,
 -- already-populated production data.
+--
+-- search_path fix (found applying to prod, 2026-08-09): pgcrypto's
+-- gen_random_bytes() below lives in the `extensions` schema on some
+-- Supabase projects but not others (chememo-dev's default search_path
+-- happened to resolve it unqualified; prod's did not). Setting search_path
+-- explicitly, rather than hardcoding `extensions.gen_random_bytes`, works
+-- regardless of which schema actually holds the function on a given project.
+set search_path = public, extensions;
 
 -- ============================================================
 -- 1. Role enum (D2) — a real Postgres type, not a controlled_vocabularies
