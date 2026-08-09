@@ -4,6 +4,11 @@ import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { ComparisonTable } from "@/components/comparison-table";
+import { GroupSummary } from "@/components/group-summary";
+import { AiComparisonTable } from "@/components/ai-comparison-table";
+import { AiContradictionCheck } from "@/components/ai-contradiction-check";
+import { generateGroupSummary } from "@/app/(app)/ask/actions";
+import { generateComparisonTable, detectContradictions } from "@/app/(app)/experiments/compare-actions";
 import type { ActionResult, Experiment } from "@/lib/types";
 
 export function SeriesDetailClient({
@@ -64,6 +69,14 @@ export function SeriesDetailClient({
       </div>
 
       <ComparisonTable experiments={timelineOrdered} controlsCounts={controlsCounts} onRemove={removeMember} />
+
+      {timelineOrdered.length > 1 && (
+        <>
+          <GroupSummary ids={timelineOrdered.map((e) => e.id)} action={generateGroupSummary} />
+          <AiComparisonTable ids={timelineOrdered.map((e) => e.id)} action={generateComparisonTable} />
+          <AiContradictionCheck experiments={timelineOrdered} controlsCounts={controlsCounts} action={detectContradictions} />
+        </>
+      )}
     </div>
   );
 }

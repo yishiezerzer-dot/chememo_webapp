@@ -2,7 +2,16 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { acquireConcurrency, checkRate } from "@/lib/rate-limit";
-import { activeChatModel, chatProvider, summarizeExperiment, summarizeGroup, type CitedAnswer } from "@/lib/llm";
+import {
+  activeChatModel,
+  chatProvider,
+  summarizeExperiment,
+  summarizeGroup,
+  detectContradictions,
+  generateComparisonTable,
+  type CitedAnswer,
+  type ComparisonTableSuggestion,
+} from "@/lib/llm";
 import { embeddingModel, EMBEDDING_DIM, isEmbeddingEnabled } from "@/lib/embeddings";
 import { AppError } from "@/lib/errors";
 import { logError } from "@/lib/logger";
@@ -10,7 +19,13 @@ import type { Experiment } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-export type AiEndpoint = "ask_grounded" | "ask_general" | "summary_single" | "summary_group";
+export type AiEndpoint =
+  | "ask_grounded"
+  | "ask_general"
+  | "summary_single"
+  | "summary_group"
+  | "comparison_table"
+  | "contradiction_check";
 
 // Acquire the per-user + global concurrency slot shared by every AI call
 // (Ask, single summary, group summary) — a typed, throw-based replacement
@@ -130,6 +145,89 @@ export async function summarizeExperimentGroup(
     await logAiRequest({
       userId,
       endpoint: "summary_group",
+      status: "error",
+      sourceCount: ids.length,
+      latencyMs: Date.now() - startedAt,
+      estTokens: null,
+    });
+    throw e;
+  }
+}
+
+// T3.6 D3 — same fetch-by-ids-then-generate-then-log shape as
+// summarizeExperimentGroup, for the contradiction-detection assist.
+export async function detectExperimentContradictions(
+  supabase: Supabase,
+  userId: string,
+  ids: string[]
+): Promise<CitedAnswer | null> {
+  if (ids.length < 2) return null;
+  const startedAt = Date.now();
+  try {
+    const { data: experiments } = await supabase
+      .from("experiments")
+      .select("*")
+      .in("id", ids)
+      .is("deleted_at", null);
+    if (!experiments || experiments.length < 2) return null;
+
+    // See the narrowing note in lib/types.ts for why this cast is safe.
+    const result = await detectContradictions(experiments as Experiment[]);
+    const estTokens = result ? Math.ceil(result.segments.reduce((n, s) => n + s.text.length, 0) / 4) : null;
+    await logAiRequest({
+      userId,
+      endpoint: "contradiction_check",
+      status: result ? "ok" : "error",
+      sourceCount: experiments.length,
+      latencyMs: Date.now() - startedAt,
+      estTokens,
+    });
+    return result;
+  } catch (e) {
+    await logAiRequest({
+      userId,
+      endpoint: "contradiction_check",
+      status: "error",
+      sourceCount: ids.length,
+      latencyMs: Date.now() - startedAt,
+      estTokens: null,
+    });
+    throw e;
+  }
+}
+
+// T3.6 D2 — same shape, for the condition/result comparison-table assist.
+export async function generateExperimentComparisonTable(
+  supabase: Supabase,
+  userId: string,
+  ids: string[]
+): Promise<ComparisonTableSuggestion | null> {
+  if (!ids.length) return null;
+  const startedAt = Date.now();
+  try {
+    const { data: experiments } = await supabase
+      .from("experiments")
+      .select("*")
+      .in("id", ids)
+      .is("deleted_at", null);
+    if (!experiments?.length) return null;
+
+    // See the narrowing note in lib/types.ts for why this cast is safe.
+    const table = await generateComparisonTable(experiments as Experiment[]);
+    const estTokens = table ? Math.ceil(JSON.stringify(table).length / 4) : null;
+    await logAiRequest({
+      userId,
+      endpoint: "comparison_table",
+      status: table ? "ok" : "error",
+      sourceCount: experiments.length,
+      latencyMs: Date.now() - startedAt,
+      estTokens,
+    });
+    return table;
+  } catch (e) {
+    await logAiRequest({
+      userId,
+      endpoint: "comparison_table",
       status: "error",
       sourceCount: ids.length,
       latencyMs: Date.now() - startedAt,

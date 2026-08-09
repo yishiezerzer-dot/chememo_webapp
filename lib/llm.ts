@@ -527,6 +527,132 @@ Rules:
   return { segments };
 }
 
+// T3.6 D3 — same deterministic citation scheme as summarizeGroup, applied to
+// detecting apparent contradictions across a set of related experiments
+// (audit §19 Phase 3). A live model can still be wrong about what counts as
+// a contradiction — that's inherent to the task — but every experiment it
+// points to is still validated against the real given set, same as any
+// other citation in this app.
+export async function detectContradictions(experiments: Experiment[]): Promise<CitedAnswer | null> {
+  if (experiments.length < 2) return null;
+  if (!isLlmEnabled()) return null;
+
+  type LabelEntry = { experimentId: string; sourceType: string; sectionType: string; content: string };
+  const labelMap = new Map<string, LabelEntry>();
+  const contextParts: string[] = [];
+  experiments.forEach((e, i) => {
+    const label = `C${i + 1}`;
+    const entry: LabelEntry = { experimentId: e.id, sourceType: "experiment", sectionType: "observations", content: formatRecord(e) };
+    labelMap.set(label, entry);
+    contextParts.push(formatEvidenceBlock(label, `Experiment ${e.id}`, entry.content));
+  });
+
+  const system = `You review a SET of related chemistry experiments for apparent contradictions using ONLY the records given below. Respond with ONLY a JSON object, no prose, matching this schema:
+{
+  "grounded": true,
+  "segments": [ { "text": string, "citations": string[] } ]  // citations = labels like "C2", ONLY from the records given below
+}
+${EVIDENCE_IS_DATA_RULE}
+Rules:
+- Flag apparent contradictions: similar conditions producing conflicting reported results or observations.
+- One segment per contradiction found, citing every experiment involved in it (at least 2 labels per segment).
+- If no contradictions are apparent, return exactly one segment saying so, with no citations.
+- Never invent a label that wasn't given below. Never invent compounds, values, or results not in the records.
+- Be concise and specific. No preamble.`;
+
+  const text = await chatComplete({
+    system,
+    user: `Experiment records:\n${contextParts.join("\n\n")}`,
+    maxTokens: 600,
+  });
+  if (!text) return null;
+
+  const parsed = parseJson(text);
+  if (!parsed) return null;
+  const result = citedAnswerSchema.safeParse(parsed);
+  if (!result.success || !result.data.grounded) return null;
+
+  const segments: CitedSegment[] = result.data.segments
+    .map((s) => ({
+      text: s.text,
+      citations: s.citations
+        .map((label) => {
+          const entry = labelMap.get(label);
+          return entry ? { label, ...entry } : null;
+        })
+        .filter((c): c is LabelEntry & { label: string } => c !== null)
+        .map((c) => ({
+          label: c.label,
+          experimentId: c.experimentId,
+          sourceType: c.sourceType,
+          sectionType: c.sectionType,
+          snippet: c.content.slice(0, SNIPPET_MAX_CHARS),
+        })),
+    }))
+    .filter((s) => s.text.trim().length > 0);
+
+  if (segments.length === 0) return null;
+  return { segments };
+}
+
+// T3.6 D2 — condition/result table generation. A different output shape
+// than CitedAnswer (a table, not prose segments), but the same citation-
+// safety discipline: any row naming an experiment id outside the given set
+// is dropped, never trusted from the model's own output.
+export type ComparisonTableSuggestion = {
+  columns: string[];
+  rows: { experimentId: string; values: string[] }[];
+};
+
+const comparisonTableSchema = z.object({
+  columns: z.array(z.string()).catch([]),
+  rows: z.array(
+    z.object({
+      experimentId: z.string().catch(""),
+      values: z.array(z.string()).catch([]),
+    })
+  ),
+});
+
+export async function generateComparisonTable(experiments: Experiment[]): Promise<ComparisonTableSuggestion | null> {
+  if (experiments.length === 0) return null;
+  if (!isLlmEnabled()) return null;
+
+  const validIds = new Set(experiments.map((e) => e.id));
+  const contextParts = experiments.map((e, i) =>
+    formatEvidenceBlock(`C${i + 1}`, `Experiment ${e.id}`, formatRecord(e))
+  );
+
+  const system = `You extract a comparison table of conditions and results across a SET of chemistry experiments using ONLY the records given below. Respond with ONLY a JSON object, no prose, matching this schema:
+{
+  "columns": string[],  // short column headers for the conditions/results that actually differ or matter across these experiments
+  "rows": [ { "experimentId": string, "values": string[] } ]  // experimentId MUST be one of the real experiment IDs given below; values aligned to columns, one row per experiment
+}
+${EVIDENCE_IS_DATA_RULE}
+Rules:
+- Choose columns that highlight real differences or notable shared conditions/results — not every field, just what's informative for comparison.
+- Never invent an experimentId that wasn't given below. Never invent values not supported by the records.
+- Use "—" for a value that isn't stated for that experiment.`;
+
+  const text = await chatComplete({
+    system,
+    user: `Experiment records:\n${contextParts.join("\n\n")}`,
+    maxTokens: 700,
+  });
+  if (!text) return null;
+
+  const parsed = parseJson(text);
+  if (!parsed) return null;
+  const result = comparisonTableSchema.safeParse(parsed);
+  if (!result.success) return null;
+
+  // Drop any row citing an experiment id outside the given set — never
+  // trust the model's own claim about which experiment a row describes.
+  const rows = result.data.rows.filter((r) => validIds.has(r.experimentId));
+  if (result.data.columns.length === 0 || rows.length === 0) return null;
+  return { columns: result.data.columns, rows };
+}
+
 // T3.2 D6 — schema-validated (was ad-hoc str/num/arr helpers). A field that
 // fails validation is omitted (via .catch(undefined)), same as the old
 // helpers' behavior — never guessed or defaulted to a placeholder value.

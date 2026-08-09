@@ -35,7 +35,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const { generateCitedAnswer, routeQuery, extractExperimentFields } = await import("@/lib/llm");
+const { generateCitedAnswer, routeQuery, extractExperimentFields, generateComparisonTable, detectContradictions } =
+  await import("@/lib/llm");
 
 function record(id: string, name: string): Experiment {
   return { id, name } as unknown as Experiment;
@@ -190,5 +191,55 @@ describe("extractExperimentFields (zod validation regression)", () => {
     mockGeminiText(JSON.stringify({ name: "Test", methods: ["NMR", "not-a-real-method"] }));
     const fields = await extractExperimentFields("notes");
     expect(fields!.methods).toEqual(["NMR"]);
+  });
+});
+
+describe("generateComparisonTable (T3.6 D2)", () => {
+  it("drops a row citing an experiment id outside the given set", async () => {
+    mockGeminiText(
+      JSON.stringify({
+        columns: ["pH"],
+        rows: [
+          { experimentId: "EXP-1", values: ["7"] },
+          { experimentId: "EXP-999-NOT-REAL", values: ["8"] },
+        ],
+      })
+    );
+    const records = [record("EXP-1", "First")];
+    const table = await generateComparisonTable(records);
+    expect(table).not.toBeNull();
+    expect(table!.rows).toEqual([{ experimentId: "EXP-1", values: ["7"] }]);
+  });
+
+  it("returns null when every row is dropped", async () => {
+    mockGeminiText(JSON.stringify({ columns: ["pH"], rows: [{ experimentId: "EXP-999-NOT-REAL", values: ["8"] }] }));
+    const records = [record("EXP-1", "First")];
+    const table = await generateComparisonTable(records);
+    expect(table).toBeNull();
+  });
+
+  it("returns null for fewer than one experiment", async () => {
+    const table = await generateComparisonTable([]);
+    expect(table).toBeNull();
+  });
+});
+
+describe("detectContradictions (T3.6 D3)", () => {
+  it("drops a citation to an experiment id outside the given set, same as generateCitedAnswer", async () => {
+    mockGeminiText(
+      JSON.stringify({
+        grounded: true,
+        segments: [{ text: "EXP-1 and EXP-2 report conflicting pH.", citations: ["C1", "C2", "C99"] }],
+      })
+    );
+    const records = [record("EXP-1", "First"), record("EXP-2", "Second")];
+    const result = await detectContradictions(records);
+    expect(result).not.toBeNull();
+    expect(result!.segments[0].citations.map((c) => c.experimentId).sort()).toEqual(["EXP-1", "EXP-2"]);
+  });
+
+  it("returns null for fewer than two experiments — nothing to contradict", async () => {
+    const result = await detectContradictions([record("EXP-1", "Only one")]);
+    expect(result).toBeNull();
   });
 });
