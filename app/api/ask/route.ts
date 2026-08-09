@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { keylessSearch } from "@/lib/search";
 import { retrieveRecords } from "@/lib/rag";
-import { isLlmEnabled, streamAnswer, streamGeneralAnswer } from "@/lib/llm";
+import { isLlmEnabled, generateCitedAnswer, streamGeneralAnswer, type CitedAnswer } from "@/lib/llm";
 import { MAX_BODY_BYTES, MAX_QUERY_CHARS } from "@/lib/rate-limit";
 import { acquireAiSlot, logAiRequest } from "@/lib/ai/service";
 import { AppError, HTTP_STATUS_FOR_CODE } from "@/lib/errors";
@@ -9,8 +9,17 @@ import { logError } from "@/lib/logger";
 import type { Experiment } from "@/lib/types";
 
 // POST { query }. Body is line-framed: the FIRST line is JSON metadata
-// (mode/grounded/results/…), and — for AI answers — the rest of the body is the
-// streamed answer text. Query travels in the POST body, not the URL (no logging).
+// (mode/grounded/results/…), and the rest of the body is the answer.
+// Query travels in the POST body, not the URL (no logging).
+//
+// T3.2 D2 — grounded lab-mode answers are ONE structured JSON body (written
+// in a single enqueue, not incrementally) rather than streamed prose: citation
+// determinism needs the whole model response parsed and validated before any
+// of it can be shown (see lib/llm.ts's generateCitedAnswer). `meta.streaming`
+// tells the client which shape to expect: true = live-streamed prose text
+// (context/general-knowledge path, unchanged), false = a single already-
+// complete JSON `CitedAnswer` body (grounded lab-mode) or no body at all
+// (keyless / empty-result cases, unchanged).
 
 type AskMeta = {
   mode: "keyless" | "ai";
@@ -82,11 +91,10 @@ export async function POST(req: Request) {
 
   // Lab mode: retrieve first. If nothing matches, say so explicitly — never
   // fall back to general knowledge, which could read as a lab conclusion.
-  const retrieved = askMode === "lab" ? await retrieveRecords(query) : { records: [], routerFailed: false };
+  const retrieved = askMode === "lab" ? await retrieveRecords(query) : { records: [], routerFailed: false, evidence: new Map() };
   const records = retrieved.records;
-  const grounded = askMode === "lab" && records.length > 0;
 
-  if (askMode === "lab" && !grounded) {
+  if (askMode === "lab" && records.length === 0) {
     slot.release();
     return new Response(
       line({
@@ -104,26 +112,78 @@ export async function POST(req: Request) {
     );
   }
 
+  const startedAt = Date.now();
+
+  // Lab mode with candidate records: attempt a structured, cited answer.
+  if (askMode === "lab") {
+    let cited: CitedAnswer | null = null;
+    let status: "ok" | "error" = "ok";
+    try {
+      cited = await generateCitedAnswer(query, records, retrieved.evidence);
+    } catch (e) {
+      status = "error";
+      logError("api/ask", "generateCitedAnswer failed", { error: e });
+    }
+
+    if (cited) {
+      slot.release();
+      void logAiRequest({
+        userId: user.id,
+        endpoint: "ask_grounded",
+        status,
+        sourceCount: records.length,
+        latencyMs: Date.now() - startedAt,
+        estTokens: Math.ceil((query.length + JSON.stringify(cited).length) / 4),
+      });
+      const meta: AskMeta = {
+        mode: "ai",
+        askMode,
+        grounded: true,
+        streaming: false,
+        interpretation: [],
+        results: records,
+        emptyReason: null,
+      };
+      return new Response(
+        new Blob([line(meta), enc.encode(JSON.stringify(cited))]),
+        { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } }
+      );
+    }
+
+    // The records didn't actually answer the question (or generation
+    // failed/is disabled) — fall through to a general-knowledge answer,
+    // clearly marked as not grounded, exactly like askMode "context" below.
+    void logAiRequest({
+      userId: user.id,
+      endpoint: "ask_grounded",
+      status,
+      sourceCount: records.length,
+      latencyMs: Date.now() - startedAt,
+      estTokens: null,
+    });
+  }
+
+  // Context mode, or lab mode that fell through above: stream a general-
+  // knowledge answer, never citing experiment IDs.
   const meta: AskMeta = {
     mode: "ai",
     askMode,
-    grounded,
+    grounded: false,
     streaming: true,
     interpretation: [],
-    results: grounded ? records : [],
+    results: [],
     emptyReason: null,
   };
 
-  const startedAt = Date.now();
   let answerChars = 0;
+  const generalStartedAt = Date.now();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       controller.enqueue(line(meta));
       let status: "ok" | "error" = "ok";
       try {
-        const gen = grounded ? streamAnswer(query, records) : streamGeneralAnswer(query);
-        for await (const chunk of gen) {
+        for await (const chunk of streamGeneralAnswer(query)) {
           answerChars += chunk.length;
           controller.enqueue(enc.encode(chunk));
         }
@@ -135,10 +195,10 @@ export async function POST(req: Request) {
         slot.release();
         void logAiRequest({
           userId: user.id,
-          endpoint: grounded ? "ask_grounded" : "ask_general",
+          endpoint: "ask_general",
           status,
-          sourceCount: records.length,
-          latencyMs: Date.now() - startedAt,
+          sourceCount: 0,
+          latencyMs: Date.now() - generalStartedAt,
           estTokens: Math.ceil((query.length + answerChars) / 4),
         });
       }

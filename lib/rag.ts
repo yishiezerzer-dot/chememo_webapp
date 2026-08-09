@@ -4,8 +4,9 @@ import { keylessSearch, executeFilters } from "@/lib/search";
 import {
   isLlmEnabled,
   routeQuery,
-  generateAnswer,
+  generateCitedAnswer,
   generateGeneralAnswer,
+  type EvidenceSource,
 } from "@/lib/llm";
 import { embedText } from "@/lib/embeddings";
 import type { Experiment } from "@/lib/types";
@@ -72,13 +73,25 @@ async function resolveChunkExperimentIds(
   });
 }
 
+export type ChunkSearchResult = {
+  experiments: Experiment[];
+  // T3.2 D1 — keyed by experiment id: the single best-matching chunk that
+  // resolved each experiment, so the citation engine can cite the actual
+  // supporting passage instead of the whole record. Absent for an experiment
+  // means no chunk evidence was available for it (the caller falls back to a
+  // whole-record citation — see generateCitedAnswer).
+  evidence: Map<string, EvidenceSource>;
+};
+
 // Semantic retrieval: embed the query, chunk-search, resolve to distinct
 // parent experiments above the similarity threshold, hydrate full rows in
-// similarity order. [] when disabled. Exported (only) so tests can exercise
-// the chunk-to-experiment resolution/dedup logic directly.
-export async function semanticSearch(semanticQuery: string, k = 8): Promise<Experiment[]> {
+// similarity order, and surface each experiment's best-matching chunk content
+// for T3.2's citation engine. {experiments: [], evidence: new Map()} when
+// disabled. Exported (only) so tests can exercise the chunk-to-experiment
+// resolution/dedup logic directly.
+export async function semanticSearch(semanticQuery: string, k = 8): Promise<ChunkSearchResult> {
   const embedding = await embedText(semanticQuery);
-  if (!embedding) return [];
+  if (!embedding) return { experiments: [], evidence: new Map() };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("match_evidence_chunks", {
@@ -93,55 +106,78 @@ export async function semanticSearch(semanticQuery: string, k = 8): Promise<Expe
     id: string;
     source_type: string;
     source_id: string;
+    section_type: string;
     metadata: Record<string, unknown>;
     similarity: number;
   }[]).filter((r) => r.similarity >= MIN_SIM);
-  if (hits.length === 0) return [];
+  if (hits.length === 0) return { experiments: [], evidence: new Map() };
 
   const experimentIds = await resolveChunkExperimentIds(hits, supabase);
   const orderedIds: string[] = [];
   const seen = new Set<string>();
-  for (const id of experimentIds) {
+  const bestChunkByExperiment = new Map<string, { chunkId: string; sourceType: string; sectionType: string }>();
+  for (let i = 0; i < hits.length; i++) {
+    const id = experimentIds[i];
     if (id && !seen.has(id)) {
       seen.add(id);
       orderedIds.push(id);
+      bestChunkByExperiment.set(id, {
+        chunkId: hits[i].id,
+        sourceType: hits[i].source_type,
+        sectionType: hits[i].section_type,
+      });
       if (orderedIds.length >= k) break;
     }
   }
-  if (orderedIds.length === 0) return [];
+  if (orderedIds.length === 0) return { experiments: [], evidence: new Map() };
 
-  const { data: rows } = await supabase
-    .from("experiments")
-    .select("*")
-    .in("id", orderedIds)
-    .is("deleted_at", null);
+  const [{ data: rows }, { data: chunkRows }] = await Promise.all([
+    supabase.from("experiments").select("*").in("id", orderedIds).is("deleted_at", null),
+    supabase
+      .from("evidence_chunks")
+      .select("id, content")
+      .in("id", [...bestChunkByExperiment.values()].map((c) => c.chunkId)),
+  ]);
+
+  const contentByChunkId = new Map((chunkRows ?? []).map((c) => [c.id, c.content]));
+  const evidence = new Map<string, EvidenceSource>();
+  for (const [expId, chunk] of bestChunkByExperiment) {
+    const content = contentByChunkId.get(chunk.chunkId);
+    if (content) evidence.set(expId, { sourceType: chunk.sourceType, sectionType: chunk.sectionType, content });
+  }
 
   const order = new Map(orderedIds.map((id, i) => [id, i]));
   // See the narrowing note in lib/types.ts for why this cast is safe.
-  return ((rows ?? []) as Experiment[]).sort(
+  const experiments = ((rows ?? []) as Experiment[]).sort(
     (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
   );
+  return { experiments, evidence };
 }
 
 // Retrieval only (no answer generation) — routes the query, runs filters and/or
-// semantic search, returns the deduped records. Used by the streaming route
-// handler, which generates the answer itself. `routerFailed` lets the caller
-// tell "the router genuinely found nothing" apart from "the router itself
-// was unavailable/unparseable" (audit §3 — these read as the same silent
-// "no matches" to the user otherwise).
-export async function retrieveRecords(query: string): Promise<{ records: Experiment[]; routerFailed: boolean }> {
+// semantic search, returns the deduped records plus chunk-level evidence for
+// T3.2's citation engine. Used by the /api/ask route, which generates the
+// answer itself. `routerFailed` lets the caller tell "the router genuinely
+// found nothing" apart from "the router itself was unavailable/unparseable"
+// (audit §3 — these read as the same silent "no matches" to the user otherwise).
+export async function retrieveRecords(
+  query: string
+): Promise<{ records: Experiment[]; routerFailed: boolean; evidence: Map<string, EvidenceSource> }> {
   const intent = await routeQuery(query);
-  if (!intent) return { records: [], routerFailed: true };
+  if (!intent) return { records: [], routerFailed: true, evidence: new Map() };
   const seen = new Map<string, Experiment>();
+  let evidence = new Map<string, EvidenceSource>();
   if (intent.mode !== "semantic") {
     for (const e of await executeFilters(intent.filters)) seen.set(e.id, e);
   }
   if (intent.mode !== "filter" && intent.semanticQuery) {
-    for (const e of await semanticSearch(intent.semanticQuery)) {
+    const semantic = await semanticSearch(intent.semanticQuery);
+    for (const e of semantic.experiments) {
       if (!seen.has(e.id)) seen.set(e.id, e);
     }
+    evidence = semantic.evidence;
   }
-  return { records: [...seen.values()], routerFailed: false };
+  return { records: [...seen.values()], routerFailed: false, evidence };
 }
 
 async function keylessAsk(query: string): Promise<AskResult> {
@@ -171,25 +207,28 @@ export async function askAI(query: string): Promise<AskResult> {
   if (!intent) return keylessAsk(trimmed); // router unavailable/unparseable → safe fallback
 
   const seen = new Map<string, Experiment>();
+  let evidence = new Map<string, EvidenceSource>();
   if (intent.mode !== "semantic") {
     for (const e of await executeFilters(intent.filters)) seen.set(e.id, e);
   }
   if (intent.mode !== "filter" && intent.semanticQuery) {
-    for (const e of await semanticSearch(intent.semanticQuery)) {
+    const semantic = await semanticSearch(intent.semanticQuery);
+    for (const e of semantic.experiments) {
       if (!seen.has(e.id)) seen.set(e.id, e);
     }
+    evidence = semantic.evidence;
   }
   const records = [...seen.values()];
 
   // Grounded answer when we have relevant records AND they actually answer.
   if (records.length > 0) {
-    const grounded = await generateAnswer(trimmed, records);
-    if (grounded && !/no matching experiments/i.test(grounded)) {
+    const cited = await generateCitedAnswer(trimmed, records, evidence);
+    if (cited) {
       return {
         mode: "ai",
         grounded: true,
         query: trimmed,
-        answer: grounded,
+        answer: cited.segments.map((s) => s.text).join(" "),
         interpretation: [],
         results: records,
         emptyReason: null,

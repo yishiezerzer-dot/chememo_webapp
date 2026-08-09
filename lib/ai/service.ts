@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { acquireConcurrency, checkRate } from "@/lib/rate-limit";
-import { activeChatModel, summarizeExperiment, summarizeGroup } from "@/lib/llm";
+import { activeChatModel, summarizeExperiment, summarizeGroup, type CitedAnswer } from "@/lib/llm";
 import { AppError } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import type { Experiment } from "@/lib/types";
@@ -48,7 +48,7 @@ export async function summarizeExperimentGroup(
   supabase: Supabase,
   userId: string,
   ids: string[]
-): Promise<string | null> {
+): Promise<CitedAnswer | null> {
   if (!ids.length) return null;
   const startedAt = Date.now();
   try {
@@ -61,13 +61,16 @@ export async function summarizeExperimentGroup(
 
     // See the narrowing note in lib/types.ts for why this cast is safe.
     const summary = await summarizeGroup(experiments as Experiment[]);
+    const estTokens = summary
+      ? Math.ceil(summary.segments.reduce((n, s) => n + s.text.length, 0) / 4)
+      : null;
     await logAiRequest({
       userId,
       endpoint: "summary_group",
       status: summary ? "ok" : "error",
       sourceCount: experiments.length,
       latencyMs: Date.now() - startedAt,
-      estTokens: summary ? Math.ceil(summary.length / 4) : null,
+      estTokens,
     });
     return summary;
   } catch (e) {

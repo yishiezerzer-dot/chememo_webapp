@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Experiment } from "@/lib/types";
+import type { CitedAnswer } from "@/lib/llm";
 import { GroupSummary } from "@/components/group-summary";
+import { CitedAnswerView } from "@/components/cited-answer";
 import { generateGroupSummary } from "@/app/(app)/ask/actions";
 
 type AskMode = "lab" | "context";
@@ -12,6 +14,9 @@ type AskMeta = {
   mode: "keyless" | "ai";
   askMode: AskMode;
   grounded: boolean;
+  // T3.2 D2 — true only when the body is live-streamed prose (context/
+  // general-knowledge path); false when it's one complete JSON CitedAnswer
+  // blob (grounded lab-mode) or there's no body at all (keyless/empty cases).
   streaming: boolean;
   interpretation: string[];
   results: Experiment[];
@@ -19,19 +24,6 @@ type AskMeta = {
 };
 
 type Phase = "idle" | "loading" | "streaming" | "done";
-
-function renderCitations(text: string) {
-  return text.split(/(\[EXP-\d+\])/g).map((p, i) => {
-    const m = p.match(/^\[(EXP-\d+)\]$/);
-    return m ? (
-      <Link key={i} href={`/experiments/${m[1]}`} className="td-id">
-        {p}
-      </Link>
-    ) : (
-      <Fragment key={i}>{p}</Fragment>
-    );
-  });
-}
 
 export function AskClient({
   initialQuery,
@@ -46,7 +38,8 @@ export function AskClient({
   const [askMode, setAskMode] = useState<AskMode>(initialAskMode);
   const [phase, setPhase] = useState<Phase>("idle");
   const [meta, setMeta] = useState<AskMeta | null>(null);
-  const [answer, setAnswer] = useState("");
+  const [answerText, setAnswerText] = useState("");
+  const [citedAnswer, setCitedAnswer] = useState<CitedAnswer | null>(null);
   const [failed, setFailed] = useState(false);
   const busy = phase === "loading" || phase === "streaming";
 
@@ -64,7 +57,8 @@ export function AskClient({
     setQ(query);
     setPhase("loading");
     setMeta(null);
-    setAnswer("");
+    setAnswerText("");
+    setCitedAnswer(null);
     setFailed(false);
 
     try {
@@ -79,7 +73,8 @@ export function AskClient({
       const dec = new TextDecoder();
       let buf = "";
       let gotMeta = false;
-      let ans = "";
+      let metaVal: AskMeta | null = null;
+      let bodyText = "";
 
       for (;;) {
         const { value, done } = await reader.read();
@@ -88,16 +83,26 @@ export function AskClient({
         if (!gotMeta) {
           const nl = buf.indexOf("\n");
           if (nl < 0) continue;
-          const m = JSON.parse(buf.slice(0, nl)) as AskMeta;
+          metaVal = JSON.parse(buf.slice(0, nl)) as AskMeta;
           buf = buf.slice(nl + 1);
           gotMeta = true;
-          setMeta(m);
-          setPhase(m.streaming ? "streaming" : "done");
+          setMeta(metaVal);
+          // Streamed prose shows as it arrives; a structured grounded answer
+          // (one JSON blob) keeps the "Thinking…" spinner until it's parseable.
+          setPhase(metaVal.streaming ? "streaming" : metaVal.grounded ? "loading" : "done");
         }
         if (gotMeta && buf) {
-          ans += buf;
+          bodyText += buf;
           buf = "";
-          setAnswer(ans);
+          if (metaVal?.streaming) setAnswerText(bodyText);
+        }
+      }
+
+      if (metaVal && !metaVal.streaming && metaVal.grounded && bodyText) {
+        try {
+          setCitedAnswer(JSON.parse(bodyText) as CitedAnswer);
+        } catch {
+          setFailed(true);
         }
       }
       setPhase("done");
@@ -117,7 +122,12 @@ export function AskClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const showAnswerCard = meta?.mode === "ai" && (answer || phase === "streaming");
+  const showAnswerCard =
+    meta?.mode === "ai" && (citedAnswer !== null || answerText.length > 0 || phase === "streaming");
+  // True whenever the shown answer is general chemistry knowledge, not the
+  // lab's own data — covers both "Scientific context" mode AND a lab-mode
+  // question whose records didn't actually answer it (T3.2's fallback).
+  const isGeneralKnowledge = meta?.mode === "ai" && !meta.grounded;
 
   return (
     <>
@@ -223,7 +233,7 @@ export function AskClient({
               aria-live="polite"
               aria-atomic="true"
               style={
-                meta.askMode === "context"
+                isGeneralKnowledge
                   ? {
                       marginBottom: 18,
                       borderColor: "var(--amber)",
@@ -235,26 +245,30 @@ export function AskClient({
               <div className="ai-head">
                 <span
                   className="eyebrow"
-                  style={meta.askMode === "context" ? { color: "var(--amber)" } : undefined}
+                  style={isGeneralKnowledge ? { color: "var(--amber)" } : undefined}
                 >
-                  {meta.askMode === "context" ? "Scientific context" : "Grounded answer"}
+                  {isGeneralKnowledge ? "Scientific context" : "Grounded answer"}
                 </span>
               </div>
-              {meta.askMode === "context" && (
+              {isGeneralKnowledge && (
                 <p style={{ fontSize: 12.5, marginTop: 8, color: "var(--amber)", fontWeight: 600 }}>
                   General chemistry knowledge — not from your lab&rsquo;s experiments.
                 </p>
               )}
-              <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                {meta.grounded ? renderCitations(answer) : answer}
-                {phase === "streaming" && (
-                  <span style={{ animation: "cm-pulse 1.1s ease-in-out infinite" }}>▍</span>
-                )}
-              </p>
+              {citedAnswer ? (
+                <CitedAnswerView answer={citedAnswer} />
+              ) : (
+                <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                  {answerText}
+                  {phase === "streaming" && (
+                    <span style={{ animation: "cm-pulse 1.1s ease-in-out infinite" }}>▍</span>
+                  )}
+                </p>
+              )}
             </div>
           )}
 
-          {phase === "done" && !answer && !failed && (
+          {phase === "done" && !citedAnswer && !answerText && !failed && (
             <div className="empty-state">
               <div className="big">{meta.emptyReason ?? "No matching experiments found."}</div>
             </div>

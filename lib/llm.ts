@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { SearchFilters } from "@/lib/search";
 import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/types";
 
@@ -103,7 +104,9 @@ async function chatComplete(opts: {
 
 // Streaming completion. Yields text chunks as they arrive. Gemini streams via
 // SSE; openai/anthropic fall back to yielding the full completion once (still
-// correct, just not incremental). Yields nothing when disabled.
+// correct, just not incremental). Yields nothing when disabled. Only used by
+// the general-knowledge path now (T3.2 D2) — grounded lab-mode answers need a
+// single structured JSON response, not incremental prose (see generateCitedAnswer).
 async function* chatStream(opts: {
   system: string;
   user: string;
@@ -170,30 +173,10 @@ async function* chatStream(opts: {
   if (full) yield full;
 }
 
-const GROUNDED_SYSTEM = `You answer questions about a chemistry lab's experiments using ONLY the provided records. Rules:
-- Cite every claim inline with the experiment ID in square brackets, e.g. [EXP-004].
-- If the records do not contain the answer, reply exactly: "No matching experiments found."
-- Never invent compounds, values, or results that are not in the records.
-- Be concise and specific.`;
-
 const GENERAL_SYSTEM = `You are a helpful, knowledgeable assistant for a prebiotic-chemistry research lab. The user's question did not match any of the lab's stored experiments, so answer from your own general knowledge.
 - Be accurate and concise.
 - Do NOT cite experiment IDs or claim anything about the lab's specific experiments.
 - If the question is outside your knowledge or ambiguous, say so briefly.`;
-
-// Streaming grounded answer (same prompt as generateAnswer).
-export async function* streamAnswer(
-  query: string,
-  records: Experiment[]
-): AsyncGenerator<string> {
-  if (!isLlmEnabled() || records.length === 0) return;
-  const context = records.map(formatRecord).join("\n\n");
-  yield* chatStream({
-    system: GROUNDED_SYSTEM,
-    user: `Question: ${query}\n\nExperiment records:\n${context}`,
-    maxTokens: 800,
-  });
-}
 
 // Streaming general-knowledge answer (same prompt as generateGeneralAnswer).
 export async function* streamGeneralAnswer(query: string): AsyncGenerator<string> {
@@ -219,11 +202,30 @@ const EMPTY_FILTERS: SearchFilters = {
 
 function parseJson(text: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ""));
+    const j = JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ""));
+    return j && typeof j === "object" ? j : null;
   } catch {
     return null;
   }
 }
+
+// T3.2 D6 — schema-validated (was ad-hoc Array.isArray/typeof checks). Each
+// field independently falls back to its old default via .catch() rather than
+// rejecting the whole response when one field is malformed — same tolerant
+// per-field degrade as before, just centralized in one schema.
+const routeIntentSchema = z.object({
+  mode: z.enum(["filter", "semantic", "both"]).catch("filter"),
+  compounds: z.array(z.string()).catch([]),
+  metals: z.array(z.string()).catch([]),
+  methods: z.array(z.string()).catch([]),
+  mz: z.array(z.number()).catch([]),
+  ph: z
+    .object({ op: z.enum(["gt", "lt", "gte", "lte", "eq"]), value: z.number() })
+    .nullable()
+    .catch(null),
+  reaction: z.string().nullable().catch(null),
+  semanticQuery: z.string().nullable().catch(null),
+});
 
 // Turn the question into a retrieval plan. Returns null when disabled or
 // unparseable (caller falls back to keyless).
@@ -246,22 +248,20 @@ Use "filter" for exact/parametric questions (pH, compound, metal, method, m/z), 
   if (!text) return null;
   const j = parseJson(text);
   if (!j) return null;
+  const parsed = routeIntentSchema.safeParse(j);
+  if (!parsed.success) return null;
+  const d = parsed.data;
 
   const filters: SearchFilters = {
     ...EMPTY_FILTERS,
-    compounds: Array.isArray(j.compounds) ? (j.compounds as string[]) : [],
-    metals: Array.isArray(j.metals) ? (j.metals as string[]) : [],
-    methods: Array.isArray(j.methods) ? (j.methods as string[]) : [],
-    mz: Array.isArray(j.mz) ? (j.mz as number[]) : [],
-    ph:
-      j.ph && typeof (j.ph as { value?: unknown }).value === "number"
-        ? (j.ph as SearchFilters["ph"])
-        : null,
-    reactionLike: j.reaction ? `%${j.reaction}%` : null,
+    compounds: d.compounds,
+    metals: d.metals,
+    methods: d.methods,
+    mz: d.mz,
+    ph: d.ph,
+    reactionLike: d.reaction ? `%${d.reaction}%` : null,
   };
-  const mode: RouteIntent["mode"] =
-    j.mode === "semantic" || j.mode === "both" ? j.mode : "filter";
-  return { mode, filters, semanticQuery: (j.semanticQuery as string) ?? null };
+  return { mode: d.mode, filters, semanticQuery: d.semanticQuery };
 }
 
 function formatRecord(e: Experiment): string {
@@ -282,28 +282,122 @@ function formatRecord(e: Experiment): string {
     .join("\n");
 }
 
-// Grounded generation: answer ONLY from the provided records, inline [EXP-###]
-// citations. Returns null when disabled.
-export async function generateAnswer(
-  query: string,
-  records: Experiment[]
-): Promise<string | null> {
-  if (!isLlmEnabled()) return null;
-  if (records.length === 0) return "No matching experiments found.";
+// T3.2 — deterministic citation engine (audit §12.2). Replaces the old
+// generateAnswer/streamAnswer, which asked the model to type [EXP-004]-style
+// citations into free prose with no validation that a cited ID was actually
+// part of the retrieved/grounding set. Every citation here resolves to a
+// label minted from the ACTUAL retrieved evidence (never a persisted or
+// guessable ID), and the "is this actually grounded" decision is an explicit
+// field the model must set, never inferred by regex-testing its own prose.
 
-  const system = `You answer questions about a chemistry lab's experiments using ONLY the provided records. Rules:
-- Cite every claim inline with the experiment ID in square brackets, e.g. [EXP-004].
-- If the records do not contain the answer, reply exactly: "No matching experiments found."
-- Never invent compounds, values, or results that are not in the records.
+export type EvidenceSource = {
+  sourceType: string;
+  sectionType: string;
+  content: string;
+};
+
+export type ResolvedCitation = {
+  label: string;
+  experimentId: string;
+  sourceType: string;
+  sectionType: string;
+  snippet: string;
+};
+
+export type CitedSegment = {
+  text: string;
+  citations: ResolvedCitation[];
+};
+
+export type CitedAnswer = {
+  segments: CitedSegment[];
+};
+
+const citedAnswerSchema = z.object({
+  grounded: z.boolean(),
+  segments: z.array(
+    z.object({
+      text: z.string().catch(""),
+      citations: z.array(z.string()).catch([]),
+    })
+  ),
+});
+
+const SNIPPET_MAX_CHARS = 400;
+
+// query, the deduped retrieved records, and — for records resolved via T3.1's
+// chunk-level semantic search — their single best-matching chunk (T3.2 D1: one
+// label per record, chunk-backed when available, whole-record fallback
+// otherwise, keyed by record.id). Returns null when disabled, ungrounded, or
+// every segment ends up empty after dropping unsupported citations — caller
+// falls back to the general-knowledge path exactly as before.
+export async function generateCitedAnswer(
+  query: string,
+  records: Experiment[],
+  evidenceByRecord: Map<string, EvidenceSource>
+): Promise<CitedAnswer | null> {
+  if (!isLlmEnabled()) return null;
+  if (records.length === 0) return null;
+
+  type LabelEntry = { experimentId: string; sourceType: string; sectionType: string; content: string };
+  const labelMap = new Map<string, LabelEntry>();
+  const contextParts: string[] = [];
+  records.forEach((r, i) => {
+    const label = `C${i + 1}`;
+    const ev = evidenceByRecord.get(r.id);
+    const entry: LabelEntry = ev
+      ? { experimentId: r.id, sourceType: ev.sourceType, sectionType: ev.sectionType, content: ev.content }
+      : { experimentId: r.id, sourceType: "experiment", sectionType: "observations", content: formatRecord(r) };
+    labelMap.set(label, entry);
+    contextParts.push(`[${label}] Experiment ${r.id} (${entry.sourceType}/${entry.sectionType}):\n${entry.content}`);
+  });
+
+  const system = `You answer questions about a chemistry lab's experiments using ONLY the evidence excerpts given below. Respond with ONLY a JSON object, no prose, matching this schema:
+{
+  "grounded": boolean,  // false if the excerpts genuinely do not answer the question
+  "segments": [ { "text": string, "citations": string[] } ]  // citations = labels like "C2", ONLY from the excerpts given below
+}
+Rules:
+- Break the answer into one or more segments; cite the excerpt label(s) that support each segment.
+- Never invent a label that wasn't given below. Never invent compounds, values, or results not in the excerpts.
+- If grounded is false, return exactly one segment explaining why, with no citations.
 - Be concise and specific.`;
 
-  const context = records.map(formatRecord).join("\n\n");
   const text = await chatComplete({
     system,
-    user: `Question: ${query}\n\nExperiment records:\n${context}`,
+    user: `Question: ${query}\n\nEvidence excerpts:\n${contextParts.join("\n\n")}`,
     maxTokens: 800,
   });
-  return text;
+  if (!text) return null;
+
+  const parsed = parseJson(text);
+  if (!parsed) return null;
+  const result = citedAnswerSchema.safeParse(parsed);
+  if (!result.success || !result.data.grounded) return null;
+
+  const segments: CitedSegment[] = result.data.segments
+    .map((s) => ({
+      text: s.text,
+      // Drop unsupported/hallucinated labels — resolve strictly from OUR OWN
+      // retrieved evidence map, never from anything the model said about them.
+      citations: s.citations
+        .map((label) => {
+          const entry = labelMap.get(label);
+          return entry ? { label, ...entry } : null;
+        })
+        .filter((c): c is LabelEntry & { label: string } => c !== null)
+        .map((c) => ({
+          label: c.label,
+          experimentId: c.experimentId,
+          sourceType: c.sourceType,
+          sectionType: c.sectionType,
+          snippet: c.content.slice(0, SNIPPET_MAX_CHARS),
+        })),
+    }))
+    .filter((s) => s.text.trim().length > 0);
+
+  if (segments.length === 0) return null;
+  return { segments };
 }
 
 // General-knowledge answer — used when the question doesn't match any stored
@@ -311,14 +405,12 @@ export async function generateAnswer(
 // data. Returns null when disabled.
 export async function generateGeneralAnswer(query: string): Promise<string | null> {
   if (!isLlmEnabled()) return null;
-  const system = `You are a helpful, knowledgeable assistant for a prebiotic-chemistry research lab. The user's question did not match any of the lab's stored experiments, so answer from your own general knowledge.
-- Be accurate and concise.
-- Do NOT cite experiment IDs or claim anything about the lab's specific experiments.
-- If the question is outside your knowledge or ambiguous, say so briefly.`;
-  return chatComplete({ system, user: query, maxTokens: 800 });
+  return chatComplete({ system: GENERAL_SYSTEM, user: query, maxTokens: 800 });
 }
 
-// Grounded single-experiment summary. Returns null when disabled.
+// Grounded single-experiment summary. Returns null when disabled. No
+// citations to validate — this describes exactly one experiment, so there is
+// nothing else it could be attributing a claim to.
 export async function summarizeExperiment(e: Experiment): Promise<string | null> {
   const system = `You summarise a single chemistry experiment using ONLY the fields provided. Rules:
 - 2–3 sentences, plain and specific.
@@ -327,18 +419,85 @@ export async function summarizeExperiment(e: Experiment): Promise<string | null>
   return chatComplete({ system, user: formatRecord(e), maxTokens: 400 });
 }
 
-export async function summarizeGroup(experiments: Experiment[]): Promise<string | null> {
+// T3.2 D5 — same deterministic citation scheme as generateCitedAnswer, at
+// whole-record granularity (a group summary is handed an experiment list
+// directly, not a query, so no chunk-level evidence was retrieved for it).
+export async function summarizeGroup(experiments: Experiment[]): Promise<CitedAnswer | null> {
   if (experiments.length === 0) return null;
-  const system = `You summarise a SET of chemistry experiments using ONLY the fields provided. Rules:
-- 3–5 sentences: shared themes, notable contrasts, and any standouts.
-- Cite each experiment you reference as [EXP-###] using the IDs given; cite an ID at most once.
-- Use only values present in the records; never invent compounds, pH, m/z, or results.
-- No preamble — state the substance directly.`;
-  const user = experiments
-    .map((e) => `[${e.id}]\n${formatRecord(e)}`)
-    .join("\n\n---\n\n");
-  return chatComplete({ system, user, maxTokens: 600 });
+  if (!isLlmEnabled()) return null;
+
+  type LabelEntry = { experimentId: string; sourceType: string; sectionType: string; content: string };
+  const labelMap = new Map<string, LabelEntry>();
+  const contextParts: string[] = [];
+  experiments.forEach((e, i) => {
+    const label = `C${i + 1}`;
+    const entry: LabelEntry = { experimentId: e.id, sourceType: "experiment", sectionType: "observations", content: formatRecord(e) };
+    labelMap.set(label, entry);
+    contextParts.push(`[${label}] Experiment ${e.id}:\n${entry.content}`);
+  });
+
+  const system = `You summarise a SET of chemistry experiments using ONLY the records given below. Respond with ONLY a JSON object, no prose, matching this schema:
+{
+  "grounded": true,
+  "segments": [ { "text": string, "citations": string[] } ]  // citations = labels like "C2", ONLY from the records given below
 }
+Rules:
+- 1-2 segments covering shared themes, notable contrasts, and any standouts; cite every experiment you reference by its label, at most once per label.
+- Never invent a label that wasn't given below. Never invent compounds, values, or results not in the records.
+- Be concise and specific. No preamble.`;
+
+  const text = await chatComplete({
+    system,
+    user: `Experiment records:\n${contextParts.join("\n\n")}`,
+    maxTokens: 600,
+  });
+  if (!text) return null;
+
+  const parsed = parseJson(text);
+  if (!parsed) return null;
+  const result = citedAnswerSchema.safeParse(parsed);
+  if (!result.success || !result.data.grounded) return null;
+
+  const segments: CitedSegment[] = result.data.segments
+    .map((s) => ({
+      text: s.text,
+      citations: s.citations
+        .map((label) => {
+          const entry = labelMap.get(label);
+          return entry ? { label, ...entry } : null;
+        })
+        .filter((c): c is LabelEntry & { label: string } => c !== null)
+        .map((c) => ({
+          label: c.label,
+          experimentId: c.experimentId,
+          sourceType: c.sourceType,
+          sectionType: c.sectionType,
+          snippet: c.content.slice(0, SNIPPET_MAX_CHARS),
+        })),
+    }))
+    .filter((s) => s.text.trim().length > 0);
+
+  if (segments.length === 0) return null;
+  return { segments };
+}
+
+// T3.2 D6 — schema-validated (was ad-hoc str/num/arr helpers). A field that
+// fails validation is omitted (via .catch(undefined)), same as the old
+// helpers' behavior — never guessed or defaulted to a placeholder value.
+const extractedFieldsSchema = z.object({
+  name: z.string().trim().min(1).optional().catch(undefined),
+  date: z.string().trim().min(1).optional().catch(undefined),
+  researcher: z.string().trim().min(1).optional().catch(undefined),
+  reaction_type: z.string().trim().min(1).optional().catch(undefined),
+  compounds: z.array(z.string()).optional().catch(undefined),
+  metals: z.array(z.string()).optional().catch(undefined),
+  ph: z.number().finite().optional().catch(undefined),
+  cycles: z.number().finite().optional().catch(undefined),
+  methods: z.array(z.string()).optional().catch(undefined),
+  mz: z.array(z.number().finite()).optional().catch(undefined),
+  observations: z.string().trim().min(1).optional().catch(undefined),
+  notes: z.string().trim().min(1).optional().catch(undefined),
+});
 
 // LLM-assisted entry: extract structured fields from messy notes. Only stated
 // fields are returned. Returns null when disabled or unparseable.
@@ -366,26 +525,22 @@ Fields:
   if (!text) return null;
   const j = parseJson(text);
   if (!j) return null;
-
-  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
-  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-  const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : undefined);
-  const numArr = (v: unknown) =>
-    Array.isArray(v) ? v.filter((x) => typeof x === "number" && Number.isFinite(x)) : undefined;
+  const parsed = extractedFieldsSchema.safeParse(j);
+  if (!parsed.success) return null;
+  const d = parsed.data;
 
   const out: Partial<ExperimentInput> = {};
-  if (str(j.name)) out.name = str(j.name);
-  if (str(j.date)) out.date = str(j.date) ?? null;
-  if (str(j.researcher)) out.researcher = str(j.researcher) ?? null;
-  if (str(j.reaction_type)) out.reaction_type = str(j.reaction_type) ?? null;
-  if (arr(j.compounds)) out.compounds = arr(j.compounds);
-  if (arr(j.metals)) out.metals = arr(j.metals);
-  if (num(j.ph) !== undefined) out.ph = num(j.ph) ?? null;
-  if (num(j.cycles) !== undefined) out.cycles = num(j.cycles) ?? null;
-  if (arr(j.methods))
-    out.methods = arr(j.methods)!.filter((m) => (METHOD_OPTIONS as readonly string[]).includes(m));
-  if (numArr(j.mz)) out.mz = numArr(j.mz);
-  if (str(j.observations)) out.observations = str(j.observations) ?? null;
-  if (str(j.notes)) out.notes = str(j.notes) ?? null;
+  if (d.name) out.name = d.name;
+  if (d.date) out.date = d.date;
+  if (d.researcher) out.researcher = d.researcher;
+  if (d.reaction_type) out.reaction_type = d.reaction_type;
+  if (d.compounds) out.compounds = d.compounds;
+  if (d.metals) out.metals = d.metals;
+  if (d.ph !== undefined) out.ph = d.ph;
+  if (d.cycles !== undefined) out.cycles = d.cycles;
+  if (d.methods) out.methods = d.methods.filter((m) => (METHOD_OPTIONS as readonly string[]).includes(m));
+  if (d.mz) out.mz = d.mz;
+  if (d.observations) out.observations = d.observations;
+  if (d.notes) out.notes = d.notes;
   return out;
 }

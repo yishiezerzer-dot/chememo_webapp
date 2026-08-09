@@ -1,30 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { Fragment, useState, useTransition } from "react";
-
-// Turn [EXP-###] citations in the summary into links.
-function renderCitations(text: string) {
-  return text.split(/(\[EXP-\d+\])/g).map((p, i) => {
-    const m = p.match(/^\[(EXP-\d+)\]$/);
-    return m ? (
-      <Link key={i} href={`/experiments/${m[1]}`} className="td-id">
-        {p}
-      </Link>
-    ) : (
-      <Fragment key={i}>{p}</Fragment>
-    );
-  });
-}
+import { useState, useTransition } from "react";
+import { CitedAnswerView } from "@/components/cited-answer";
+import type { CitedAnswer } from "@/lib/llm";
 
 export function GroupSummary({
   ids,
   action,
 }: {
   ids: string[];
-  action: (ids: string[]) => Promise<string | null>;
+  action: (ids: string[]) => Promise<CitedAnswer | null>;
 }) {
-  const [summary, setSummary] = useState<string | null>(null);
+  const [summary, setSummary] = useState<CitedAnswer | null>(null);
   const [failed, setFailed] = useState(false);
   const [pending, start] = useTransition();
 
@@ -34,7 +21,7 @@ export function GroupSummary({
         <div className="ai-head">
           <span className="eyebrow">Group summary · {ids.length} experiments</span>
         </div>
-        <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{renderCitations(summary)}</p>
+        <CitedAnswerView answer={summary} />
       </div>
     );
   }

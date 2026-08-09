@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 // hit to its parent experiment (directly via metadata.experiment_id for most
 // source types, or via a live fan-out against experiments.protocol_version_id
 // for the two protocol-level source types, which have no single parent).
-// These tests prove the dedup/resolution logic without hitting a real DB.
+// T3.2 D1 — it also surfaces each resolved experiment's best-matching chunk
+// content (source_type/section_type/content) for the citation engine.
+// These tests prove the dedup/resolution/evidence logic without hitting a
+// real DB.
 
 const embedTextMock = vi.fn();
 vi.mock("@/lib/embeddings", () => ({ embedText: embedTextMock }));
@@ -12,6 +15,7 @@ vi.mock("@/lib/embeddings", () => ({ embedText: embedTextMock }));
 let rpcResult: { data: unknown; error: unknown } = { data: [], error: null };
 const protocolLinkRows: { id: string; protocol_version_id: string }[] = [];
 const experimentRows: Record<string, unknown>[] = [];
+const chunkContentRows: { id: string; content: string }[] = [];
 
 function makeQuery(table: string) {
   const query: Record<string, unknown> = {};
@@ -19,7 +23,7 @@ function makeQuery(table: string) {
   query.select = vi.fn(chain);
   query.in = vi.fn(chain);
   query.is = vi.fn(chain);
-  // Both `.select().in().is()` chains in rag.ts eventually resolve as a
+  // Every `.select().in()...` chain in rag.ts eventually resolves as a
   // thenable — resolve based on which table was queried.
   query.then = (resolve: (v: { data: unknown }) => void) => {
     if (table === "experiments") {
@@ -32,6 +36,8 @@ function makeQuery(table: string) {
       } else {
         resolve({ data: experimentRows });
       }
+    } else if (table === "evidence_chunks") {
+      resolve({ data: chunkContentRows });
     } else {
       resolve({ data: [] });
     }
@@ -51,42 +57,56 @@ vi.mock("@/lib/search", () => ({ keylessSearch: vi.fn(), executeFilters: vi.fn()
 vi.mock("@/lib/llm", () => ({
   isLlmEnabled: () => true,
   routeQuery: vi.fn(),
-  generateAnswer: vi.fn(),
+  generateCitedAnswer: vi.fn(),
   generateGeneralAnswer: vi.fn(),
 }));
 
 const { semanticSearch } = await import("@/lib/rag");
 
 describe("semanticSearch", () => {
-  it("returns [] when embeddings are disabled", async () => {
+  it("returns empty experiments/evidence when embeddings are disabled", async () => {
     embedTextMock.mockResolvedValueOnce(null);
     const result = await semanticSearch("formed droplets");
-    expect(result).toEqual([]);
+    expect(result.experiments).toEqual([]);
+    expect(result.evidence.size).toBe(0);
   });
 
-  it("resolves ordinary chunk hits to their experiment via metadata.experiment_id and dedupes", async () => {
+  it("resolves ordinary chunk hits to their experiment via metadata.experiment_id, dedupes, and surfaces the winning chunk's content", async () => {
     embedTextMock.mockResolvedValueOnce([0.1, 0.2]);
     rpcResult = {
       data: [
-        { id: "c1", source_type: "step_observation", source_id: "so1", metadata: { experiment_id: "EXP-1" }, similarity: 0.9 },
-        { id: "c2", source_type: "analysis_result", source_id: "ar1", metadata: { experiment_id: "EXP-1" }, similarity: 0.85 },
-        { id: "c3", source_type: "comment", source_id: "cm1", metadata: { experiment_id: "EXP-2" }, similarity: 0.7 },
+        { id: "c1", source_type: "step_observation", source_id: "so1", section_type: "observations", metadata: { experiment_id: "EXP-1" }, similarity: 0.9 },
+        { id: "c2", source_type: "analysis_result", source_id: "ar1", section_type: "analytical_result", metadata: { experiment_id: "EXP-1" }, similarity: 0.85 },
+        { id: "c3", source_type: "comment", source_id: "cm1", section_type: "discussion", metadata: { experiment_id: "EXP-2" }, similarity: 0.7 },
       ],
       error: null,
     };
     experimentRows.length = 0;
     experimentRows.push({ id: "EXP-1", name: "First" }, { id: "EXP-2", name: "Second" });
+    chunkContentRows.length = 0;
+    chunkContentRows.push({ id: "c1", content: "Droplets observed at 40C." }, { id: "c3", content: "Nice result!" });
 
     const result = await semanticSearch("query");
     // EXP-1 hit twice (higher similarity first) but only appears once, ahead of EXP-2.
-    expect(result.map((e) => e.id)).toEqual(["EXP-1", "EXP-2"]);
+    expect(result.experiments.map((e) => e.id)).toEqual(["EXP-1", "EXP-2"]);
+    // EXP-1's evidence comes from its FIRST (highest-similarity) hit, c1 — not c2.
+    expect(result.evidence.get("EXP-1")).toEqual({
+      sourceType: "step_observation",
+      sectionType: "observations",
+      content: "Droplets observed at 40C.",
+    });
+    expect(result.evidence.get("EXP-2")).toEqual({
+      sourceType: "comment",
+      sectionType: "discussion",
+      content: "Nice result!",
+    });
   });
 
   it("resolves protocol-level hits via a live fan-out against experiments.protocol_version_id", async () => {
     embedTextMock.mockResolvedValueOnce([0.1, 0.2]);
     rpcResult = {
       data: [
-        { id: "c4", source_type: "protocol_step", source_id: "ps1", metadata: { protocol_version_id: "PV-1" }, similarity: 0.8 },
+        { id: "c4", source_type: "protocol_step", source_id: "ps1", section_type: "protocol_step", metadata: { protocol_version_id: "PV-1" }, similarity: 0.8 },
       ],
       error: null,
     };
@@ -94,23 +114,32 @@ describe("semanticSearch", () => {
     protocolLinkRows.push({ id: "EXP-3", protocol_version_id: "PV-1" });
     experimentRows.length = 0;
     experimentRows.push({ id: "EXP-3", name: "Third" });
+    chunkContentRows.length = 0;
+    chunkContentRows.push({ id: "c4", content: "Step 1: mix reagents." });
 
     const result = await semanticSearch("query");
-    expect(result.map((e) => e.id)).toEqual(["EXP-3"]);
+    expect(result.experiments.map((e) => e.id)).toEqual(["EXP-3"]);
+    expect(result.evidence.get("EXP-3")).toEqual({
+      sourceType: "protocol_step",
+      sectionType: "protocol_step",
+      content: "Step 1: mix reagents.",
+    });
   });
 
   it("drops hits below the similarity threshold and hits with no resolvable experiment", async () => {
     embedTextMock.mockResolvedValueOnce([0.1, 0.2]);
     rpcResult = {
       data: [
-        { id: "c5", source_type: "comment", source_id: "cm2", metadata: {}, similarity: 0.99 },
-        { id: "c6", source_type: "comment", source_id: "cm3", metadata: { experiment_id: "EXP-4" }, similarity: 0.1 },
+        { id: "c5", source_type: "comment", source_id: "cm2", section_type: "discussion", metadata: {}, similarity: 0.99 },
+        { id: "c6", source_type: "comment", source_id: "cm3", section_type: "discussion", metadata: { experiment_id: "EXP-4" }, similarity: 0.1 },
       ],
       error: null,
     };
     experimentRows.length = 0;
+    chunkContentRows.length = 0;
 
     const result = await semanticSearch("query");
-    expect(result).toEqual([]);
+    expect(result.experiments).toEqual([]);
+    expect(result.evidence.size).toBe(0);
   });
 });

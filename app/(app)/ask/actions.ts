@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { isLlmEnabled } from "@/lib/llm";
+import { isLlmEnabled, type CitedAnswer } from "@/lib/llm";
 import { acquireAiSlot, summarizeExperimentGroup } from "@/lib/ai/service";
 
 // Summarise a set of experiments (the grounded results of an Ask). Reads via
@@ -11,7 +11,7 @@ import { acquireAiSlot, summarizeExperimentGroup } from "@/lib/ai/service";
 // redirect on a missing session like other actions, since this is a
 // background call from an in-progress Ask conversation). Generated on demand
 // (not cached) — it's tied to a query.
-export async function generateGroupSummary(ids: string[]): Promise<string | null> {
+export async function generateGroupSummary(ids: string[]): Promise<CitedAnswer | null> {
   const supabase = await createClient();
   const {
     data: { user },
