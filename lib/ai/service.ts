@@ -9,9 +9,11 @@ import {
   summarizeGroup,
   detectContradictions,
   generateComparisonTable,
+  suggestNextExperiment,
   type CitedAnswer,
   type ComparisonTableSuggestion,
 } from "@/lib/llm";
+import { retrieveRecords } from "@/lib/rag";
 import { embeddingModel, EMBEDDING_DIM, isEmbeddingEnabled } from "@/lib/embeddings";
 import { AppError } from "@/lib/errors";
 import { logError } from "@/lib/logger";
@@ -26,7 +28,8 @@ export type AiEndpoint =
   | "summary_group"
   | "comparison_table"
   | "contradiction_check"
-  | "crew_plan";
+  | "crew_plan"
+  | "next_experiment_suggestion";
 
 // Acquire the per-user + global concurrency slot shared by every AI call
 // (Ask, single summary, group summary) — a typed, throw-based replacement
@@ -231,6 +234,63 @@ export async function generateExperimentComparisonTable(
       endpoint: "comparison_table",
       status: "error",
       sourceCount: ids.length,
+      latencyMs: Date.now() - startedAt,
+      estTokens: null,
+    });
+    throw e;
+  }
+}
+
+// T3.6 D6 — reactive gap-spotting: fetch the anchor experiment, retrieve up
+// to 5 related past experiments via T3.3's hybrid retrieval (a short topic
+// query synthesized from the anchor's own content, same technique T3.7's
+// coordinator uses for its own grounding), then generate a suggestion. Reads
+// via the caller's session so RLS applies to both the anchor and the
+// retrieval — no service role anywhere in this path.
+export async function suggestNextExperimentForRecord(
+  supabase: Supabase,
+  userId: string,
+  experimentId: string
+): Promise<CitedAnswer | null> {
+  const startedAt = Date.now();
+  const { data: anchor } = await supabase
+    .from("experiments")
+    .select("*")
+    .eq("id", experimentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!anchor) return null;
+
+  try {
+    // See the narrowing note in lib/types.ts for why this cast is safe.
+    const anchorExperiment = anchor as Experiment;
+    const topicQuery =
+      [anchorExperiment.scientific_question, anchorExperiment.observations, anchorExperiment.conclusion]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 200) || anchorExperiment.name;
+    const retrieved = await retrieveRecords(topicQuery).catch(() => ({ records: [] as Experiment[] }));
+    const related = retrieved.records.filter((e) => e.id !== experimentId).slice(0, 5);
+
+    const suggestion = await suggestNextExperiment(anchorExperiment, related);
+    const estTokens = suggestion
+      ? Math.ceil(suggestion.segments.reduce((n, s) => n + s.text.length, 0) / 4)
+      : null;
+    await logAiRequest({
+      userId,
+      endpoint: "next_experiment_suggestion",
+      status: suggestion ? "ok" : "error",
+      sourceCount: related.length + 1,
+      latencyMs: Date.now() - startedAt,
+      estTokens,
+    });
+    return suggestion;
+  } catch (e) {
+    await logAiRequest({
+      userId,
+      endpoint: "next_experiment_suggestion",
+      status: "error",
+      sourceCount: 0,
       latencyMs: Date.now() - startedAt,
       estTokens: null,
     });

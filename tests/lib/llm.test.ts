@@ -35,8 +35,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const { generateCitedAnswer, routeQuery, extractExperimentFields, generateComparisonTable, detectContradictions } =
-  await import("@/lib/llm");
+const {
+  generateCitedAnswer,
+  routeQuery,
+  extractExperimentFields,
+  generateComparisonTable,
+  detectContradictions,
+  suggestNextExperiment,
+} = await import("@/lib/llm");
 
 function record(id: string, name: string): Experiment {
   return { id, name } as unknown as Experiment;
@@ -240,6 +246,41 @@ describe("detectContradictions (T3.6 D3)", () => {
 
   it("returns null for fewer than two experiments — nothing to contradict", async () => {
     const result = await detectContradictions([record("EXP-1", "Only one")]);
+    expect(result).toBeNull();
+  });
+});
+
+describe("suggestNextExperiment (T3.6 D6)", () => {
+  it("drops a citation to a label outside the anchor+related set", async () => {
+    mockGeminiText(
+      JSON.stringify({
+        grounded: true,
+        segments: [{ text: "Try pH 7 next, following on EXP-1 and EXP-2.", citations: ["C0", "C1", "C99"] }],
+      })
+    );
+    const anchor = record("EXP-1", "Anchor experiment");
+    const related = [record("EXP-2", "Related experiment")];
+    const result = await suggestNextExperiment(anchor, related);
+    expect(result).not.toBeNull();
+    expect(result!.segments[0].citations.map((c) => c.experimentId).sort()).toEqual(["EXP-1", "EXP-2"]);
+  });
+
+  it("still cites the anchor correctly with no related experiments given", async () => {
+    mockGeminiText(
+      JSON.stringify({
+        grounded: true,
+        segments: [{ text: "No prior related work found; try varying pH next.", citations: ["C0"] }],
+      })
+    );
+    const anchor = record("EXP-1", "Anchor experiment");
+    const result = await suggestNextExperiment(anchor, []);
+    expect(result).not.toBeNull();
+    expect(result!.segments[0].citations.map((c) => c.experimentId)).toEqual(["EXP-1"]);
+  });
+
+  it("returns null when the model reports grounded: false", async () => {
+    mockGeminiText(JSON.stringify({ grounded: false, segments: [] }));
+    const result = await suggestNextExperiment(record("EXP-1", "Anchor"), []);
     expect(result).toBeNull();
   });
 });

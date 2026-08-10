@@ -611,6 +611,88 @@ Rules:
   return { segments };
 }
 
+// T3.6 D6 — reactive gap-spotting from data already in the corpus: given the
+// experiment currently being viewed (the "anchor") plus related past
+// experiments the lab has already run, suggest one concrete next experiment
+// grounded in an actual gap or open question visible in the records. Deferred
+// alongside D1-D3 because it originally overlapped with T3.7's crew; scoped
+// once T3.7/T3.8 shipped to be reactive/data-driven rather than another
+// note-to-plan path — same citation-safety discipline as detectContradictions,
+// applied to the anchor + retrieved related experiments instead of a
+// human-selected comparison set.
+export async function suggestNextExperiment(anchor: Experiment, related: Experiment[]): Promise<CitedAnswer | null> {
+  if (!isLlmEnabled()) return null;
+
+  type LabelEntry = { experimentId: string; sourceType: string; sectionType: string; content: string };
+  const labelMap = new Map<string, LabelEntry>();
+  const contextParts: string[] = [];
+
+  const anchorLabel = "C0";
+  const anchorEntry: LabelEntry = {
+    experimentId: anchor.id,
+    sourceType: "experiment",
+    sectionType: "observations",
+    content: formatRecord(anchor),
+  };
+  labelMap.set(anchorLabel, anchorEntry);
+  contextParts.push(formatEvidenceBlock(anchorLabel, `Current experiment ${anchor.id} (the one being viewed)`, anchorEntry.content));
+
+  related.forEach((e, i) => {
+    const label = `C${i + 1}`;
+    const entry: LabelEntry = { experimentId: e.id, sourceType: "experiment", sectionType: "observations", content: formatRecord(e) };
+    labelMap.set(label, entry);
+    contextParts.push(formatEvidenceBlock(label, `Related past experiment ${e.id}`, entry.content));
+  });
+
+  const system = `You suggest ONE concrete next experiment for a prebiotic chemistry lab, using ONLY the records given below: the current experiment being viewed (${anchorLabel}) and related past experiments the lab has already run. Respond with ONLY a JSON object, no prose, matching this schema:
+{
+  "grounded": true,
+  "segments": [ { "text": string, "citations": string[] } ]
+}
+${EVIDENCE_IS_DATA_RULE}
+Rules:
+- Base the suggestion on an actual gap or open question visible in the given records (an untried condition, an unresolved result, a natural follow-up) — never a generic suggestion unconnected to the data.
+- Cite every record your reasoning draws on, using labels like "${anchorLabel}"/"C1"/"C2", ONLY from the records given below.
+- Exactly one segment: the suggested next experiment and why, in 2-4 sentences.
+- If the current experiment has no results yet to react to, say so plainly instead of guessing.
+- Never invent compounds, values, or results not in the records.
+- Be concise and specific. No preamble.`;
+
+  const text = await chatComplete({
+    system,
+    user: `Experiment records:\n${contextParts.join("\n\n")}`,
+    maxTokens: 500,
+  });
+  if (!text) return null;
+
+  const parsed = parseJson(text);
+  if (!parsed) return null;
+  const result = citedAnswerSchema.safeParse(parsed);
+  if (!result.success || !result.data.grounded) return null;
+
+  const segments: CitedSegment[] = result.data.segments
+    .map((s) => ({
+      text: s.text,
+      citations: s.citations
+        .map((label) => {
+          const entry = labelMap.get(label);
+          return entry ? { label, ...entry } : null;
+        })
+        .filter((c): c is LabelEntry & { label: string } => c !== null)
+        .map((c) => ({
+          label: c.label,
+          experimentId: c.experimentId,
+          sourceType: c.sourceType,
+          sectionType: c.sectionType,
+          snippet: c.content.slice(0, SNIPPET_MAX_CHARS),
+        })),
+    }))
+    .filter((s) => s.text.trim().length > 0);
+
+  if (segments.length === 0) return null;
+  return { segments };
+}
+
 // T3.6 D2 — condition/result table generation. A different output shape
 // than CitedAnswer (a table, not prose segments), but the same citation-
 // safety discipline: any row naming an experiment id outside the given set

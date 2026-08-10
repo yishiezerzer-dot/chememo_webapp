@@ -49,6 +49,7 @@ import { createCommentAction, resolveCommentAction, reopenCommentAction } from "
 import { createTaskAction, updateTaskStatusAction } from "@/app/(app)/tasks-actions";
 import { exportExperimentMarkdownAction } from "./export-actions";
 import { resolveUnresolvedItemAction } from "./provenance-actions";
+import { suggestNextExperiment } from "./suggestion-actions";
 import { getCrewProvenance } from "@/lib/ai/crew/provenance";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
@@ -62,6 +63,7 @@ import { ControlsPanel } from "@/components/controls-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { CrewProvenancePanel } from "@/components/crew-provenance-panel";
+import { AiNextExperimentSuggestion } from "@/components/ai-next-experiment-suggestion";
 import { LifecycleControls } from "@/components/lifecycle-controls";
 import { StepRunner } from "@/components/step-runner";
 import { CommentThread } from "@/components/comment-thread";
@@ -496,6 +498,8 @@ export default async function ExperimentDetailPage({
             summary={summary}
             action={generateSummary.bind(null, e.id)}
           />
+
+          {aiEnabled && <AiNextExperimentSuggestion experimentId={e.id} action={suggestNextExperiment} />}
 
           <HistoryPanel
             entries={timeline}
