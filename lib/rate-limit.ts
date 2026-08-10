@@ -15,6 +15,12 @@ let globalInFlight = 0;
 export const MAX_QUERY_CHARS = 2000;
 export const MAX_BODY_BYTES = 8 * 1024;
 
+// T3.7 D5 — a page of bench notes runs 3,000-5,000 characters and a typed-up
+// lab-book page can exceed 8 KB, so the crew needs its own, larger limits
+// rather than raising Ask's shared ones (Ask has no reason to accept 20 KB).
+export const MAX_CREW_INPUT_CHARS = 20_000;
+export const MAX_CREW_BODY_BYTES = 64 * 1024;
+
 export function checkRate(userId: string): { ok: true } | { ok: false; error: string } {
   const now = Date.now();
   const recent = (hits.get(userId) ?? []).filter((t) => now - t < WINDOW_MS);

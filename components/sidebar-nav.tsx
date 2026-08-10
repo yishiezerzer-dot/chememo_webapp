@@ -101,6 +101,16 @@ const ITEMS = [
     ),
   },
   {
+    href: "/plan",
+    label: "Plan",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M9 12l2 2 4-4" />
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+      </svg>
+    ),
+  },
+  {
     href: "/health",
     label: "Health",
     icon: (

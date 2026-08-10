@@ -25,7 +25,8 @@ export type AiEndpoint =
   | "summary_single"
   | "summary_group"
   | "comparison_table"
-  | "contradiction_check";
+  | "contradiction_check"
+  | "crew_plan";
 
 // Acquire the per-user + global concurrency slot shared by every AI call
 // (Ask, single summary, group summary) — a typed, throw-based replacement
