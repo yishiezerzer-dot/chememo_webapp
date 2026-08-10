@@ -105,7 +105,10 @@ export async function chatComplete(opts: {
   const client = new OpenAI({ apiKey: key });
   const res = await client.chat.completions.create({
     model,
-    max_tokens: opts.maxTokens,
+    // max_completion_tokens, not max_tokens: newer models (o-series, gpt-5.x)
+    // reject max_tokens outright, and max_completion_tokens works fine on
+    // older chat models (gpt-4o-mini) too, so one field covers both.
+    max_completion_tokens: opts.maxTokens,
     temperature: 0,
     messages: [
       { role: "system", content: opts.system },
