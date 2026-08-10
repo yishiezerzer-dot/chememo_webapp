@@ -174,10 +174,20 @@ describe.skipIf(!ready)("crew-authored draft experiments (local Supabase)", () =
     const id = await makeExperiment();
     await makeProvenance(id, 1);
 
-    const { error } = await ownerClient
+    // With RLS enabled and no UPDATE policy defined at all, Postgres denies
+    // the command by silently matching zero rows (not by raising an error) —
+    // so the real invariant to check is that the value is actually
+    // unchanged afterward, not that the call itself errors.
+    await ownerClient
       .from("experiment_crew_provenance")
       .update({ unresolved_open_count: 0 })
       .eq("experiment_id", id);
-    expect(error).not.toBeNull();
+
+    const { data } = await admin
+      .from("experiment_crew_provenance")
+      .select("unresolved_open_count")
+      .eq("experiment_id", id)
+      .single();
+    expect(data?.unresolved_open_count).toBe(1);
   });
 });
