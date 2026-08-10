@@ -103,18 +103,31 @@ export async function chatComplete(opts: {
   // openai
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ apiKey: key });
-  const res = await client.chat.completions.create({
+  const baseParams = {
     model,
     // max_completion_tokens, not max_tokens: newer models (o-series, gpt-5.x)
     // reject max_tokens outright, and max_completion_tokens works fine on
     // older chat models (gpt-4o-mini) too, so one field covers both.
     max_completion_tokens: opts.maxTokens,
-    temperature: 0,
     messages: [
-      { role: "system", content: opts.system },
-      { role: "user", content: opts.user },
+      { role: "system" as const, content: opts.system },
+      { role: "user" as const, content: opts.user },
     ],
-  });
+  };
+  let res;
+  try {
+    res = await client.chat.completions.create({ ...baseParams, temperature: 0 });
+  } catch (e) {
+    // Some newer models (reasoning-tier o-series/gpt-5.x) only support the
+    // default temperature (1) and reject any other value outright — retry
+    // once without it rather than hardcode a model-name allowlist that will
+    // go stale the next time a new model ships.
+    if (e instanceof Error && /temperature/i.test(e.message)) {
+      res = await client.chat.completions.create(baseParams);
+    } else {
+      throw e;
+    }
+  }
   return res.choices[0]?.message?.content?.trim() || null;
 }
 
