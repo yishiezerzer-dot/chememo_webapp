@@ -29,14 +29,14 @@ export async function createProject(
   workspaceId: string,
   name: string,
   color: string
-): Promise<void> {
+): Promise<string> {
   const base = slugify(name);
   for (let attempt = 0; attempt < 10; attempt++) {
     const id = attempt === 0 ? base : `${base}-${attempt + 1}`;
     const { error } = await supabase
       .from("projects")
       .insert({ id, label: name, color, owner_id: userId, workspace_id: workspaceId });
-    if (!error) return;
+    if (!error) return id;
     // 23505 = unique_violation (id already taken) — retry with a suffix.
     if (error.code !== "23505") {
       throw new AppError("conflict", `Could not create project: ${error.message}`, {

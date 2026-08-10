@@ -38,12 +38,18 @@ const NEXT_MOVES: Record<ExperimentStatus, { label: string; next: ExperimentStat
 export function LifecycleControls({
   status,
   hasConclusion,
+  unresolvedOpenCount = 0,
   setStatusAction,
   completeAction,
   reviewAction,
 }: {
   status: ExperimentStatus | null;
   hasConclusion: boolean;
+  // T3.8 D4 — a crew-authored draft's own moves off 'draft' are disabled
+  // here as the user-facing explanation; the DB trigger (branch g) is the
+  // real backstop. Cancel is not gated: rejecting a bad AI proposal is
+  // exactly what an open item should never block.
+  unresolvedOpenCount?: number;
   setStatusAction: (next: ExperimentStatus) => Promise<ActionResult>;
   completeAction: () => Promise<ActionResult>;
   reviewAction: () => Promise<ActionResult>;
@@ -74,17 +80,25 @@ export function LifecycleControls({
 
   return (
     <div className="filter-chips">
-      {moves.map((m) => (
-        <button
-          key={m.next}
-          type="button"
-          className="btn btn-ghost btn-sm"
-          disabled={pending}
-          onClick={() => run(() => setStatusAction(m.next))}
-        >
-          {m.label}
-        </button>
-      ))}
+      {moves.map((m) => {
+        const gated = status === "draft" && m.next !== "cancelled" && unresolvedOpenCount > 0;
+        return (
+          <button
+            key={m.next}
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={pending || gated}
+            title={
+              gated
+                ? `This experiment has ${unresolvedOpenCount} unresolved item${unresolvedOpenCount === 1 ? "" : "s"} from its AI-generated plan. Resolve them before starting.`
+                : undefined
+            }
+            onClick={() => run(() => setStatusAction(m.next))}
+          >
+            {m.label}
+          </button>
+        );
+      })}
       {canComplete && (
         <button
           type="button"

@@ -48,6 +48,8 @@ import { listTasks } from "@/lib/tasks/service";
 import { createCommentAction, resolveCommentAction, reopenCommentAction } from "@/app/(app)/comments-actions";
 import { createTaskAction, updateTaskStatusAction } from "@/app/(app)/tasks-actions";
 import { exportExperimentMarkdownAction } from "./export-actions";
+import { resolveUnresolvedItemAction } from "./provenance-actions";
+import { getCrewProvenance } from "@/lib/ai/crew/provenance";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList, UnlinkedFilesInbox } from "@/components/file-list";
@@ -59,6 +61,7 @@ import { SamplesPanel } from "@/components/samples-panel";
 import { ControlsPanel } from "@/components/controls-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
+import { CrewProvenancePanel } from "@/components/crew-provenance-panel";
 import { LifecycleControls } from "@/components/lifecycle-controls";
 import { StepRunner } from "@/components/step-runner";
 import { CommentThread } from "@/components/comment-thread";
@@ -144,6 +147,7 @@ export default async function ExperimentDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
   const isOwner = !!user && user.id === e.owner_id;
+  const crewProvenance = await getCrewProvenance(supabase, e.id);
 
   const projectLabel = projects.find((p) => p.id === e.project)?.label ?? e.project;
 
@@ -225,9 +229,20 @@ export default async function ExperimentDetailPage({
         <LifecycleControls
           status={e.status}
           hasConclusion={!!e.conclusion?.trim()}
+          unresolvedOpenCount={crewProvenance?.unresolvedOpenCount ?? 0}
           setStatusAction={setStatus.bind(null, e.id)}
           completeAction={completeExperiment.bind(null, e.id)}
           reviewAction={reviewExperiment.bind(null, e.id)}
+        />
+      )}
+
+      {crewProvenance && (
+        <CrewProvenancePanel
+          experimentId={e.id}
+          provenance={crewProvenance}
+          isDraft={e.status === "draft"}
+          isOwner={isOwner}
+          resolveAction={resolveUnresolvedItemAction}
         />
       )}
 

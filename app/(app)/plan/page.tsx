@@ -1,4 +1,5 @@
 import { listProjects } from "@/lib/projects/service";
+import { listTemplates } from "@/lib/templates/service";
 import { isLlmEnabled } from "@/lib/llm";
 import { PlanClient } from "@/components/plan-client";
 
@@ -20,7 +21,7 @@ export default async function PlanPage() {
     );
   }
 
-  const projects = await listProjects();
+  const [projects, templates] = await Promise.all([listProjects(), listTemplates()]);
 
   return (
     <div>
@@ -34,7 +35,7 @@ export default async function PlanPage() {
         yourself. Nothing here is saved or applied automatically.
       </p>
 
-      <PlanClient projects={projects} />
+      <PlanClient projects={projects} templates={templates} />
     </div>
   );
 }

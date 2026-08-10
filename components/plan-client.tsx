@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import type { Project } from "@/lib/types";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import type { ExperimentTemplate, Project } from "@/lib/types";
 import type { CrewDraft, PlanFields } from "@/lib/ai/crew/types";
 import { useToast } from "@/components/toast-provider";
+import { createDraftExperimentFromPlan } from "@/app/(app)/plan/commit-actions";
+
+function deriveDefaultName(draft: CrewDraft): string {
+  const source = draft.structured.scientific_question || draft.rawSource;
+  return source.trim().slice(0, 80);
+}
 
 const FIELD_LABELS: { key: keyof PlanFields; label: string }[] = [
   { key: "scientific_question", label: "Scientific question" },
@@ -42,13 +49,52 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function PlanClient({ projects }: { projects: Project[] }) {
+export function PlanClient({ projects, templates }: { projects: Project[]; templates: ExperimentTemplate[] }) {
   const [notes, setNotes] = useState("");
   const [projectId, setProjectId] = useState("");
   const [phase, setPhase] = useState<"idle" | "loading" | "done">("idle");
   const [draft, setDraft] = useState<CrewDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = phase === "loading";
+
+  const [confirming, setConfirming] = useState(false);
+  const [commitName, setCommitName] = useState("");
+  const [templateId, setTemplateId] = useState("");
+  const [alsoCreateProject, setAlsoCreateProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [committing, startCommit] = useTransition();
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  function openConfirm() {
+    if (!draft) return;
+    setCommitName(deriveDefaultName(draft));
+    setTemplateId("");
+    setAlsoCreateProject(false);
+    setNewProjectName("");
+    setCommitError(null);
+    setConfirming(true);
+  }
+
+  function commit() {
+    if (!draft || !commitName.trim()) return;
+    startCommit(async () => {
+      const res = await createDraftExperimentFromPlan(draft, {
+        name: commitName.trim(),
+        templateId: templateId || null,
+        newProjectName: alsoCreateProject ? newProjectName.trim() || null : null,
+      });
+      // A successful commit redirects server-side and never returns here —
+      // only a failure result reaches this line.
+      if (!res.ok) {
+        setCommitError(res.error);
+      } else {
+        showToast("Draft experiment created", "success");
+        router.refresh();
+      }
+    });
+  }
 
   async function run() {
     if (!notes.trim() || busy) return;
@@ -249,6 +295,99 @@ export function PlanClient({ projects }: { projects: Project[] }) {
               </ul>
             )}
           </div>
+
+          {!confirming ? (
+            <button type="button" className="btn" onClick={openConfirm} style={{ alignSelf: "flex-start" }}>
+              Create draft experiment
+            </button>
+          ) : (
+            <div className="ai-summary-card">
+              <div className="ai-head">
+                <span className="eyebrow">Create draft experiment</span>
+              </div>
+              <p className="muted" style={{ fontSize: 12.5 }}>
+                This creates a real experiment at draft status, with the raw
+                notes and {draft.unresolved.length} unresolved item
+                {draft.unresolved.length === 1 ? "" : "s"} attached. It
+                cannot be started until every item is resolved.
+              </p>
+
+              <div className="field">
+                <label htmlFor="commit-name">Experiment name</label>
+                <input
+                  id="commit-name"
+                  value={commitName}
+                  onChange={(e) => setCommitName(e.target.value)}
+                  disabled={committing}
+                />
+              </div>
+
+              <div className="field" style={{ maxWidth: 320 }}>
+                <label htmlFor="commit-template">Template (optional)</label>
+                <select
+                  id="commit-template"
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  disabled={committing}
+                >
+                  <option value="">No template</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 400 }}>
+                  <input
+                    type="checkbox"
+                    checked={alsoCreateProject}
+                    onChange={(e) => setAlsoCreateProject(e.target.checked)}
+                    disabled={committing}
+                  />
+                  Also create a new project
+                </label>
+                {alsoCreateProject && (
+                  <input
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="Project name"
+                    disabled={committing}
+                    style={{ marginTop: 8 }}
+                  />
+                )}
+                <p className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+                  Left unchecked, the experiment is created with no project
+                  and an unresolved item noting that.
+                </p>
+              </div>
+
+              {commitError && (
+                <p style={{ fontSize: 12.5, color: "var(--rose, #ff6b81)" }}>{commitError}</p>
+              )}
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!commitName.trim() || committing}
+                  onClick={commit}
+                >
+                  {committing ? "Creating…" : "Confirm and create"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={committing}
+                  onClick={() => setConfirming(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

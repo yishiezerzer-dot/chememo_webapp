@@ -936,6 +936,63 @@ export type Database = {
           },
         ]
       }
+      experiment_crew_provenance: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          crew_version: string
+          experiment_id: string
+          model: string
+          normalization: Json
+          prompt_versions: Json
+          raw_source: string
+          unresolved: Json
+          unresolved_open_count: number
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          crew_version: string
+          experiment_id: string
+          model: string
+          normalization: Json
+          prompt_versions: Json
+          raw_source: string
+          unresolved: Json
+          unresolved_open_count: number
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          crew_version?: string
+          experiment_id?: string
+          model?: string
+          normalization?: Json
+          prompt_versions?: Json
+          raw_source?: string
+          unresolved?: Json
+          unresolved_open_count?: number
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_crew_provenance_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: true
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_crew_provenance_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experiment_drafts: {
         Row: {
           base_updated_at: string | null
@@ -3537,6 +3594,10 @@ export type Database = {
       next_protocol_id: { Args: never; Returns: string }
       reopen_experiment: {
         Args: { p_id: string; p_reason: string }
+        Returns: undefined
+      }
+      resolve_crew_unresolved_item: {
+        Args: { p_experiment_id: string; p_item_index: number }
         Returns: undefined
       }
       upsert_evidence_chunk: {
