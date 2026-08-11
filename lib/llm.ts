@@ -767,6 +767,10 @@ const extractedFieldsSchema = z.object({
   mz: z.array(z.number().finite()).optional().catch(undefined),
   observations: z.string().trim().min(1).optional().catch(undefined),
   notes: z.string().trim().min(1).optional().catch(undefined),
+  scientific_question: z.string().trim().min(1).optional().catch(undefined),
+  hypothesis: z.string().trim().min(1).optional().catch(undefined),
+  rationale: z.string().trim().min(1).optional().catch(undefined),
+  conclusion: z.string().trim().min(1).optional().catch(undefined),
 });
 
 // LLM-assisted entry: extract structured fields from messy notes. Only stated
@@ -788,7 +792,11 @@ Fields:
   "methods": string[],       // only from: ${METHOD_OPTIONS.join(", ")}
   "mz": number[],
   "observations": string,
-  "notes": string
+  "notes": string,
+  "scientific_question": string,  // what the notes are trying to find out, if stated
+  "hypothesis": string,           // a stated or clearly implied hypothesis/prediction
+  "rationale": string,            // why this experiment, if stated (prior results, motivation)
+  "conclusion": string            // a stated conclusion/interpretation of the result, if any
 }`;
 
   const text = await chatComplete({ system, user: notes, maxTokens: 700 });
@@ -812,5 +820,9 @@ Fields:
   if (d.mz) out.mz = d.mz;
   if (d.observations) out.observations = d.observations;
   if (d.notes) out.notes = d.notes;
+  if (d.scientific_question) out.scientific_question = d.scientific_question;
+  if (d.hypothesis) out.hypothesis = d.hypothesis;
+  if (d.rationale) out.rationale = d.rationale;
+  if (d.conclusion) out.conclusion = d.conclusion;
   return out;
 }

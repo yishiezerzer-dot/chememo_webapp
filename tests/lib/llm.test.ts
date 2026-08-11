@@ -198,6 +198,23 @@ describe("extractExperimentFields (zod validation regression)", () => {
     const fields = await extractExperimentFields("notes");
     expect(fields!.methods).toEqual(["NMR"]);
   });
+
+  it("extracts scientific_question/hypothesis/rationale/conclusion when the notes state them", async () => {
+    mockGeminiText(
+      JSON.stringify({
+        name: "Test",
+        scientific_question: "Does Zn2+ change oligomer yield?",
+        hypothesis: "Zn2+ increases yield relative to no metal.",
+        rationale: "Zn2+ is a known Lewis-acid catalyst.",
+        conclusion: "Results are consistent with the hypothesis.",
+      })
+    );
+    const fields = await extractExperimentFields("notes with a stated hypothesis and conclusion");
+    expect(fields!.scientific_question).toBe("Does Zn2+ change oligomer yield?");
+    expect(fields!.hypothesis).toBe("Zn2+ increases yield relative to no metal.");
+    expect(fields!.rationale).toBe("Zn2+ is a known Lewis-acid catalyst.");
+    expect(fields!.conclusion).toBe("Results are consistent with the hypothesis.");
+  });
 });
 
 describe("generateComparisonTable (T3.6 D2)", () => {
