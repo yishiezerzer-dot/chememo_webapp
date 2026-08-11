@@ -99,6 +99,29 @@ export async function searchExperiments(
   return { rows: pageRows, nextCursor, facets };
 }
 
+// A plain .select() caps out at Supabase/PostgREST's ~1000-row response
+// limit with no error and no truncation flag -- fine at today's dataset size,
+// but computeFacets/searchAllExperiments below both pull every matching row,
+// so once the match set exceeds that cap they'd silently go wrong (undercounted
+// facets; a CSV export missing rows with no indication anything was cut).
+// Paging with .range() sees every row regardless of table size.
+const RANGE_PAGE_SIZE = 1000;
+async function fetchAllRows<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  buildQuery: (from: number, to: number) => any
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += RANGE_PAGE_SIZE) {
+    const { data, error } = await buildQuery(from, from + RANGE_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as T[];
+    if (page.length === 0) break;
+    rows.push(...page);
+    if (page.length < RANGE_PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 // T1.6 D3 — scoped to columns that exist today (status/project/reaction_type/
 // methods); true per-sample facets need T2.3's samples table. Counts reflect
 // the *same* filter set as the page query, per the spec's own wording — not
@@ -107,18 +130,23 @@ async function computeFacets(
   supabase: Supabase,
   params: ExperimentSearchParams
 ): Promise<ExperimentSearchResult["facets"]> {
-  const q = applyFilters(
-    (supabase.from("experiments") as Query).select("status, project, reaction_type, methods"),
-    params
+  const rows = await fetchAllRows<{
+    status: string | null;
+    project: string | null;
+    reaction_type: string | null;
+    methods: string[] | null;
+  }>((from, to) =>
+    applyFilters(
+      (supabase.from("experiments") as Query).select("status, project, reaction_type, methods"),
+      params
+    ).range(from, to)
   );
-  const { data, error } = await q;
-  if (error) throw error;
 
   const status: Record<string, number> = {};
   const project: Record<string, number> = {};
   const reactionType: Record<string, number> = {};
   const methods: Record<string, number> = {};
-  for (const row of (data ?? []) as { status: string | null; project: string | null; reaction_type: string | null; methods: string[] | null }[]) {
+  for (const row of rows) {
     if (row.status) status[row.status] = (status[row.status] ?? 0) + 1;
     if (row.project) project[row.project] = (project[row.project] ?? 0) + 1;
     if (row.reaction_type) reactionType[row.reaction_type] = (reactionType[row.reaction_type] ?? 0) + 1;
@@ -132,10 +160,9 @@ async function computeFacets(
 // match, not just the current page). Same filter logic as searchExperiments.
 export async function searchAllExperiments(params: ExperimentSearchParams): Promise<Experiment[]> {
   const supabase = await createClient();
-  const q = applyFilters((supabase.from("experiments") as Query).select("*"), params).order("date", {
-    ascending: false,
-  });
-  const { data, error } = await q;
-  if (error) throw error;
-  return (data ?? []) as Experiment[];
+  return fetchAllRows<Experiment>((from, to) =>
+    applyFilters((supabase.from("experiments") as Query).select("*"), params)
+      .order("date", { ascending: false })
+      .range(from, to)
+  );
 }
