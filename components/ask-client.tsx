@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Experiment } from "@/lib/types";
 import type { CitedAnswer } from "@/lib/llm";
 import type { MatchExplanation } from "@/lib/rag";
@@ -12,6 +12,22 @@ import { AiFeedback } from "@/components/ai-feedback";
 import { generateGroupSummary, submitAiFeedback } from "@/app/(app)/ask/actions";
 
 type AskMode = "lab" | "context";
+
+// The general-knowledge ("Scientific context") path streams raw model prose,
+// which sometimes includes markdown bold (**like this**) even though nothing
+// downstream ever parsed it -- it was rendering as literal asterisks. Handles
+// bold only (the one thing actually observed), not a full markdown parser;
+// an unclosed "**" mid-stream just renders literally until its pair arrives.
+function renderInlineBold(text: string): ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? (
+      <strong key={i}>{part.slice(2, -2)}</strong>
+    ) : (
+      part
+    )
+  );
+}
 
 type AskMeta = {
   mode: "keyless" | "ai";
@@ -276,7 +292,7 @@ export function AskClient({
                 <CitedAnswerView answer={citedAnswer} />
               ) : (
                 <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                  {answerText}
+                  {renderInlineBold(answerText)}
                   {phase === "streaming" && (
                     <span style={{ animation: "cm-pulse 1.1s ease-in-out infinite" }}>▍</span>
                   )}
