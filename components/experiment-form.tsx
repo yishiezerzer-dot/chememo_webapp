@@ -14,7 +14,7 @@ import {
 import { SampleMatrixEditor } from "@/components/sample-matrix-editor";
 import { ControlsChecklist } from "@/components/controls-checklist";
 import { QuantitiesEditor } from "@/components/quantities-editor";
-import { useAutosave, readLocalDraft, type AutosaveState } from "@/lib/use-autosave";
+import { useAutosave, readLocalDraft, clearLocalDraft, type AutosaveState } from "@/lib/use-autosave";
 import { discardDraftAction } from "@/app/(app)/drafts-actions";
 
 type Props = {
@@ -219,11 +219,13 @@ export function ExperimentForm(props: Props) {
     // The stale draft's job is done once its content is back in the visible
     // form — otherwise a reload before the next autosave tick would re-offer
     // this same banner even though the user already restored it.
+    clearLocalDraft(draftKey);
     void discardDraftAction(draftKey);
   }
 
   function discardBanner() {
     setBanner(null);
+    clearLocalDraft(draftKey);
     void discardDraftAction(draftKey);
   }
 

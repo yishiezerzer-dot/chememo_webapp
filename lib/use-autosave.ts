@@ -27,6 +27,20 @@ export function readLocalDraft(key: DraftKey): LocalDraft | null {
   }
 }
 
+// A successful save (or an explicit restore/discard) needs to clear this too
+// -- discardDraftAction only ever deleted the *server* draft row, so the
+// localStorage mirror written on every keystroke by writeLocal() below
+// survived indefinitely and could resurface a stale "Recover an unsaved
+// draft?" banner on a later visit even after the real save had gone through.
+export function clearLocalDraft(key: DraftKey): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(localStorageKey(key));
+  } catch {
+    // best-effort, same as readLocalDraft/writeLocal above
+  }
+}
+
 // T1.3 — debounced autosave (D3): localStorage is written synchronously on
 // every change (closes the gap between keystrokes and the next server tick),
 // the server draft is written on a ~2.5s debounce (the cross-device/
@@ -120,8 +134,9 @@ export function useAutosave({
   const markConflict = useCallback(() => setState("conflict"), []);
   const markSaved = useCallback(() => {
     dirtyRef.current = false;
+    clearLocalDraft(draftKey);
     setState("saved");
-  }, []);
+  }, [draftKey]);
 
   return { state, markConflict, markSaved };
 }
