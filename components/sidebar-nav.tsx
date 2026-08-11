@@ -40,6 +40,18 @@ const ITEMS = [
     ),
   },
   {
+    href: "/experiments/map",
+    label: "Map",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="6" cy="6" r="2.5" />
+        <circle cx="18" cy="7" r="2.5" />
+        <circle cx="9" cy="18" r="2.5" />
+        <path d="M8 7.5l7.5.5M7.5 8l1 8" />
+      </svg>
+    ),
+  },
+  {
     href: "/new",
     label: "New experiment",
     icon: (

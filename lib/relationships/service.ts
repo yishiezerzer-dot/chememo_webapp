@@ -55,6 +55,50 @@ export async function listRelationships(experimentId: string): Promise<Relations
   });
 }
 
+// T3.6 D7 — one project's whole relationship structure at once, for the
+// knowledge-graph view. No new table: nodes are experiments.project = the
+// given project; edges are experiment_relationships rows where BOTH
+// endpoints are in that node set (a relationship crossing project
+// boundaries is invisible here, not an error — the graph is project-scoped
+// by design, per the spec's D1).
+export type GraphNode = { id: string; name: string; status: ExperimentStatus | null; date: string | null };
+export type GraphEdge = { id: string; source: string; target: string; relationshipType: RelationshipType };
+
+export async function listRelationshipsForProject(projectId: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
+  const supabase = await createClient();
+  const { data: experiments, error } = await supabase
+    .from("experiments")
+    .select("id, name, status, date")
+    .eq("project", projectId)
+    .is("deleted_at", null);
+  if (error) throw error;
+
+  const nodes: GraphNode[] = (experiments ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    status: e.status as ExperimentStatus | null,
+    date: e.date,
+  }));
+  if (nodes.length === 0) return { nodes: [], edges: [] };
+
+  const ids = nodes.map((n) => n.id);
+  const { data: rels, error: relsError } = await supabase
+    .from("experiment_relationships")
+    .select("*")
+    .in("source_experiment_id", ids)
+    .in("target_experiment_id", ids);
+  if (relsError) throw relsError;
+
+  const edges: GraphEdge[] = (rels ?? []).map((r) => ({
+    id: r.id,
+    source: r.source_experiment_id,
+    target: r.target_experiment_id,
+    relationshipType: r.relationship_type as RelationshipType,
+  }));
+
+  return { nodes, edges };
+}
+
 export async function createRelationship(
   supabase: Supabase,
   userId: string,
