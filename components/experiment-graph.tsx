@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type SimulationNodeDatum } from "d3-force";
 import type { GraphNode, GraphEdge } from "@/lib/relationships/service";
 import { RELATIONSHIP_LABEL, type RelationshipType } from "@/lib/types";
@@ -66,7 +65,6 @@ function layout(nodes: GraphNode[], edges: GraphEdge[]): Map<string, { x: number
 }
 
 export function ExperimentGraph({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }) {
-  const router = useRouter();
   const initial = useMemo(() => layout(nodes, edges), [nodes, edges]);
   const [positions, setPositions] = useState(initial);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
@@ -102,7 +100,13 @@ export function ExperimentGraph({ nodes, edges }: { nodes: GraphNode[]; edges: G
   function onNodePointerUp(id: string) {
     const wasDrag = dragRef.current?.moved;
     dragRef.current = null;
-    if (!wasDrag) router.push(`/experiments/${id}`);
+    // A plain browser navigation rather than next/navigation's useRouter —
+    // calling router.push() from inside an SVG pointer-event handler threw a
+    // "Cannot read properties of null" error in production (caught by manual
+    // testing before shipping), reproducible on every click. A full
+    // navigation is a fine trade for a "click a node to open its page"
+    // action that was never meant to be an instant SPA transition anyway.
+    if (!wasDrag) window.location.assign(`/experiments/${id}`);
   }
 
   function onCanvasPointerDown(e: React.PointerEvent) {
