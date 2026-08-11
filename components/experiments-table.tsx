@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { StatusBadge, STATUS_LABEL } from "@/components/status-badge";
 import { exportExperimentsCsvAction, saveViewAction, deleteViewAction } from "@/app/(app)/experiments/actions";
-import { buildExperimentQueryString as buildQueryString } from "@/lib/experiments/search-params";
+import {
+  buildExperimentQueryString as buildQueryString,
+  parseExperimentSearchParams,
+} from "@/lib/experiments/search-params";
 import type { Experiment, ExperimentSearchParams, ExperimentSortKey, ExperimentStatus, Project, SavedView } from "@/lib/types";
 
 type Facets = {
@@ -35,15 +38,24 @@ export function ExperimentsTable({
   params: ExperimentSearchParams;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [pending, start] = useTransition();
   const [q, setQ] = useState(params.q ?? "");
   const [viewName, setViewName] = useState("");
 
   function navigate(patch: Partial<ExperimentSearchParams>) {
+    // Read the live URL, not the `params` prop -- that prop is a snapshot
+    // from the last server render, so two filter edits fired back-to-back
+    // (before the first router.push's RSC round-trip lands and refreshes
+    // `params`) would each build off the same stale snapshot and clobber
+    // each other. useSearchParams() reflects the URL immediately after
+    // router.push updates it client-side, so this stays correct even when
+    // called again before the previous navigation has fully resolved.
+    const current = parseExperimentSearchParams(Object.fromEntries(searchParams.entries()));
     // Any filter change restarts pagination (a stale cursor from a different
     // filter set could skip or duplicate rows).
-    router.push(`/experiments?${buildQueryString({ ...params, ...patch })}`);
+    router.push(`/experiments?${buildQueryString({ ...current, ...patch })}`);
   }
 
   function toggleSort(key: ExperimentSortKey) {
