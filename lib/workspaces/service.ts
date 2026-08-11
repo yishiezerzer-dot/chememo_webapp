@@ -44,12 +44,28 @@ export type MemberView = { userId: string; role: WorkspaceRole; fullName: string
 export async function listMembers(supabase: Supabase, workspaceId: string): Promise<MemberView[]> {
   const { data, error } = await supabase
     .from("workspace_members")
-    .select("user_id, role, profiles(full_name, initials)")
+    .select("user_id, role")
     .eq("workspace_id", workspaceId)
     .order("joined_at");
   if (error) throw error;
-  return (data ?? []).map((r) => {
-    const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  // No direct FK exists from workspace_members to profiles (both only
+  // reference auth.users separately), so PostgREST's embedded-select syntax
+  // can't auto-join them — fetch profiles separately and merge here instead.
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, full_name, initials")
+    .in(
+      "id",
+      rows.map((r) => r.user_id)
+    );
+  if (profilesError) throw profilesError;
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+  return rows.map((r) => {
+    const p = byId.get(r.user_id);
     return { userId: r.user_id, role: r.role, fullName: p?.full_name ?? null, initials: p?.initials ?? null };
   });
 }
