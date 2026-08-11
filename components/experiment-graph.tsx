@@ -120,11 +120,13 @@ export function ExperimentGraph({ nodes, edges }: { nodes: GraphNode[]; edges: G
   function onCanvasPointerMove(e: React.PointerEvent) {
     if (dragRef.current) return onNodePointerMove(e);
     if (!panRef.current) return;
-    setView((v) => ({
-      ...v,
-      x: panRef.current!.viewX + (e.clientX - panRef.current!.startX),
-      y: panRef.current!.viewY + (e.clientY - panRef.current!.startY),
-    }));
+    const pan = panRef.current;
+    const x = pan.viewX + (e.clientX - pan.startX);
+    const y = pan.viewY + (e.clientY - pan.startY);
+    // Same class of bug as onNodePointerMove: capture pan above rather than
+    // reading panRef.current inside the updater closure, since React can
+    // defer the updater until after onCanvasPointerUp has nulled the ref.
+    setView((v) => ({ ...v, x, y }));
   }
   function onCanvasPointerUp() {
     panRef.current = null;
