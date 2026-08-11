@@ -640,7 +640,14 @@ table.exp-table {
 
 /* ============ form ============ */
 .form-shell { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
-.form-sections { display: flex; flex-direction: column; gap: 16px; }
+.form-sections {
+  display: flex; flex-direction: column; gap: 16px;
+  /* Grid items default to min-width:auto, so without this the sample-matrix
+     table's 1400px min-width (meant to scroll locally via .table-scroll-inner's
+     own overflow-x) instead blows out this whole grid track, pushing the
+     aside/Save-button column off-screen. */
+  min-width: 0;
+}
 .fsec { padding: 22px; border-radius: var(--radius); }
 .fsec h3 { font-family: var(--display); font-size: 17px; margin: 0 0 3px; font-weight: 600; }
 .fsec .sec-sub { color: var(--ink-mute); font-size: 12px; margin: 0 0 16px; line-height: 1.5; }
