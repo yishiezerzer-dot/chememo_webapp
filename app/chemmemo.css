@@ -864,6 +864,14 @@ table.sample-matrix-table { width: 100%; border-collapse: collapse; font-size: 1
 .sample-matrix-table td { padding: 4px 6px; }
 .sample-matrix-table input, .sample-matrix-table select { width: 100%; min-width: 70px; font-size: 12px; padding: 5px 6px; }
 
+/* T1.5 — protocol Critical parameters / Known failure modes tables
+   (components/protocol-version-editor.tsx). Never had a CSS rule at all, so
+   header labels rendered edge-to-edge with no spacing between them. */
+table.matrix-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.matrix-table th { text-align: left; padding: 6px 10px 6px 0; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-mute); white-space: nowrap; }
+.matrix-table td { padding: 4px 8px 4px 0; }
+.matrix-table input { width: 100%; min-width: 90px; font-size: 13px; padding: 5px 6px; }
+
 .controls-checklist { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .mz-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
