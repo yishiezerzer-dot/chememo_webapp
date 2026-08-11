@@ -93,8 +93,13 @@ export function ExperimentGraph({ nodes, edges }: { nodes: GraphNode[]; edges: G
   function onNodePointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return;
     dragRef.current.moved = true;
+    const id = dragRef.current.id;
     const p = toSvgPoint(e.clientX, e.clientY);
-    setPositions((prev) => new Map(prev).set(dragRef.current!.id, p));
+    // Capture id above rather than reading dragRef.current inside the updater
+    // closure — React can defer invoking a setState updater, and by then
+    // onNodePointerUp may have already set dragRef.current to null, throwing
+    // "Cannot read properties of null (reading 'id')" on every click.
+    setPositions((prev) => new Map(prev).set(id, p));
   }
 
   function onNodePointerUp(id: string) {
