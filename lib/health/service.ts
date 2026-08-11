@@ -14,27 +14,35 @@ export type HealthSnapshot = {
 export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   const admin = createAdminClient();
 
-  const [dbCheck, jobsCheck, chunksCheck, aiCheck] = await Promise.all([
-    admin.from("experiments").select("id").limit(1),
-    admin.from("index_jobs").select("status").neq("status", "done"),
-    admin.from("evidence_chunks").select("status").neq("status", "done"),
-    admin
-      .from("ai_requests")
-      .select("status")
-      .order("created_at", { ascending: false })
-      .limit(50),
-  ]);
+  // head:true count-only requests return an exact count via a header, never
+  // row bodies -- unlike a plain .select() (previously used here), they
+  // aren't subject to Supabase/PostgREST's ~1000-row response cap, so these
+  // stay accurate no matter how large index_jobs/evidence_chunks get.
+  const [dbCheck, pendingJobsCheck, failedJobsCheck, pendingChunksCheck, failedChunksCheck, aiCheck] =
+    await Promise.all([
+      admin.from("experiments").select("id").limit(1),
+      admin.from("index_jobs").select("id", { count: "exact", head: true }).in("status", ["pending", "processing"]),
+      admin.from("index_jobs").select("id", { count: "exact", head: true }).eq("status", "failed"),
+      admin
+        .from("evidence_chunks")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["pending", "processing"]),
+      admin.from("evidence_chunks").select("id", { count: "exact", head: true }).eq("status", "failed"),
+      admin
+        .from("ai_requests")
+        .select("status")
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
 
   const dbOk = !dbCheck.error;
   if (dbCheck.error) logError("health-service", "db check failed", { error: dbCheck.error });
 
-  const jobs = jobsCheck.data ?? [];
-  const pendingJobs = jobs.filter((j) => j.status === "pending" || j.status === "processing").length;
-  const failedJobs = jobs.filter((j) => j.status === "failed").length;
+  const pendingJobs = pendingJobsCheck.count ?? 0;
+  const failedJobs = failedJobsCheck.count ?? 0;
 
-  const chunks = chunksCheck.data ?? [];
-  const pendingChunks = chunks.filter((c) => c.status === "pending" || c.status === "processing").length;
-  const failedChunks = chunks.filter((c) => c.status === "failed").length;
+  const pendingChunks = pendingChunksCheck.count ?? 0;
+  const failedChunks = failedChunksCheck.count ?? 0;
 
   const aiRows = aiCheck.data ?? [];
   const aiErrors = aiRows.filter((r) => r.status === "error").length;
@@ -142,10 +150,22 @@ export type EvidenceChunkIndexStatus = {
 // getIndexVersionStatus's now-frozen index_jobs-derived placeholder above.
 export async function getEvidenceChunkIndexStatus(): Promise<EvidenceChunkIndexStatus> {
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("evidence_chunks")
-    .select("status, source_type, embedding_model, embedding_dimensions, embedding_version, indexed_at");
-  const rows = data ?? [];
+
+  // A plain .select() caps out at Supabase/PostgREST's ~1000-row response
+  // limit, silently returning an incomplete (and non-obviously incomplete --
+  // no error, no truncation flag) slice of the table once evidence_chunks
+  // grows past it. Page through with .range() to see every row.
+  const pageSize = 1000;
+  const rows: { status: string; source_type: string; embedding_model: string | null; embedding_dimensions: number | null; embedding_version: number | null; indexed_at: string | null }[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data: page } = await admin
+      .from("evidence_chunks")
+      .select("status, source_type, embedding_model, embedding_dimensions, embedding_version, indexed_at")
+      .range(from, from + pageSize - 1);
+    if (!page || page.length === 0) break;
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
 
   const byStatus: Record<string, number> = {};
   const bySourceType: Record<string, number> = {};
