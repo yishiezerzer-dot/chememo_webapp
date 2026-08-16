@@ -936,6 +936,72 @@ export type Database = {
           },
         ]
       }
+      experiment_ai_suggestions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          experiment_id: string
+          field: string
+          id: string
+          model: string
+          rationale: string
+          resolved_at: string | null
+          resolved_by: string | null
+          source: string
+          status: string
+          suggested_value: string
+          unresolved_index: number | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          experiment_id: string
+          field: string
+          id?: string
+          model: string
+          rationale: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source: string
+          status?: string
+          suggested_value: string
+          unresolved_index?: number | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          experiment_id?: string
+          field?: string
+          id?: string
+          model?: string
+          rationale?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source?: string
+          status?: string
+          suggested_value?: string
+          unresolved_index?: number | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiment_ai_suggestions_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiment_ai_suggestions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       experiment_crew_provenance: {
         Row: {
           created_at: string
@@ -3551,6 +3617,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_ai_suggestion: {
+        Args: { p_accept: boolean; p_suggestion_id: string }
+        Returns: undefined
+      }
       archive_experiment: {
         Args: { p_ended_as?: string; p_id: string }
         Returns: undefined
