@@ -10,9 +10,13 @@ import {
   detectContradictions,
   generateComparisonTable,
   suggestNextExperiment,
+  suggestExperimentFields,
+  AI_SUGGESTIBLE_FIELDS,
   type CitedAnswer,
   type ComparisonTableSuggestion,
+  type SuggestibleField,
 } from "@/lib/llm";
+import { getCrewProvenance } from "@/lib/ai/crew/provenance";
 import { retrieveRecords } from "@/lib/rag";
 import { embeddingModel, EMBEDDING_DIM, isEmbeddingEnabled } from "@/lib/embeddings";
 import { AppError } from "@/lib/errors";
@@ -29,7 +33,9 @@ export type AiEndpoint =
   | "comparison_table"
   | "contradiction_check"
   | "crew_plan"
-  | "next_experiment_suggestion";
+  | "next_experiment_suggestion"
+  | "gap_scan"
+  | "crew_resolve";
 
 // Acquire the per-user + global concurrency slot shared by every AI call
 // (Ask, single summary, group summary) — a typed, throw-based replacement
@@ -342,4 +348,126 @@ export async function generateSingleSummary(
     source_ids: [experimentId],
   });
   return summary;
+}
+
+// AI Field Suggestions — see ChemMemo_Feature_AIFieldSuggestions_Spec.md.
+// Both functions insert via the CALLER's own RLS-scoped session (never the
+// service role) — experiment_ai_suggestions_insert requires
+// created_by = auth.uid() and an owner match, so writing through anything
+// else would either fail or silently bypass that check (T3.8 D6's "no
+// service role anywhere in this path" reasoning, applied here too).
+
+// D1/D6 — Feature 1: the general "Check for missing details" scan, no
+// targetFields constraint, so the model considers the whole D8 allowlist.
+export async function generateGapSuggestions(
+  supabase: Supabase,
+  userId: string,
+  experimentId: string
+): Promise<{ count: number } | null> {
+  const startedAt = Date.now();
+  const { data: exp } = await supabase
+    .from("experiments")
+    .select("*")
+    .eq("id", experimentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!exp) return null;
+  const experiment = exp as Experiment;
+  if (experiment.locked_at) return null; // D9 — nothing to apply a suggestion to on a locked record.
+
+  try {
+    const suggestions = await suggestExperimentFields(experiment);
+    if (suggestions === null) {
+      await logAiRequest({ userId, endpoint: "gap_scan", status: "error", sourceCount: 1, latencyMs: Date.now() - startedAt, estTokens: null });
+      return null;
+    }
+    if (suggestions.length > 0) {
+      const { error } = await supabase.from("experiment_ai_suggestions").insert(
+        suggestions.map((s) => ({
+          experiment_id: experimentId,
+          field: s.field,
+          suggested_value: s.suggestedValue,
+          rationale: s.rationale,
+          source: "gap_scan" as const,
+          model: activeChatModel(),
+          created_by: userId,
+        }))
+      );
+      if (error) throw error;
+    }
+    await logAiRequest({
+      userId,
+      endpoint: "gap_scan",
+      status: "ok",
+      sourceCount: 1,
+      latencyMs: Date.now() - startedAt,
+      estTokens: Math.ceil(suggestions.reduce((n, s) => n + s.suggestedValue.length + s.rationale.length, 0) / 4),
+    });
+    return { count: suggestions.length };
+  } catch (e) {
+    await logAiRequest({ userId, endpoint: "gap_scan", status: "error", sourceCount: 1, latencyMs: Date.now() - startedAt, estTokens: null });
+    throw e;
+  }
+}
+
+// D1/D6 — Feature 2: "Resolve with AI" on one specific crew unresolved item.
+// Reuses the exact same suggestExperimentFields call, constrained to the
+// one already-known field. A field outside the D8 allowlist (e.g. an
+// unresolved item about acceptance_criteria) has no AI path — returns null
+// rather than attempting a suggestion the table's own CHECK would reject.
+export async function generateResolutionSuggestion(
+  supabase: Supabase,
+  userId: string,
+  experimentId: string,
+  unresolvedIndex: number
+): Promise<{ count: number } | null> {
+  const startedAt = Date.now();
+  const { data: exp } = await supabase
+    .from("experiments")
+    .select("*")
+    .eq("id", experimentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!exp) return null;
+  const experiment = exp as Experiment;
+  if (experiment.locked_at) return null; // D9
+
+  const provenance = await getCrewProvenance(supabase, experimentId);
+  const item = provenance?.unresolved[unresolvedIndex];
+  if (!item || !(AI_SUGGESTIBLE_FIELDS as readonly string[]).includes(item.field)) return null;
+  const field = item.field as SuggestibleField;
+
+  try {
+    const suggestions = await suggestExperimentFields(experiment, [field]);
+    if (suggestions === null) {
+      await logAiRequest({ userId, endpoint: "crew_resolve", status: "error", sourceCount: 1, latencyMs: Date.now() - startedAt, estTokens: null });
+      return null;
+    }
+    if (suggestions.length > 0) {
+      const s = suggestions[0];
+      const { error } = await supabase.from("experiment_ai_suggestions").insert({
+        experiment_id: experimentId,
+        field: s.field,
+        suggested_value: s.suggestedValue,
+        rationale: s.rationale,
+        source: "crew_resolve" as const,
+        unresolved_index: unresolvedIndex,
+        model: activeChatModel(),
+        created_by: userId,
+      });
+      if (error) throw error;
+    }
+    await logAiRequest({
+      userId,
+      endpoint: "crew_resolve",
+      status: "ok",
+      sourceCount: 1,
+      latencyMs: Date.now() - startedAt,
+      estTokens: suggestions[0] ? Math.ceil((suggestions[0].suggestedValue.length + suggestions[0].rationale.length) / 4) : 0,
+    });
+    return { count: suggestions.length };
+  } catch (e) {
+    await logAiRequest({ userId, endpoint: "crew_resolve", status: "error", sourceCount: 1, latencyMs: Date.now() - startedAt, estTokens: null });
+    throw e;
+  }
 }
