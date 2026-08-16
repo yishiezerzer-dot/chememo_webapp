@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { resolveMetalAlias, resolveReactionAlias, type SearchFilters } from "@/lib/search";
 import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/types";
+import { logWarn } from "@/lib/logger";
 
 // T3.4 D5 — version tag for each system prompt below, registered in
 // prompt_versions (migration 20260819120000). Bump the relevant entry by
@@ -870,7 +871,11 @@ const fieldSuggestionsSchema = z.array(fieldSuggestionSchema);
 // Shared core, called by both entry points below with an already-built
 // record text block. Never invents; returns [] (not null) when the model has
 // nothing confident to propose — null is reserved for "LLM disabled or the
-// call failed," a real distinction callers need.
+// call failed," a real distinction callers need. Retries once with more
+// token headroom on any failure, same reasoning-tier-model truncation fix
+// already proven for the crew's own agents (agent-runner.ts) — a 500-token
+// budget asking about several fields at once is exactly the shape that
+// failure mode hits.
 async function suggestFieldsFromRecord(
   record: string,
   fields: readonly SuggestibleField[]
@@ -885,17 +890,27 @@ Rules:
 "rationale" must point to what in the record supports the suggestion (e.g. "the observations describe...").
 An empty array [] is a valid, expected response when nothing can be confidently proposed.`;
 
-  const text = await chatComplete({ system, user: record, maxTokens: 500 });
-  if (!text) return null;
-  const j = parseJson(text);
-  if (!j) return null;
-  const parsed = fieldSuggestionsSchema.safeParse(j);
-  if (!parsed.success) return null;
+  async function tryOnce(maxTokens: number): Promise<{ ok: true; data: FieldSuggestion[] } | { ok: false; reason: string }> {
+    const text = await chatComplete({ system, user: record, maxTokens });
+    if (!text) return { ok: false, reason: "empty completion" };
+    const j = parseJson(text);
+    if (!j) return { ok: false, reason: "response was not valid JSON" };
+    const parsed = fieldSuggestionsSchema.safeParse(j);
+    if (!parsed.success) return { ok: false, reason: JSON.stringify(parsed.error.issues).slice(0, 500) };
+    // Defense in depth: never trust the model to have honored the fields
+    // constraint from the prompt alone.
+    const allowed = new Set(fields);
+    return { ok: true, data: parsed.data.filter((s) => allowed.has(s.field)) };
+  }
 
-  // Defense in depth: never trust the model to have honored the
-  // targetFields constraint from the prompt alone.
-  const allowed = new Set(fields);
-  return parsed.data.filter((s) => allowed.has(s.field));
+  const first = await tryOnce(900);
+  if (first.ok) return first.data;
+  logWarn("llm/suggest-fields", `first attempt failed (${first.reason}), retrying with more headroom`);
+
+  const second = await tryOnce(1400);
+  if (second.ok) return second.data;
+  logWarn("llm/suggest-fields", `retry also failed (${second.reason})`);
+  return null;
 }
 
 type SuggestibleFieldBag = {
