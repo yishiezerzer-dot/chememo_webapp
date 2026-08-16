@@ -3,7 +3,7 @@ import type { createClient } from "@/lib/supabase/server";
 import { createExperiment, softDeleteExperiment } from "@/lib/experiments/service";
 import { createProject } from "@/lib/projects/service";
 import { isEmptyValue } from "@/lib/experiment-form-parse";
-import { activeChatModel } from "@/lib/llm";
+import { activeChatModel, isLlmEnabled, suggestFieldsForPlan, AI_SUGGESTIBLE_FIELDS, type SuggestibleField } from "@/lib/llm";
 import { AppError } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import type { ExperimentInput, ExperimentTemplateVersion } from "@/lib/types";
@@ -191,6 +191,55 @@ export async function commitCrewDraft(
       logError("crew/commit", "rollback soft-delete also failed", { error: e })
     );
     throw new AppError("conflict", "Could not save the plan's provenance; the draft was not created.");
+  }
+
+  // AI Field Suggestions — "when they finish planning, suggest for areas they
+  // didn't find in the user's prompt." Best-effort only: the scientist still
+  // has to explicitly Agree to any of these (D3 — write-on-accept, same as
+  // manually clicking "Resolve with AI" later) before anything is written, so
+  // a failure here must never block draft creation, which has already fully
+  // succeeded above. Scoped to the same D8 narrative-field allowlist as the
+  // rest of the feature — a missing "controls"/"acceptance_criteria"/
+  // "project" unresolved item has no AI-suggestible answer.
+  if (isLlmEnabled()) {
+    try {
+      const suggestible = unresolved
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => (AI_SUGGESTIBLE_FIELDS as readonly string[]).includes(item.field));
+      const targetFields = [...new Set(suggestible.map(({ item }) => item.field))] as SuggestibleField[];
+
+      if (targetFields.length > 0) {
+        const suggestions = await suggestFieldsForPlan(input, draft.rawSource, targetFields);
+        if (suggestions && suggestions.length > 0) {
+          const rows = suggestions
+            .map((s) => {
+              const match = suggestible.find(({ item }) => item.field === s.field);
+              return match
+                ? {
+                    experiment_id: experimentId,
+                    field: s.field,
+                    suggested_value: s.suggestedValue,
+                    rationale: s.rationale,
+                    source: "crew_resolve" as const,
+                    unresolved_index: match.index,
+                    model: activeChatModel(),
+                    created_by: userId,
+                  }
+                : null;
+            })
+            .filter((r): r is NonNullable<typeof r> => r !== null);
+
+          if (rows.length > 0) {
+            const { error: suggestionError } = await supabase.from("experiment_ai_suggestions").insert(rows);
+            if (suggestionError) {
+              logError("crew/commit", "plan-time suggestion insert failed (non-blocking)", { error: suggestionError });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      logError("crew/commit", "plan-time suggestion generation failed (non-blocking)", { error: e });
+    }
   }
 
   return experimentId;

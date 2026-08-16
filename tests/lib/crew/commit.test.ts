@@ -7,7 +7,24 @@ import type { ExperimentTemplateVersion } from "@/lib/types";
 // (unchecked project proposal never silently assigns one) are exercised
 // against a spied fake Supabase client below.
 
-vi.mock("@/lib/llm", () => ({ activeChatModel: () => "test-model" }));
+// isLlmEnabled defaults to false via mockReturnValue below — the D5/D7 tests
+// exercise commit-flow safety properties, not the plan-time AI suggestion
+// generation (that's covered by its own describe block further down), so
+// keeping it disabled there means commitCrewDraft's new best-effort
+// suggestion branch is never reached, matching the "inert without keys"
+// pattern already established everywhere else in this app. vi.fn() wrappers
+// (not plain arrow functions) so individual tests can override behavior via
+// vi.mocked(...).mockReturnValue(...).
+vi.mock("@/lib/llm", () => ({
+  activeChatModel: () => "test-model",
+  isLlmEnabled: vi.fn(() => false),
+  suggestFieldsForPlan: vi.fn(async () => []),
+  AI_SUGGESTIBLE_FIELDS: [
+    "scientific_question", "hypothesis", "rationale", "primary_outcome",
+    "secondary_outcomes", "data_analysis_plan", "risks_failure_modes",
+    "conclusion", "next_steps", "observations",
+  ],
+}));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 
 const { buildCommitInput, commitCrewDraft } = await import("@/lib/ai/crew/commit");
@@ -95,6 +112,8 @@ describe("buildCommitInput — D9 template required-field handling", () => {
 // made against the "experiments" table so D5 can be asserted directly.
 function makeFakeSupabase(insertError: { message: string } | null = null) {
   const experimentsCalls: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aiSuggestionInserts: any[] = [];
   const from = vi.fn((table: string) => {
     if (table === "experiments") {
       return {
@@ -111,9 +130,17 @@ function makeFakeSupabase(insertError: { message: string } | null = null) {
     if (table === "experiment_crew_provenance") {
       return { insert: vi.fn(async () => ({ error: insertError })) };
     }
+    if (table === "experiment_ai_suggestions") {
+      return {
+        insert: vi.fn(async (rows: unknown) => {
+          aiSuggestionInserts.push(rows);
+          return { error: null };
+        }),
+      };
+    }
     throw new Error(`unexpected table ${table}`);
   });
-  return { client: { from } as never, experimentsCalls };
+  return { client: { from } as never, experimentsCalls, aiSuggestionInserts };
 }
 
 vi.mock("@/lib/experiments/service", () => ({
@@ -158,5 +185,74 @@ describe("commitCrewDraft — D5/D7", () => {
       newProjectName: "New Programme",
     });
     expect(createProject).toHaveBeenCalledWith(client, "user-1", "ws-1", "New Programme", expect.any(String));
+  });
+});
+
+describe("commitCrewDraft — plan-time AI suggestions", () => {
+  it("generates and inserts a suggestion linked to the matching unresolved item's index, only for narrative-field items", async () => {
+    const { isLlmEnabled, suggestFieldsForPlan } = await import("@/lib/llm");
+    vi.mocked(isLlmEnabled).mockReturnValue(true);
+    vi.mocked(suggestFieldsForPlan).mockResolvedValue([
+      { field: "hypothesis", suggestedValue: "Zn2+ templates the depsipeptide.", rationale: "Pattern from the Zn analog." },
+    ]);
+
+    const { client, aiSuggestionInserts } = makeFakeSupabase();
+    const draft = makeDraft({}, [
+      { field: "controls", issue: "Blank control not mentioned.", candidates: [] },
+      { field: "hypothesis", issue: "No hypothesis stated.", candidates: [] },
+    ]);
+    await commitCrewDraft(client, "user-1", "ws-1", draft, {
+      name: "Test experiment",
+      templateVersionId: null,
+      template: null,
+      newProjectName: null,
+    });
+
+    // Only asked about the narrative field ("hypothesis"), never "controls".
+    expect(suggestFieldsForPlan).toHaveBeenCalledWith(expect.anything(), draft.rawSource, ["hypothesis"]);
+    expect(aiSuggestionInserts).toHaveLength(1);
+    const [rows] = aiSuggestionInserts;
+    expect(rows).toEqual([
+      expect.objectContaining({
+        field: "hypothesis",
+        suggested_value: "Zn2+ templates the depsipeptide.",
+        source: "crew_resolve",
+        unresolved_index: 1, // "hypothesis" is unresolved[1] — "controls" (index 0) has no suggestion
+        created_by: "user-1",
+      }),
+    ]);
+  });
+
+  it("never blocks draft creation when suggestion generation throws", async () => {
+    const { isLlmEnabled, suggestFieldsForPlan } = await import("@/lib/llm");
+    vi.mocked(isLlmEnabled).mockReturnValue(true);
+    vi.mocked(suggestFieldsForPlan).mockRejectedValue(new Error("provider outage"));
+
+    const { client } = makeFakeSupabase();
+    const draft = makeDraft({}, [{ field: "hypothesis", issue: "No hypothesis stated.", candidates: [] }]);
+    const experimentId = await commitCrewDraft(client, "user-1", "ws-1", draft, {
+      name: "Test experiment",
+      templateVersionId: null,
+      template: null,
+      newProjectName: null,
+    });
+    expect(experimentId).toBe("EXP-TEST-1"); // commit still succeeded
+  });
+
+  it("skips the suggestion call entirely when there are no narrative-field unresolved items", async () => {
+    const { isLlmEnabled, suggestFieldsForPlan } = await import("@/lib/llm");
+    vi.mocked(isLlmEnabled).mockReturnValue(true);
+    vi.mocked(suggestFieldsForPlan).mockClear();
+
+    const { client, aiSuggestionInserts } = makeFakeSupabase();
+    const draft = makeDraft({}, [{ field: "controls", issue: "Blank control not mentioned.", candidates: [] }]);
+    await commitCrewDraft(client, "user-1", "ws-1", draft, {
+      name: "Test experiment",
+      templateVersionId: null,
+      template: null,
+      newProjectName: null,
+    });
+    expect(suggestFieldsForPlan).not.toHaveBeenCalled();
+    expect(aiSuggestionInserts).toHaveLength(0);
   });
 });
