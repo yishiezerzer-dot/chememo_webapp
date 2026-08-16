@@ -42,6 +42,7 @@ const {
   generateComparisonTable,
   detectContradictions,
   suggestNextExperiment,
+  suggestExperimentFields,
 } = await import("@/lib/llm");
 
 function record(id: string, name: string): Experiment {
@@ -298,6 +299,32 @@ describe("suggestNextExperiment (T3.6 D6)", () => {
   it("returns null when the model reports grounded: false", async () => {
     mockGeminiText(JSON.stringify({ grounded: false, segments: [] }));
     const result = await suggestNextExperiment(record("EXP-1", "Anchor"), []);
+    expect(result).toBeNull();
+  });
+});
+
+describe("suggestExperimentFields (AI Field Suggestions)", () => {
+  it("returns [] rather than a guess when the model proposes nothing (D5)", async () => {
+    mockGeminiText(JSON.stringify([]));
+    const result = await suggestExperimentFields(record("EXP-1", "Test"));
+    expect(result).toEqual([]);
+  });
+
+  it("filters out a suggestion for a field outside the requested targetFields, even if the model proposes one anyway", async () => {
+    mockGeminiText(
+      JSON.stringify([
+        { field: "hypothesis", suggestedValue: "Zn2+ templates the depsipeptide.", rationale: "Stated in observations." },
+        { field: "conclusion", suggestedValue: "Confirmed by m/z 297.", rationale: "Stated in observations." },
+      ])
+    );
+    const result = await suggestExperimentFields(record("EXP-1", "Test"), ["hypothesis"]);
+    expect(result).not.toBeNull();
+    expect(result!.map((s) => s.field)).toEqual(["hypothesis"]);
+  });
+
+  it("drops a malformed entry (invalid field name) rather than returning a partially-trusted array", async () => {
+    mockGeminiText(JSON.stringify([{ field: "not_a_real_field", suggestedValue: "x", rationale: "y" }]));
+    const result = await suggestExperimentFields(record("EXP-1", "Test"));
     expect(result).toBeNull();
   });
 });

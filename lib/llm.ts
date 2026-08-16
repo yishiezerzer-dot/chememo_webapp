@@ -13,6 +13,7 @@ export const PROMPT_VERSIONS = {
   extract_fields: 1,
   summarize_experiment: 1,
   summarize_group: 1,
+  suggest_fields: 1,
 } as const;
 
 // Provider-agnostic LLM layer. Switch via AI_PROVIDER (gemini | openai |
@@ -825,4 +826,78 @@ Fields:
   if (d.rationale) out.rationale = d.rationale;
   if (d.conclusion) out.conclusion = d.conclusion;
   return out;
+}
+
+// AI Field Suggestions — see ChemMemo_Feature_AIFieldSuggestions_Spec.md.
+// D8: narrative fields only, exactly matching the CHECK constraint on
+// experiment_ai_suggestions.field (migration 20260825120000) — keep both
+// lists in sync by hand if this ever changes.
+export const AI_SUGGESTIBLE_FIELDS = [
+  "scientific_question", "hypothesis", "rationale", "primary_outcome",
+  "secondary_outcomes", "data_analysis_plan", "risks_failure_modes",
+  "conclusion", "next_steps", "observations",
+] as const;
+export type SuggestibleField = (typeof AI_SUGGESTIBLE_FIELDS)[number];
+
+const fieldSuggestionSchema = z.object({
+  field: z.enum(AI_SUGGESTIBLE_FIELDS),
+  suggestedValue: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+});
+export type FieldSuggestion = z.infer<typeof fieldSuggestionSchema>;
+// D5/D6 — per-item .catch would let one malformed entry silently vanish
+// from a real array; failing the whole parse on any bad entry is the
+// correct hard-fail here, same reasoning schemas.ts gives for the crew's
+// array fields (never silently drop a suggestion that half-parsed).
+const fieldSuggestionsSchema = z.array(fieldSuggestionSchema);
+
+// D6 — one whole-record call, not one call per field: cheaper, and lets the
+// model see the whole record for context (a good conclusion suggestion has
+// to have read the observations). targetFields narrows which named fields
+// the model may propose for (Feature 2, "Resolve with AI" on one specific
+// unresolved item); omitted, it scans the full allowlist (Feature 1, the
+// general "Check for missing details" scan). Returns [] (not null) when the
+// model has nothing confident to propose — null is reserved for "LLM
+// disabled or the call failed," a real distinction the caller needs.
+export async function suggestExperimentFields(
+  experiment: Experiment,
+  targetFields?: SuggestibleField[]
+): Promise<FieldSuggestion[] | null> {
+  const fields = targetFields && targetFields.length ? targetFields : AI_SUGGESTIBLE_FIELDS;
+
+  const record = [
+    `[${experiment.id}] ${experiment.name}`,
+    experiment.project ? `Project: ${experiment.project}` : null,
+    experiment.reaction_type ? `Reaction type: ${experiment.reaction_type}` : null,
+    experiment.compounds?.length ? `Compounds: ${experiment.compounds.join(", ")}` : null,
+    experiment.metals?.length ? `Metals: ${experiment.metals.join(", ")}` : null,
+    experiment.ph !== null ? `pH: ${experiment.ph}` : null,
+    experiment.cycles !== null ? `Cycles: ${experiment.cycles}` : null,
+    ...AI_SUGGESTIBLE_FIELDS.map((f) => `${f}: ${experiment[f] ? experiment[f] : "(empty)"}`),
+    experiment.notes ? `notes: ${experiment.notes}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const system = `A chemist's lab-notebook record is shown below, some fields filled, some marked (empty). Propose a value ONLY for these field(s), and ONLY if the record's own already-filled content clearly supports it: ${fields.join(", ")}.
+
+Rules:
+- Never invent a value the record's own content doesn't support. If you're not confident, omit that field entirely — do not guess.
+- Only propose a value for a field currently marked (empty). Never propose replacing a field that already has content.
+- Respond with ONLY a JSON array, one object per field you're proposing:
+[{"field": string, "suggestedValue": string, "rationale": string}]
+"rationale" must point to what in the record supports the suggestion (e.g. "the observations describe...").
+An empty array [] is a valid, expected response when nothing can be confidently proposed.`;
+
+  const text = await chatComplete({ system, user: record, maxTokens: 500 });
+  if (!text) return null;
+  const j = parseJson(text);
+  if (!j) return null;
+  const parsed = fieldSuggestionsSchema.safeParse(j);
+  if (!parsed.success) return null;
+
+  // Defense in depth: never trust the model to have honored the
+  // targetFields constraint from the prompt alone.
+  const allowed = new Set(fields);
+  return parsed.data.filter((s) => allowed.has(s.field));
 }
