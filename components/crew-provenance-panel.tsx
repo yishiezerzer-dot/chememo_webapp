@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import type { ActionResult } from "@/lib/types";
 import type { CrewProvenance } from "@/lib/ai/crew/provenance";
+import type { AiSuggestion } from "@/lib/ai/suggestions";
 
 // T3.8 — shown only when a provenance row exists (a hand-authored experiment
 // has none at all, per D8). The badge is not colour-only (amber background +
@@ -16,13 +17,25 @@ export function CrewProvenancePanel({
   provenance,
   isDraft,
   isOwner,
+  isLocked,
   resolveAction,
+  aiSuggestionsByIndex,
+  generateAiResolutionAction,
+  resolveAiSuggestionAction,
 }: {
   experimentId: string;
   provenance: CrewProvenance;
   isDraft: boolean;
   isOwner: boolean;
+  // AI Field Suggestions (Feature 2, "Resolve with AI") — see
+  // ChemMemo_Feature_AIFieldSuggestions_Spec.md. Optional so this component
+  // still works with only the manual resolveAction wired, matching how a
+  // hand-authored experiment simply omits it entirely.
+  isLocked?: boolean;
   resolveAction: (experimentId: string, itemIndex: number) => Promise<ActionResult>;
+  aiSuggestionsByIndex?: Map<number, AiSuggestion>;
+  generateAiResolutionAction?: (experimentId: string, itemIndex: number) => Promise<ActionResult>;
+  resolveAiSuggestionAction?: (experimentId: string, suggestionId: string, accept: boolean) => Promise<ActionResult>;
 }) {
   const [rawOpen, setRawOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -32,6 +45,22 @@ export function CrewProvenancePanel({
   function resolve(index: number) {
     start(async () => {
       const res = await resolveAction(experimentId, index);
+      if (!res.ok) showToast(res.error, "error");
+      else router.refresh();
+    });
+  }
+
+  function generateAiResolution(index: number) {
+    start(async () => {
+      const res = await generateAiResolutionAction!(experimentId, index);
+      if (!res.ok) showToast(res.error, "error");
+      else router.refresh();
+    });
+  }
+
+  function resolveAiSuggestion(suggestionId: string, accept: boolean) {
+    start(async () => {
+      const res = await resolveAiSuggestionAction!(experimentId, suggestionId, accept);
       if (!res.ok) showToast(res.error, "error");
       else router.refresh();
     });
@@ -62,25 +91,64 @@ export function CrewProvenancePanel({
               Needs your input · {provenance.unresolved.length}
             </h4>
             <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
-              {provenance.unresolved.map((u, i) => (
-                <li key={i}>
-                  <strong>{u.field}</strong> — {u.issue}
-                  {u.candidates.length > 0 && (
-                    <span className="muted"> (candidates: {u.candidates.join(", ")})</span>
-                  )}
-                  {isOwner && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      disabled={pending}
-                      onClick={() => resolve(i)}
-                      style={{ marginLeft: 8 }}
-                    >
-                      Resolve
-                    </button>
-                  )}
-                </li>
-              ))}
+              {provenance.unresolved.map((u, i) => {
+                const aiSuggestion = aiSuggestionsByIndex?.get(i);
+                return (
+                  <li key={i}>
+                    <strong>{u.field}</strong> — {u.issue}
+                    {u.candidates.length > 0 && (
+                      <span className="muted"> (candidates: {u.candidates.join(", ")})</span>
+                    )}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={pending}
+                        onClick={() => resolve(i)}
+                        style={{ marginLeft: 8 }}
+                      >
+                        Resolve
+                      </button>
+                    )}
+                    {isOwner && generateAiResolutionAction && !aiSuggestion && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={pending || isLocked}
+                        title={isLocked ? "This experiment is locked; nothing can be applied here." : undefined}
+                        onClick={() => generateAiResolution(i)}
+                        style={{ marginLeft: 8 }}
+                      >
+                        Resolve with AI
+                      </button>
+                    )}
+                    {aiSuggestion && (
+                      <div className="obs-box" style={{ marginTop: 6, padding: 10 }}>
+                        <p style={{ margin: "0 0 4px", fontSize: 13 }}>{aiSuggestion.suggestedValue}</p>
+                        <span className="muted" style={{ fontSize: 12 }}>{aiSuggestion.rationale}</span>
+                        <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={pending}
+                            onClick={() => resolveAiSuggestion(aiSuggestion.id, true)}
+                          >
+                            Agree
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={pending}
+                            onClick={() => resolveAiSuggestion(aiSuggestion.id, false)}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}

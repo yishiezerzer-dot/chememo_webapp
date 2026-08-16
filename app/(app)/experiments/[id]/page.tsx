@@ -49,8 +49,14 @@ import { createCommentAction, resolveCommentAction, reopenCommentAction } from "
 import { createTaskAction, updateTaskStatusAction } from "@/app/(app)/tasks-actions";
 import { exportExperimentMarkdownAction } from "./export-actions";
 import { resolveUnresolvedItemAction } from "./provenance-actions";
+import {
+  generateGapSuggestionsAction,
+  generateResolutionSuggestionAction,
+  resolveAiSuggestionAction,
+} from "./ai-suggestions-actions";
 import { suggestNextExperiment } from "./suggestion-actions";
 import { getCrewProvenance } from "@/lib/ai/crew/provenance";
+import { getPendingAiSuggestions } from "@/lib/ai/suggestions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
 import { FileList, UnlinkedFilesInbox } from "@/components/file-list";
@@ -63,6 +69,7 @@ import { ControlsPanel } from "@/components/controls-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { CrewProvenancePanel } from "@/components/crew-provenance-panel";
+import { AiFieldSuggestionsPanel } from "@/components/ai-field-suggestions-panel";
 import { AiNextExperimentSuggestion } from "@/components/ai-next-experiment-suggestion";
 import { LifecycleControls } from "@/components/lifecycle-controls";
 import { StepRunner } from "@/components/step-runner";
@@ -150,6 +157,14 @@ export default async function ExperimentDetailPage({
   } = await supabase.auth.getUser();
   const isOwner = !!user && user.id === e.owner_id;
   const crewProvenance = await getCrewProvenance(supabase, e.id);
+  const isLocked = e.locked_at !== null;
+  const aiSuggestions = isOwner ? await getPendingAiSuggestions(supabase, e.id) : [];
+  const gapSuggestions = aiSuggestions.filter((s) => s.source === "gap_scan");
+  const resolveSuggestionsByIndex = new Map(
+    aiSuggestions
+      .filter((s) => s.source === "crew_resolve" && s.unresolvedIndex !== null)
+      .map((s) => [s.unresolvedIndex as number, s])
+  );
 
   const projectLabel = projects.find((p) => p.id === e.project)?.label ?? e.project;
 
@@ -244,7 +259,22 @@ export default async function ExperimentDetailPage({
           provenance={crewProvenance}
           isDraft={e.status === "draft"}
           isOwner={isOwner}
+          isLocked={isLocked}
           resolveAction={resolveUnresolvedItemAction}
+          aiSuggestionsByIndex={resolveSuggestionsByIndex}
+          generateAiResolutionAction={generateResolutionSuggestionAction}
+          resolveAiSuggestionAction={resolveAiSuggestionAction}
+        />
+      )}
+
+      {isOwner && (
+        <AiFieldSuggestionsPanel
+          experimentId={e.id}
+          suggestions={gapSuggestions}
+          isOwner={isOwner}
+          isLocked={isLocked}
+          generateAction={generateGapSuggestionsAction}
+          resolveAction={resolveAiSuggestionAction}
         />
       )}
 
