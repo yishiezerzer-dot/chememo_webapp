@@ -115,17 +115,33 @@ export async function chatComplete(opts: {
       { role: "user" as const, content: opts.user },
     ],
   };
+  // reasoning_effort: "low" — reasoning-tier models (o-series, gpt-5.x) spend
+  // part of max_completion_tokens on hidden reasoning before any visible
+  // output; for short structured-extraction tasks like these that budget can
+  // be exhausted before the JSON body is ever emitted, returning an empty or
+  // truncated completion (the crew's Intake/Design/Critic agents' real,
+  // observed failure mode — Controls survives because its output is much
+  // smaller). Low effort leaves more of the budget for actual output. Older
+  // models reject the field outright, same as temperature below — retried
+  // without it rather than a model-name allowlist that goes stale.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let params: any = { ...baseParams, temperature: 0, reasoning_effort: "low" };
   let res;
-  try {
-    res = await client.chat.completions.create({ ...baseParams, temperature: 0 });
-  } catch (e) {
-    // Some newer models (reasoning-tier o-series/gpt-5.x) only support the
-    // default temperature (1) and reject any other value outright — retry
-    // once without it rather than hardcode a model-name allowlist that will
-    // go stale the next time a new model ships.
-    if (e instanceof Error && /temperature/i.test(e.message)) {
-      res = await client.chat.completions.create(baseParams);
-    } else {
+  for (;;) {
+    try {
+      res = await client.chat.completions.create(params);
+      break;
+    } catch (e) {
+      if (e instanceof Error && /temperature/i.test(e.message) && "temperature" in params) {
+        params = { ...params };
+        delete params.temperature;
+        continue;
+      }
+      if (e instanceof Error && /reasoning_effort/i.test(e.message) && "reasoning_effort" in params) {
+        params = { ...params };
+        delete params.reasoning_effort;
+        continue;
+      }
       throw e;
     }
   }
@@ -851,34 +867,14 @@ export type FieldSuggestion = z.infer<typeof fieldSuggestionSchema>;
 // array fields (never silently drop a suggestion that half-parsed).
 const fieldSuggestionsSchema = z.array(fieldSuggestionSchema);
 
-// D6 — one whole-record call, not one call per field: cheaper, and lets the
-// model see the whole record for context (a good conclusion suggestion has
-// to have read the observations). targetFields narrows which named fields
-// the model may propose for (Feature 2, "Resolve with AI" on one specific
-// unresolved item); omitted, it scans the full allowlist (Feature 1, the
-// general "Check for missing details" scan). Returns [] (not null) when the
-// model has nothing confident to propose — null is reserved for "LLM
-// disabled or the call failed," a real distinction the caller needs.
-export async function suggestExperimentFields(
-  experiment: Experiment,
-  targetFields?: SuggestibleField[]
+// Shared core, called by both entry points below with an already-built
+// record text block. Never invents; returns [] (not null) when the model has
+// nothing confident to propose — null is reserved for "LLM disabled or the
+// call failed," a real distinction callers need.
+async function suggestFieldsFromRecord(
+  record: string,
+  fields: readonly SuggestibleField[]
 ): Promise<FieldSuggestion[] | null> {
-  const fields = targetFields && targetFields.length ? targetFields : AI_SUGGESTIBLE_FIELDS;
-
-  const record = [
-    `[${experiment.id}] ${experiment.name}`,
-    experiment.project ? `Project: ${experiment.project}` : null,
-    experiment.reaction_type ? `Reaction type: ${experiment.reaction_type}` : null,
-    experiment.compounds?.length ? `Compounds: ${experiment.compounds.join(", ")}` : null,
-    experiment.metals?.length ? `Metals: ${experiment.metals.join(", ")}` : null,
-    experiment.ph !== null ? `pH: ${experiment.ph}` : null,
-    experiment.cycles !== null ? `Cycles: ${experiment.cycles}` : null,
-    ...AI_SUGGESTIBLE_FIELDS.map((f) => `${f}: ${experiment[f] ? experiment[f] : "(empty)"}`),
-    experiment.notes ? `notes: ${experiment.notes}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
   const system = `A chemist's lab-notebook record is shown below, some fields filled, some marked (empty). Propose a value ONLY for these field(s), and ONLY if the record's own already-filled content clearly supports it: ${fields.join(", ")}.
 
 Rules:
@@ -900,4 +896,62 @@ An empty array [] is a valid, expected response when nothing can be confidently 
   // targetFields constraint from the prompt alone.
   const allowed = new Set(fields);
   return parsed.data.filter((s) => allowed.has(s.field));
+}
+
+type SuggestibleFieldBag = {
+  project: string | null;
+  reaction_type: string | null;
+  compounds: string[];
+  metals: string[];
+  ph: number | null;
+  cycles: number | null;
+  notes: string | null;
+} & Record<SuggestibleField, string | null>;
+
+function formatFieldRecord(header: string, bag: SuggestibleFieldBag, extra?: string | null): string {
+  return [
+    header,
+    bag.project ? `Project: ${bag.project}` : null,
+    bag.reaction_type ? `Reaction type: ${bag.reaction_type}` : null,
+    bag.compounds?.length ? `Compounds: ${bag.compounds.join(", ")}` : null,
+    bag.metals?.length ? `Metals: ${bag.metals.join(", ")}` : null,
+    bag.ph !== null ? `pH: ${bag.ph}` : null,
+    bag.cycles !== null ? `Cycles: ${bag.cycles}` : null,
+    ...AI_SUGGESTIBLE_FIELDS.map((f) => `${f}: ${bag[f] ? bag[f] : "(empty)"}`),
+    bag.notes ? `notes: ${bag.notes}` : null,
+    extra ? `Raw bench notes:\n${extra}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+// D6 — one whole-record call, not one call per field: cheaper, and lets the
+// model see the whole record for context (a good conclusion suggestion has
+// to have read the observations). targetFields narrows which named fields
+// the model may propose for (Feature 2, "Resolve with AI" on one specific
+// unresolved item); omitted, it scans the full allowlist (Feature 1, the
+// general "Check for missing details" scan).
+export async function suggestExperimentFields(
+  experiment: Experiment,
+  targetFields?: SuggestibleField[]
+): Promise<FieldSuggestion[] | null> {
+  const fields = targetFields && targetFields.length ? targetFields : AI_SUGGESTIBLE_FIELDS;
+  const record = formatFieldRecord(`[${experiment.id}] ${experiment.name}`, experiment);
+  return suggestFieldsFromRecord(record, fields);
+}
+
+// Plan-time suggestions — see ChemMemo_Feature_AIFieldSuggestions_Spec.md's
+// "when the crew finishes planning" extension. Same engine as
+// suggestExperimentFields, but for a crew-committed plan BEFORE the
+// experiment row exists (ExperimentInput has no id/created_at yet), so it
+// works off the same field bag plus the crew's own raw notes for extra
+// context the structured fields alone might not carry.
+export async function suggestFieldsForPlan(
+  input: ExperimentInput,
+  rawSource: string,
+  targetFields: SuggestibleField[]
+): Promise<FieldSuggestion[] | null> {
+  if (targetFields.length === 0) return [];
+  const record = formatFieldRecord(input.name, input, rawSource);
+  return suggestFieldsFromRecord(record, targetFields);
 }

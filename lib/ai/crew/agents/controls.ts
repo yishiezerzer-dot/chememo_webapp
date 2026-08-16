@@ -31,5 +31,5 @@ Rules:
   const user = `Structured facts so far:\n${JSON.stringify(draft.structured)}\n\nRaw bench notes:\n${draft.rawSource}${
     ctx.groundingText ? `\n\n${ctx.groundingText}` : ""
   }`;
-  return runAgentStep(system, user, agentOutputSchema, 800);
+  return runAgentStep("controls", system, user, agentOutputSchema, 1000);
 };

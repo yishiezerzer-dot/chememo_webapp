@@ -25,5 +25,5 @@ Rules:
     unresolved: draft.unresolved,
     normalization: draft.normalization,
   })}`;
-  return runAgentStep(system, user, criticOutputSchema, 700);
+  return runAgentStep("critic", system, user, criticOutputSchema, 1100);
 };

@@ -41,25 +41,25 @@ const schema = z.object({ value: z.string() });
 describe("runAgentStep", () => {
   it("returns the parsed result on a valid first response", async () => {
     mockGeminiSequence([JSON.stringify({ value: "ok" })]);
-    const result = await runAgentStep("system", "user", schema, 100);
+    const result = await runAgentStep("test-agent", "system", "user", schema, 100);
     expect(result).toEqual({ value: "ok" });
   });
 
   it("retries once with validation errors and succeeds on the corrected response", async () => {
     mockGeminiSequence([JSON.stringify({ value: 42 }), JSON.stringify({ value: "corrected" })]);
-    const result = await runAgentStep("system", "user", schema, 100);
+    const result = await runAgentStep("test-agent", "system", "user", schema, 100);
     expect(result).toEqual({ value: "corrected" });
   });
 
   it("returns null when both the first response and the retry are invalid", async () => {
     mockGeminiSequence([JSON.stringify({ value: 1 }), JSON.stringify({ value: 2 })]);
-    const result = await runAgentStep("system", "user", schema, 100);
+    const result = await runAgentStep("test-agent", "system", "user", schema, 100);
     expect(result).toBeNull();
   });
 
   it("returns null when the model response isn't valid JSON at all", async () => {
     mockGeminiSequence(["not json", "still not json"]);
-    const result = await runAgentStep("system", "user", schema, 100);
+    const result = await runAgentStep("test-agent", "system", "user", schema, 100);
     expect(result).toBeNull();
   });
 });

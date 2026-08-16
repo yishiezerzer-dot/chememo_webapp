@@ -27,5 +27,5 @@ Rules:
 - Clear scientific English, no em dashes.`;
 
   const user = `Raw bench notes:\n${draft.rawSource}`;
-  return runAgentStep(system, user, agentOutputSchema, 800);
+  return runAgentStep("intake", system, user, agentOutputSchema, 1200);
 };
