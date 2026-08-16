@@ -7,6 +7,17 @@ import type { ActionResult } from "@/lib/types";
 import type { CrewProvenance } from "@/lib/ai/crew/provenance";
 import type { AiSuggestion } from "@/lib/ai/suggestions";
 
+// Mirrors lib/llm.ts's AI_SUGGESTIBLE_FIELDS (D8) — duplicated here, not
+// imported, since that module pulls in server-only provider SDKs
+// (openai/@anthropic-ai/sdk) that have no reason to reach the client bundle.
+// Keep both lists in sync by hand, same convention as the migration's own
+// CHECK constraint copy.
+const AI_SUGGESTIBLE_FIELDS = new Set([
+  "scientific_question", "hypothesis", "rationale", "primary_outcome",
+  "secondary_outcomes", "data_analysis_plan", "risks_failure_modes",
+  "conclusion", "next_steps", "observations",
+]);
+
 // T3.8 — shown only when a provenance row exists (a hand-authored experiment
 // has none at all, per D8). The badge is not colour-only (amber background +
 // explicit text) per T1.10; the checklist has aria-live on resolve.
@@ -110,7 +121,7 @@ export function CrewProvenancePanel({
                         Resolve
                       </button>
                     )}
-                    {isOwner && generateAiResolutionAction && !aiSuggestion && (
+                    {isOwner && generateAiResolutionAction && !aiSuggestion && AI_SUGGESTIBLE_FIELDS.has(u.field) && (
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
