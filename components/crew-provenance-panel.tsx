@@ -31,7 +31,7 @@ export function CrewProvenancePanel({
   isOwner,
   isLocked,
   resolveAction,
-  aiSuggestionsByIndex,
+  aiSuggestionsByField,
   generateAiResolutionAction,
   resolveAiSuggestionAction,
 }: {
@@ -45,16 +45,23 @@ export function CrewProvenancePanel({
   // hand-authored experiment simply omits it entirely.
   isLocked?: boolean;
   resolveAction: (experimentId: string, itemIndex: number) => Promise<ActionResult>;
-  aiSuggestionsByIndex?: Map<number, AiSuggestion>;
+  aiSuggestionsByField?: Map<string, AiSuggestion>;
   generateAiResolutionAction?: (experimentId: string, itemIndex: number) => Promise<ActionResult>;
   resolveAiSuggestionAction?: (experimentId: string, suggestionId: string, accept: boolean) => Promise<ActionResult>;
 }) {
   const [rawOpen, setRawOpen] = useState(false);
   const [pending, start] = useTransition();
+  // Which specific button triggered the in-flight transition -- pending
+  // alone is shared by every button in this list (one useTransition for the
+  // whole panel), so without this every button would show a spinner
+  // whenever ANY of them was clicked (bug found 2026-08-17: Yishi wanted
+  // only the pressed button to spin).
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
 
   function resolve(index: number) {
+    setPendingKey(`resolve-${index}`);
     start(async () => {
       const res = await resolveAction(experimentId, index);
       if (!res.ok) showToast(res.error, "error");
@@ -63,6 +70,7 @@ export function CrewProvenancePanel({
   }
 
   function generateAiResolution(index: number) {
+    setPendingKey(`ai-${index}`);
     start(async () => {
       const res = await generateAiResolutionAction!(experimentId, index);
       if (!res.ok) showToast(res.error, "error");
@@ -71,6 +79,7 @@ export function CrewProvenancePanel({
   }
 
   function resolveAiSuggestion(suggestionId: string, accept: boolean) {
+    setPendingKey(`${suggestionId}-${accept ? "agree" : "dismiss"}`);
     start(async () => {
       const res = await resolveAiSuggestionAction!(experimentId, suggestionId, accept);
       if (!res.ok) showToast(res.error, "error");
@@ -104,7 +113,9 @@ export function CrewProvenancePanel({
             </h4>
             <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
               {provenance.unresolved.map((u, i) => {
-                const aiSuggestion = aiSuggestionsByIndex?.get(i);
+                const aiSuggestion = aiSuggestionsByField?.get(u.field);
+                const resolveBusy = pending && pendingKey === `resolve-${i}`;
+                const aiBusy = pending && pendingKey === `ai-${i}`;
                 return (
                   <li key={i}>
                     <strong>{u.field}</strong> — {u.issue}
@@ -116,11 +127,11 @@ export function CrewProvenancePanel({
                         type="button"
                         className="btn btn-ghost btn-sm"
                         disabled={pending}
-                        aria-busy={pending}
+                        aria-busy={resolveBusy}
                         onClick={() => resolve(i)}
                         style={{ marginLeft: 8 }}
                       >
-                        {pending && <Spinner />}
+                        {resolveBusy && <Spinner />}
                         Resolve
                       </button>
                     )}
@@ -129,12 +140,12 @@ export function CrewProvenancePanel({
                         type="button"
                         className="btn btn-ghost btn-sm"
                         disabled={pending || isLocked}
-                        aria-busy={pending}
+                        aria-busy={aiBusy}
                         title={isLocked ? "This experiment is locked; nothing can be applied here." : undefined}
                         onClick={() => generateAiResolution(i)}
                         style={{ marginLeft: 8 }}
                       >
-                        {pending && <Spinner />}
+                        {aiBusy && <Spinner />}
                         Resolve with AI
                       </button>
                     )}
@@ -147,20 +158,20 @@ export function CrewProvenancePanel({
                             type="button"
                             className="btn btn-sm"
                             disabled={pending}
-                            aria-busy={pending}
+                            aria-busy={pending && pendingKey === `${aiSuggestion.id}-agree`}
                             onClick={() => resolveAiSuggestion(aiSuggestion.id, true)}
                           >
-                            {pending && <Spinner />}
+                            {pending && pendingKey === `${aiSuggestion.id}-agree` && <Spinner />}
                             Agree
                           </button>
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
                             disabled={pending}
-                            aria-busy={pending}
+                            aria-busy={pending && pendingKey === `${aiSuggestion.id}-dismiss`}
                             onClick={() => resolveAiSuggestion(aiSuggestion.id, false)}
                           >
-                            {pending && <Spinner />}
+                            {pending && pendingKey === `${aiSuggestion.id}-dismiss` && <Spinner />}
                             Dismiss
                           </button>
                         </div>

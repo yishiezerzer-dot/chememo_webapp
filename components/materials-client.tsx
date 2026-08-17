@@ -89,6 +89,7 @@ function StockRow({
   solubilityStatuses: string[];
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [attempts, setAttempts] = useState<StockSolubilityAttempt[] | null>(null);
@@ -107,7 +108,8 @@ function StockRow({
     setOpen((o) => !o);
   }
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(action: () => Promise<{ ok: boolean; error?: string }>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -136,10 +138,10 @@ function StockRow({
             className="btn btn-ghost btn-sm"
             style={{ marginLeft: "auto" }}
             disabled={pending}
-            aria-busy={pending}
-            onClick={() => run(() => verifyStockAction(stock.id))}
+            aria-busy={pending && pendingKey === "verify"}
+            onClick={() => run(() => verifyStockAction(stock.id), "verify")}
           >
-            {pending && <Spinner />}
+            {pending && pendingKey === "verify" && <Spinner />}
             Mark verified
           </button>
         )}
@@ -172,7 +174,7 @@ function StockRow({
               type="button"
               className="btn btn-sm"
               disabled={pending}
-              aria-busy={pending}
+              aria-busy={pending && pendingKey === "log-attempt"}
               onClick={() =>
                 run(async () => {
                   const nextAttemptNumber = (attempts?.length ?? 0) + 1;
@@ -190,10 +192,10 @@ function StockRow({
                     setAttemptNotes("");
                   }
                   return res;
-                })
+                }, "log-attempt")
               }
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "log-attempt" && <Spinner />}
               + Log attempt
             </button>
           </div>
@@ -217,6 +219,7 @@ function LotRow({
   onDeleted: () => void;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [stocks, setStocks] = useState<StockSolution[] | null>(null);
@@ -238,7 +241,8 @@ function LotRow({
     setOpen((o) => !o);
   }
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(action: () => Promise<{ ok: boolean; error?: string }>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -262,16 +266,17 @@ function LotRow({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
-          aria-busy={pending}
-          onClick={() =>
+          aria-busy={pending && pendingKey === "delete-lot"}
+          onClick={() => {
+            setPendingKey("delete-lot");
             start(async () => {
               const res = await deleteLotAction(lot.id);
               if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
               else onDeleted();
-            })
-          }
+            });
+          }}
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "delete-lot" && <Spinner />}
           Delete
         </button>
       </div>
@@ -302,7 +307,7 @@ function LotRow({
                   type="button"
                   className="btn btn-sm"
                   disabled={pending}
-                  aria-busy={pending}
+                  aria-busy={pending && pendingKey === "save-stock"}
                   onClick={() =>
                     run(async () => {
                       const res = await createStockAction(lot.id, {
@@ -333,10 +338,10 @@ function LotRow({
                         setShowNewStock(false);
                       }
                       return res;
-                    })
+                    }, "save-stock")
                   }
                 >
-                  {pending && <Spinner />}
+                  {pending && pendingKey === "save-stock" && <Spinner />}
                   Save stock
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewStock(false)}>
@@ -363,6 +368,7 @@ function MaterialRow({
   solubilityStatuses: string[];
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -391,7 +397,8 @@ function MaterialRow({
     setLots(detail.lots as MaterialLot[]);
   }
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(action: () => Promise<{ ok: boolean; error?: string }>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -414,10 +421,10 @@ function MaterialRow({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
-          aria-busy={pending}
-          onClick={() => run(() => deleteMaterialAction(material.id))}
+          aria-busy={pending && pendingKey === "delete-material"}
+          onClick={() => run(() => deleteMaterialAction(material.id), "delete-material")}
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "delete-material" && <Spinner />}
           Delete
         </button>
       </div>
@@ -448,7 +455,7 @@ function MaterialRow({
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={pending}
-                aria-busy={pending}
+                aria-busy={pending && pendingKey === "add-identifier"}
                 onClick={() =>
                   run(async () => {
                     const res = await addIdentifierAction(material.id, identifierType, identifierValue);
@@ -458,10 +465,10 @@ function MaterialRow({
                       setIdentifierValue("");
                     }
                     return res;
-                  })
+                  }, "add-identifier")
                 }
               >
-                {pending && <Spinner />}
+                {pending && pendingKey === "add-identifier" && <Spinner />}
                 + Add
               </button>
             </div>
@@ -500,7 +507,7 @@ function MaterialRow({
                 type="button"
                 className="btn btn-sm"
                 disabled={pending}
-                aria-busy={pending}
+                aria-busy={pending && pendingKey === "save-lot"}
                 onClick={() =>
                   run(async () => {
                     const res = await createLotAction(material.id, {
@@ -529,10 +536,10 @@ function MaterialRow({
                       setLotStorage("");
                     }
                     return res;
-                  })
+                  }, "save-lot")
                 }
               >
-                {pending && <Spinner />}
+                {pending && pendingKey === "save-lot" && <Spinner />}
                 Save lot
               </button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(false)}>
@@ -559,6 +566,7 @@ export function MaterialsClient({
   quantityKinds: QuantityKind[];
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [showNewMaterial, setShowNewMaterial] = useState(false);
@@ -580,16 +588,17 @@ export function MaterialsClient({
             <span key={s.id} className="chip" style={{ marginRight: 6, marginBottom: 6, display: "inline-block" }}>
               {s.name}
               <b
-                onClick={() =>
+                onClick={() => {
+                  setPendingKey(`storage-${s.id}`);
                   start(async () => {
                     const res = await deleteStorageLocationAction(s.id);
                     if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
                     else router.refresh();
-                  })
-                }
+                  });
+                }}
                 style={{ marginLeft: 6, cursor: "pointer" }}
               >
-                ×
+                {pending && pendingKey === `storage-${s.id}` ? <Spinner /> : "×"}
               </b>
             </span>
           ))}
@@ -602,8 +611,9 @@ export function MaterialsClient({
               type="button"
               className="btn btn-sm"
               disabled={pending}
-              aria-busy={pending}
-              onClick={() =>
+              aria-busy={pending && pendingKey === "save-storage"}
+              onClick={() => {
+                setPendingKey("save-storage");
                 start(async () => {
                   const res = await createStorageLocationAction(storageName, storageConditions, "");
                   if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -613,10 +623,10 @@ export function MaterialsClient({
                     setShowNewStorage(false);
                     router.refresh();
                   }
-                })
-              }
+                });
+              }}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "save-storage" && <Spinner />}
               Save
             </button>
           </div>
@@ -634,7 +644,8 @@ export function MaterialsClient({
         <form
           className="obs-box glass"
           style={{ marginBottom: 16 }}
-          action={(formData) =>
+          action={(formData) => {
+            setPendingKey("save-material");
             start(async () => {
               const res = await createMaterialAction(null, formData);
               if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -642,8 +653,8 @@ export function MaterialsClient({
                 setShowNewMaterial(false);
                 router.refresh();
               }
-            })
-          }
+            });
+          }}
         >
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <input name="preferred_name" placeholder="Preferred name" required />
@@ -654,8 +665,8 @@ export function MaterialsClient({
             <input name="stereochemistry" placeholder="Stereochemistry" />
           </div>
           <textarea name="safety_notes" placeholder="Safety notes" style={{ marginTop: 8, width: "100%" }} />
-          <button type="submit" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending} aria-busy={pending}>
-            {pending && <Spinner />}
+          <button type="submit" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending} aria-busy={pending && pendingKey === "save-material"}>
+            {pending && pendingKey === "save-material" && <Spinner />}
             Save material
           </button>
         </form>

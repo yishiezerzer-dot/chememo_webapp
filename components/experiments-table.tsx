@@ -45,6 +45,7 @@ export function ExperimentsTable({
   const [q, setQ] = useState(params.q ?? "");
   const [viewName, setViewName] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
 
   function navigate(patch: Partial<ExperimentSearchParams>) {
     // Read the live URL, not the `params` prop -- that prop is a snapshot
@@ -97,6 +98,7 @@ export function ExperimentsTable({
   function saveView() {
     const name = viewName.trim();
     if (!name) return;
+    setPendingKey("save-view");
     start(async () => {
       const res = await saveViewAction(name, params);
       if (!res.ok) showToast(res.error, "error");
@@ -108,6 +110,7 @@ export function ExperimentsTable({
   }
 
   function deleteView(id: string) {
+    setPendingKey(`delete-view-${id}`);
     start(async () => {
       const res = await deleteViewAction(id);
       if (!res.ok) showToast(res.error, "error");
@@ -222,7 +225,7 @@ export function ExperimentsTable({
                 {v.name}
               </a>
               <b onClick={() => deleteView(v.id)} style={{ cursor: "pointer" }}>
-                ×
+                {pending && pendingKey === `delete-view-${v.id}` ? <Spinner /> : "×"}
               </b>
             </span>
           ))}
@@ -235,8 +238,8 @@ export function ExperimentsTable({
             placeholder="Save this view as…"
             style={{ maxWidth: 180 }}
           />
-          <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending} onClick={saveView}>
-            {pending && <Spinner />}
+          <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending && pendingKey === "save-view"} onClick={saveView}>
+            {pending && pendingKey === "save-view" && <Spinner />}
             Save view
           </button>
         </div>

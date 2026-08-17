@@ -56,6 +56,7 @@ function ConditionProgramSection({
   quantityKinds: QuantityKind[];
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -81,7 +82,8 @@ function ConditionProgramSection({
     setOpen((o) => !o);
   }
 
-  function run(action: () => Promise<ActionResult>, after?: () => void) {
+  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error, "error");
@@ -123,10 +125,10 @@ function ConditionProgramSection({
                     type="button"
                     className="btn btn-sm"
                     disabled={pending || !templateId}
-                    aria-busy={pending}
-                    onClick={() => run(() => applyConditionProgramTemplateAction(experimentId, batchId, templateId))}
+                    aria-busy={pending && pendingKey === "apply-template"}
+                    onClick={() => run(() => applyConditionProgramTemplateAction(experimentId, batchId, templateId), "apply-template")}
                   >
-                    {pending && <Spinner />}
+                    {pending && pendingKey === "apply-template" && <Spinner />}
                     Apply template
                   </button>
                 </>
@@ -144,7 +146,7 @@ function ConditionProgramSection({
                     type="button"
                     className="btn btn-sm"
                     disabled={pending || !name.trim()}
-                    aria-busy={pending}
+                    aria-busy={pending && pendingKey === "save-program"}
                     onClick={() =>
                       run(
                         () =>
@@ -161,6 +163,7 @@ function ConditionProgramSection({
                             {},
                             ""
                           ),
+                        "save-program",
                         () => {
                           setShowAdHoc(false);
                           setName("");
@@ -170,7 +173,7 @@ function ConditionProgramSection({
                       )
                     }
                   >
-                    {pending && <Spinner />}
+                    {pending && pendingKey === "save-program" && <Spinner />}
                     Save program
                   </button>
                 </div>
@@ -218,7 +221,7 @@ function ConditionProgramSection({
                     type="button"
                     className="btn btn-sm"
                     disabled={pending || !cycleIndex}
-                    aria-busy={pending}
+                    aria-busy={pending && pendingKey === "save-cycle"}
                     onClick={() =>
                       run(
                         () => {
@@ -238,6 +241,7 @@ function ConditionProgramSection({
                             {}
                           );
                         },
+                        "save-cycle",
                         () => {
                           setShowCycle(false);
                           setCycleIndex("");
@@ -248,7 +252,7 @@ function ConditionProgramSection({
                       )
                     }
                   >
-                    {pending && <Spinner />}
+                    {pending && pendingKey === "save-cycle" && <Spinner />}
                     Save cycle
                   </button>
                 </div>
@@ -280,7 +284,7 @@ function ConditionProgramSection({
                   type="button"
                   className="btn btn-sm"
                   disabled={pending}
-                  aria-busy={pending}
+                  aria-busy={pending && pendingKey === "save-env"}
                   onClick={() =>
                     run(() =>
                       saveEnvironmentalConditionsAction(experimentId, batchId, {
@@ -301,11 +305,12 @@ function ConditionProgramSection({
                         quantities: {},
                         custom_fields: {},
                         notes: null,
-                      })
+                      }),
+                      "save-env"
                     )
                   }
                 >
-                  {pending && <Spinner />}
+                  {pending && pendingKey === "save-env" && <Spinner />}
                   Save
                 </button>
               </div>
@@ -376,6 +381,7 @@ function AnalysisRunsSection({
   assignmentConfidences: string[];
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [runs, setRuns] = useState<AnalysisRun[] | null>(null);
@@ -396,7 +402,8 @@ function AnalysisRunsSection({
     setOpen((o) => !o);
   }
 
-  function run(action: () => Promise<ActionResult>, after?: () => void) {
+  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error, "error");
@@ -473,7 +480,7 @@ function AnalysisRunsSection({
                             type="button"
                             className="btn btn-ghost btn-sm"
                             disabled={pending || !peakMz}
-                            aria-busy={pending}
+                            aria-busy={pending && pendingKey === `peak-${res.id}`}
                             onClick={() =>
                               run(async () => {
                                 const res2 = await addPeakAction(experimentId, res.id, {
@@ -496,10 +503,10 @@ function AnalysisRunsSection({
                                   await loadPeaks(res.id);
                                 }
                                 return res2;
-                              })
+                              }, `peak-${res.id}`)
                             }
                           >
-                            {pending && <Spinner />}
+                            {pending && pendingKey === `peak-${res.id}` && <Spinner />}
                             + Peak
                           </button>
                         </div>
@@ -518,10 +525,11 @@ function AnalysisRunsSection({
                         type="button"
                         className="btn btn-ghost btn-sm"
                         disabled={pending}
-                        aria-busy={pending}
+                        aria-busy={pending && pendingKey === `add-result-${r.id}`}
                         onClick={() =>
                           run(
                             () => createResultAction(experimentId, r.id, resultConfidence, resultSummary, {}),
+                            `add-result-${r.id}`,
                             async () => {
                               setResultSummary("");
                               setRunDetail(await getRunDetailAction(r.id));
@@ -529,7 +537,7 @@ function AnalysisRunsSection({
                           )
                         }
                       >
-                        {pending && <Spinner />}
+                        {pending && pendingKey === `add-result-${r.id}` && <Spinner />}
                         + Add result
                       </button>
                     </div>
@@ -560,10 +568,11 @@ function AnalysisRunsSection({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !methodId}
-              aria-busy={pending}
+              aria-busy={pending && pendingKey === "new-run"}
               onClick={() =>
                 run(
                   () => createRunAction(experimentId, sampleId, methodId, status, operator),
+                  "new-run",
                   async () => {
                     setMethodId("");
                     setOperator("");
@@ -572,7 +581,7 @@ function AnalysisRunsSection({
                 )
               }
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "new-run" && <Spinner />}
               + New run
             </button>
           </div>
@@ -620,6 +629,7 @@ function SampleRow({
   assignmentConfidences: string[];
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -638,7 +648,8 @@ function SampleRow({
     setOpen((o) => !o);
   }
 
-  function run(action: () => Promise<ActionResult>) {
+  function run(action: () => Promise<ActionResult>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error, "error");
@@ -687,14 +698,14 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !aliasValue.trim()}
-              aria-busy={pending}
+              aria-busy={pending && pendingKey === "alias"}
               onClick={() => {
                 const v = aliasValue;
                 setAliasValue("");
-                run(() => addAlias(sample.id, v, ""));
+                run(() => addAlias(sample.id, v, ""), "alias");
               }}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "alias" && <Spinner />}
               + Alias
             </button>
           </div>
@@ -710,10 +721,10 @@ function SampleRow({
                     className="btn btn-ghost btn-sm"
                     style={{ marginLeft: 8 }}
                     disabled={pending}
-                    aria-busy={pending}
-                    onClick={() => run(() => deleteRelationship(r.id))}
+                    aria-busy={pending && pendingKey === `rel-${r.id}`}
+                    onClick={() => run(() => deleteRelationship(r.id), `rel-${r.id}`)}
                   >
-                    {pending ? <Spinner /> : "×"}
+                    {pending && pendingKey === `rel-${r.id}` ? <Spinner /> : "×"}
                   </button>
                 </div>
               ))}
@@ -739,10 +750,10 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !relTarget}
-              aria-busy={pending}
-              onClick={() => run(() => createRelationship(sample.id, relTarget, relType))}
+              aria-busy={pending && pendingKey === "link"}
+              onClick={() => run(() => createRelationship(sample.id, relTarget, relType), "link")}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "link" && <Spinner />}
               + Link
             </button>
           </div>
@@ -753,14 +764,14 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !toLocation.trim()}
-              aria-busy={pending}
+              aria-busy={pending && pendingKey === "transfer"}
               onClick={() => {
                 const v = toLocation;
                 setToLocation("");
-                run(() => recordEvent(sample.id, "transfer", { to_location_path: v }));
+                run(() => recordEvent(sample.id, "transfer", { to_location_path: v }), "transfer");
               }}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "transfer" && <Spinner />}
               + Record transfer
             </button>
           </div>
@@ -778,14 +789,14 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !weight}
-              aria-busy={pending}
+              aria-busy={pending && pendingKey === "measurement"}
               onClick={() => {
                 const v = weight;
                 setWeight("");
-                run(() => addMeasurement(sample.id, { sample_weight: { value: Number(v), unit_code: weightUnit } }, ""));
+                run(() => addMeasurement(sample.id, { sample_weight: { value: Number(v), unit_code: weightUnit } }, ""), "measurement");
               }}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "measurement" && <Spinner />}
               + Log measurement
             </button>
           </div>
@@ -866,6 +877,7 @@ export function SamplesPanel({
   conditionProgramTemplates: ConditionProgramTemplate[];
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [showNewBatch, setShowNewBatch] = useState(false);
@@ -880,7 +892,8 @@ export function SamplesPanel({
   const allSamples = Object.values(samplesByBatch).flat();
   void SAMPLE_EVENT_TYPES;
 
-  function run(action: () => Promise<ActionResult>, after?: () => void) {
+  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error, "error");
@@ -962,7 +975,7 @@ export function SamplesPanel({
                 type="button"
                 className="btn btn-sm"
                 disabled={pending}
-                aria-busy={pending}
+                aria-busy={pending && pendingKey === "save-sample"}
                 onClick={() => {
                   const originOption = lotStockOptions.find((o) => o.id === origin);
                   run(
@@ -977,11 +990,12 @@ export function SamplesPanel({
                         replicate: Number(replicate) || 1,
                         notes: null,
                       }),
+                    "save-sample",
                     () => setAddingToBatch(null)
                   );
                 }}
               >
-                {pending && <Spinner />}
+                {pending && pendingKey === "save-sample" && <Spinner />}
                 Save sample
               </button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddingToBatch(null)}>
@@ -1004,15 +1018,15 @@ export function SamplesPanel({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending}
-              aria-busy={pending}
+              aria-busy={pending && pendingKey === "save-batch"}
               onClick={() =>
-                run(() => createBatch(batchLabel, ""), () => {
+                run(() => createBatch(batchLabel, ""), "save-batch", () => {
                   setBatchLabel("");
                   setShowNewBatch(false);
                 })
               }
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "save-batch" && <Spinner />}
               Save batch
             </button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewBatch(false)}>

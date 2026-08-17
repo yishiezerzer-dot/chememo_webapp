@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
@@ -23,11 +23,13 @@ export function CommentThread({
   reopenComment: (commentId: string) => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
-  function run(action: () => Promise<ActionResult>) {
+  function run(action: () => Promise<ActionResult>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error, "error");
@@ -54,10 +56,10 @@ export function CommentThread({
             type="button"
             className="btn btn-ghost btn-sm"
             disabled={pending}
-            aria-busy={pending}
-            onClick={() => run(() => (c.resolved_at ? reopenComment(c.id) : resolveComment(c.id)))}
+            aria-busy={pending && pendingKey === c.id}
+            onClick={() => run(() => (c.resolved_at ? reopenComment(c.id) : resolveComment(c.id)), c.id)}
           >
-            {pending && <Spinner />}
+            {pending && pendingKey === c.id && <Spinner />}
             {c.resolved_at ? "Reopen" : "Resolve"}
           </button>
         </div>
@@ -68,7 +70,7 @@ export function CommentThread({
           type="button"
           className="btn btn-sm"
           disabled={pending}
-          aria-busy={pending}
+          aria-busy={pending && pendingKey === "post"}
           onClick={() => {
             const body = bodyRef.current?.value.trim();
             if (!body) return;
@@ -76,10 +78,10 @@ export function CommentThread({
               const res = await createComment(body);
               if (res.ok && bodyRef.current) bodyRef.current.value = "";
               return res;
-            });
+            }, "post");
           }}
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "post" && <Spinner />}
           Post
         </button>
       </div>

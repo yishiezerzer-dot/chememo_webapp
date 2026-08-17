@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
@@ -42,12 +42,14 @@ export function AiFieldSuggestionsPanel({
   resolveAction: (experimentId: string, suggestionId: string, accept: boolean) => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
 
   if (!isOwner) return null;
 
   function generate() {
+    setPendingKey("generate");
     start(async () => {
       const res = await generateAction(experimentId);
       if (!res.ok) showToast(res.error, "error");
@@ -56,6 +58,7 @@ export function AiFieldSuggestionsPanel({
   }
 
   function resolve(suggestionId: string, accept: boolean) {
+    setPendingKey(`${suggestionId}-${accept ? "agree" : "dismiss"}`);
     start(async () => {
       const res = await resolveAction(experimentId, suggestionId, accept);
       if (!res.ok) showToast(res.error, "error");
@@ -71,11 +74,11 @@ export function AiFieldSuggestionsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending || isLocked}
-          aria-busy={pending}
+          aria-busy={pending && pendingKey === "generate"}
           title={isLocked ? "This experiment is locked; nothing can be applied here." : undefined}
           onClick={generate}
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "generate" && <Spinner />}
           Check for missing details
         </button>
       </div>
@@ -93,20 +96,20 @@ export function AiFieldSuggestionsPanel({
                     type="button"
                     className="btn btn-sm"
                     disabled={pending}
-                    aria-busy={pending}
+                    aria-busy={pending && pendingKey === `${s.id}-agree`}
                     onClick={() => resolve(s.id, true)}
                   >
-                    {pending && <Spinner />}
+                    {pending && pendingKey === `${s.id}-agree` && <Spinner />}
                     Agree
                   </button>
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
                     disabled={pending}
-                    aria-busy={pending}
+                    aria-busy={pending && pendingKey === `${s.id}-dismiss`}
                     onClick={() => resolve(s.id, false)}
                   >
-                    {pending && <Spinner />}
+                    {pending && pendingKey === `${s.id}-dismiss` && <Spinner />}
                     Dismiss
                   </button>
                 </div>

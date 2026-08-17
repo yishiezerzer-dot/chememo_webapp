@@ -100,7 +100,10 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
     setOpen((o) => !o);
   }
 
-  function run(action: () => Promise<ActionResult>, after?: () => void) {
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+
+  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -138,15 +141,15 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
             <>
               <form
                 action={(fd) =>
-                  run(() => replaceFileAction(experimentId, file.id, fd), () => {
+                  run(() => replaceFileAction(experimentId, file.id, fd), "replace", () => {
                     if (replaceInputRef.current) replaceInputRef.current.value = "";
                   })
                 }
                 style={{ marginBottom: 8 }}
               >
                 <input ref={replaceInputRef} type="file" name="file" required disabled={pending} />
-                <button type="submit" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending}>
-                  {pending && <Spinner />}
+                <button type="submit" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending && pendingKey === "replace"}>
+                  {pending && pendingKey === "replace" && <Spinner />}
                   Replace with new version
                 </button>
               </form>
@@ -205,7 +208,7 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={pending}
-                aria-busy={pending}
+                aria-busy={pending && pendingKey === "save-metadata"}
                 style={{ marginBottom: 8 }}
                 onClick={() =>
                   run(() =>
@@ -217,11 +220,11 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                       acquisitionTimestamp ? new Date(acquisitionTimestamp).toISOString() : "",
                       Object.fromEntries(metadataEntries),
                       retentionState
-                    )
+                    ), "save-metadata"
                   )
                 }
               >
-                {pending && <Spinner />}
+                {pending && pendingKey === "save-metadata" && <Spinner />}
                 Save metadata
               </button>
 
@@ -238,10 +241,10 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                   type="button"
                   className="btn btn-ghost btn-sm"
                   disabled={pending || !runId}
-                  aria-busy={pending}
-                  onClick={() => run(() => linkFileToRunAction(experimentId, file.id, runId))}
+                  aria-busy={pending && pendingKey === "link-run"}
+                  onClick={() => run(() => linkFileToRunAction(experimentId, file.id, runId), "link-run")}
                 >
-                  {pending && <Spinner />}
+                  {pending && pendingKey === "link-run" && <Spinner />}
                   Link
                 </button>
                 {file.analysis_run_id && (
@@ -249,10 +252,10 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                     type="button"
                     className="btn btn-ghost btn-sm"
                     disabled={pending}
-                    aria-busy={pending}
-                    onClick={() => run(() => unlinkFileFromRunAction(experimentId, file.id))}
+                    aria-busy={pending && pendingKey === "unlink-run"}
+                    onClick={() => run(() => unlinkFileFromRunAction(experimentId, file.id), "unlink-run")}
                   >
-                    {pending && <Spinner />}
+                    {pending && pendingKey === "unlink-run" && <Spinner />}
                     Unlink
                   </button>
                 )}

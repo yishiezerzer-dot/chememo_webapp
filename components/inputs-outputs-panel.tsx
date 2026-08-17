@@ -61,6 +61,7 @@ export function InputsOutputsPanel({
   recalculate: () => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
 
@@ -80,7 +81,8 @@ export function InputsOutputsPanel({
   const [outputAmountValue, setOutputAmountValue] = useState("");
   const [outputAmountUnit, setOutputAmountUnit] = useState(massKind?.canonical_unit_code ?? "g");
 
-  function run(action: () => Promise<ActionResult>) {
+  function run(action: () => Promise<ActionResult>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error, "error");
@@ -103,8 +105,8 @@ export function InputsOutputsPanel({
     <div className="obs-box glass">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h4 style={{ margin: 0 }}>Inputs &amp; outputs</h4>
-        <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending} onClick={() => run(recalculate)}>
-          {pending && <Spinner />}
+        <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending && pendingKey === "recalculate"} onClick={() => run(recalculate, "recalculate")}>
+          {pending && pendingKey === "recalculate" && <Spinner />}
           Recalculate stoichiometry
         </button>
       </div>
@@ -141,10 +143,10 @@ export function InputsOutputsPanel({
                   className="btn btn-ghost btn-sm"
                   style={{ marginLeft: "auto" }}
                   disabled={pending}
-                  aria-busy={pending}
-                  onClick={() => run(() => removeInput(i.id))}
+                  aria-busy={pending && pendingKey === i.id}
+                  onClick={() => run(() => removeInput(i.id), i.id)}
                 >
-                  {pending && <Spinner />}
+                  {pending && pendingKey === i.id && <Spinner />}
                   Remove
                 </button>
               </div>
@@ -182,7 +184,7 @@ export function InputsOutputsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending || !inputSource}
-          aria-busy={pending}
+          aria-busy={pending && pendingKey === "add-input"}
           onClick={() => {
             const option = lotStockOptions.find((o) => o.id === inputSource);
             if (!option) return;
@@ -196,10 +198,10 @@ export function InputsOutputsPanel({
                 setInputPurity("");
               }
               return res;
-            });
+            }, "add-input");
           }}
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "add-input" && <Spinner />}
           + Add input
         </button>
       </div>
@@ -227,10 +229,10 @@ export function InputsOutputsPanel({
                   className="btn btn-ghost btn-sm"
                   style={{ marginLeft: "auto" }}
                   disabled={pending}
-                  aria-busy={pending}
-                  onClick={() => run(() => removeOutput(o.id))}
+                  aria-busy={pending && pendingKey === o.id}
+                  onClick={() => run(() => removeOutput(o.id), o.id)}
                 >
-                  {pending && <Spinner />}
+                  {pending && pendingKey === o.id && <Spinner />}
                   Remove
                 </button>
               </div>
@@ -268,7 +270,7 @@ export function InputsOutputsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending || (!outputMaterial && !outputName.trim())}
-          aria-busy={pending}
+          aria-busy={pending && pendingKey === "add-output"}
           onClick={() =>
             run(async () => {
               const res = await addOutput(
@@ -284,10 +286,10 @@ export function InputsOutputsPanel({
                 setOutputAmountValue("");
               }
               return res;
-            })
+            }, "add-output")
           }
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "add-output" && <Spinner />}
           + Add output
         </button>
       </div>

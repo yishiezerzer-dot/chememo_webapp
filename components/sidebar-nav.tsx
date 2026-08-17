@@ -151,11 +151,13 @@ export function SidebarNav({
   const [name, setName] = useState("");
   const [color, setColor] = useState(SWATCHES[0]);
   const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
+    setBusyKey("add");
     const res = await createProject(name, color);
     setBusy(false);
     if (res.ok) {
@@ -172,6 +174,7 @@ export function SidebarNav({
   async function handleDelete(id: string) {
     if (busy) return;
     setBusy(true);
+    setBusyKey(id);
     const res = await deleteProject(id);
     setBusy(false);
     if (res.ok) {
@@ -221,7 +224,7 @@ export function SidebarNav({
                 aria-label={`Delete ${p.label}`}
                 onClick={() => handleDelete(p.id)}
                 disabled={busy}
-                aria-busy={busy}
+                aria-busy={busy && busyKey === p.id}
                 className="btn-ghost btn-sm"
                 style={{
                   border: "none",
@@ -232,7 +235,7 @@ export function SidebarNav({
                   flex: "none",
                 }}
               >
-                {busy ? <Spinner /> : "×"}
+                {busy && busyKey === p.id ? <Spinner /> : "×"}
               </button>
             )}
           </div>
@@ -294,8 +297,8 @@ export function SidebarNav({
             ))}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button type="submit" className="btn btn-sm" disabled={busy} aria-busy={busy}>
-              {busy && <Spinner />}
+            <button type="submit" className="btn btn-sm" disabled={busy} aria-busy={busy && busyKey === "add"}>
+              {busy && busyKey === "add" && <Spinner />}
               Add
             </button>
             <button

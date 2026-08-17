@@ -25,13 +25,15 @@ export function MembersClient({
   isAdmin: boolean;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const emailRef = useRef<HTMLInputElement>(null);
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>("researcher");
   const [lastLink, setLastLink] = useState<string | null>(null);
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(action: () => Promise<{ ok: boolean; error?: string }>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -55,7 +57,7 @@ export function MembersClient({
                 value={m.role}
                 disabled={pending}
                 style={{ marginLeft: "auto" }}
-                onChange={(e) => run(() => updateMemberRoleAction(m.userId, e.target.value as WorkspaceRole))}
+                onChange={(e) => run(() => updateMemberRoleAction(m.userId, e.target.value as WorkspaceRole), `role-${m.userId}`)}
               >
                 {WORKSPACE_ROLES.map((r) => (
                   <option key={r} value={r}>
@@ -71,10 +73,10 @@ export function MembersClient({
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={pending}
-                aria-busy={pending}
-                onClick={() => run(() => removeMemberAction(m.userId))}
+                aria-busy={pending && pendingKey === `remove-${m.userId}`}
+                onClick={() => run(() => removeMemberAction(m.userId), `remove-${m.userId}`)}
               >
-                {pending && <Spinner />}
+                {pending && pendingKey === `remove-${m.userId}` && <Spinner />}
                 Remove
               </button>
             )}
@@ -101,10 +103,11 @@ export function MembersClient({
               type="button"
               className="btn btn-sm"
               disabled={pending}
-              aria-busy={pending}
+              aria-busy={pending && pendingKey === "invite"}
               onClick={() => {
                 const email = emailRef.current?.value.trim();
                 if (!email) return;
+                setPendingKey("invite");
                 start(async () => {
                   const res = await inviteMemberAction(email, inviteRole);
                   if (!res.ok) {
@@ -116,7 +119,7 @@ export function MembersClient({
                 });
               }}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === "invite" && <Spinner />}
               + Invite
             </button>
           </div>

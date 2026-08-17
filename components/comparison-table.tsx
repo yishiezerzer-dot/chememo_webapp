@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
@@ -23,11 +23,13 @@ export function ComparisonTable({
   onRemove?: (experimentId: string) => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
 
   function remove(experimentId: string) {
     if (!onRemove) return;
+    setPendingKey(experimentId);
     start(async () => {
       const res = await onRemove(experimentId);
       if (!res.ok) showToast(res.error, "error");
@@ -80,8 +82,8 @@ export function ComparisonTable({
                   <td className="td-center muted">{controlsCounts[e.id] ?? 0}</td>
                   {onRemove && (
                     <td>
-                      <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending} onClick={() => remove(e.id)}>
-                        {pending && <Spinner />}
+                      <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending && pendingKey === e.id} onClick={() => remove(e.id)}>
+                        {pending && pendingKey === e.id && <Spinner />}
                         Remove
                       </button>
                     </td>

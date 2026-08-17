@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
@@ -26,6 +26,7 @@ export function NotificationsListClient({
   markRead: (id: string) => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
 
@@ -58,16 +59,17 @@ export function NotificationsListClient({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending}
-              aria-busy={pending}
-              onClick={() =>
+              aria-busy={pending && pendingKey === item.id}
+              onClick={() => {
+                setPendingKey(item.id);
                 start(async () => {
                   const res = await markRead(item.id);
                   if (!res.ok) showToast(res.error, "error");
                   else router.refresh();
-                })
-              }
+                });
+              }}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === item.id && <Spinner />}
               Mark read
             </button>
           )}

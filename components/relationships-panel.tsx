@@ -28,6 +28,7 @@ export function RelationshipsPanel({
   removeFromSeries: (seriesId: string) => Promise<ActionResult>;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const targetRef = useRef<HTMLInputElement>(null);
@@ -36,7 +37,8 @@ export function RelationshipsPanel({
   const availableSeries = allSeries.filter((s) => !memberSeriesIds.has(s.id));
   const [seriesToAdd, setSeriesToAdd] = useState("");
 
-  function run(action: () => Promise<ActionResult>) {
+  function run(action: () => Promise<ActionResult>, key: string) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error, "error");
@@ -71,10 +73,10 @@ export function RelationshipsPanel({
                     className="btn btn-ghost btn-sm"
                     style={{ marginLeft: "auto" }}
                     disabled={pending}
-                    aria-busy={pending}
-                    onClick={() => run(() => deleteRelationship(r.relationship.id))}
+                    aria-busy={pending && pendingKey === r.relationship.id}
+                    onClick={() => run(() => deleteRelationship(r.relationship.id), r.relationship.id)}
                   >
-                    {pending && <Spinner />}
+                    {pending && pendingKey === r.relationship.id && <Spinner />}
                     Remove
                   </button>
                 </div>
@@ -106,7 +108,7 @@ export function RelationshipsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
-          aria-busy={pending}
+          aria-busy={pending && pendingKey === "add-relationship"}
           onClick={() => {
             const target = targetRef.current?.value.trim();
             if (!target) return;
@@ -114,10 +116,10 @@ export function RelationshipsPanel({
               const res = await createRelationship(target, type);
               if (res.ok && targetRef.current) targetRef.current.value = "";
               return res;
-            });
+            }, "add-relationship");
           }}
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "add-relationship" && <Spinner />}
           + Add relationship
         </button>
       </div>
@@ -130,7 +132,7 @@ export function RelationshipsPanel({
               <a href={`/series/${s.id}`} style={{ color: "inherit" }}>
                 {s.name}
               </a>
-              <b onClick={() => run(() => removeFromSeries(s.id))} style={{ cursor: "pointer" }}>
+              <b onClick={() => run(() => removeFromSeries(s.id), `series-${s.id}`)} style={{ cursor: "pointer" }}>
                 ×
               </b>
             </span>
@@ -151,10 +153,10 @@ export function RelationshipsPanel({
             type="button"
             className="btn btn-ghost btn-sm"
             disabled={pending || !seriesToAdd}
-            aria-busy={pending}
-            onClick={() => run(() => addToSeries(seriesToAdd))}
+            aria-busy={pending && pendingKey === "add-to-series"}
+            onClick={() => run(() => addToSeries(seriesToAdd), "add-to-series")}
           >
-            {pending && <Spinner />}
+            {pending && pendingKey === "add-to-series" && <Spinner />}
             Add
           </button>
         </div>

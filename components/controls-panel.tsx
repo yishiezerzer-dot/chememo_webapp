@@ -19,6 +19,7 @@ export function ControlsPanel({
   hasConditionProgram: boolean;
 }) {
   const [pending, start] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const [controlType, setControlType] = useState<ControlType>(CONTROL_TYPES[0]);
@@ -26,7 +27,8 @@ export function ControlsPanel({
 
   const check = requiredControlsPresent(controls, hasConditionProgram);
 
-  function run(action: () => Promise<ActionResult>, after?: () => void) {
+  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
+    setPendingKey(key);
     start(async () => {
       const res = await action();
       if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
@@ -60,10 +62,10 @@ export function ControlsPanel({
               className="btn btn-ghost btn-sm"
               style={{ marginLeft: "auto" }}
               disabled={pending}
-              aria-busy={pending}
-              onClick={() => run(() => deleteControlAction(experimentId, c.id))}
+              aria-busy={pending && pendingKey === c.id}
+              onClick={() => run(() => deleteControlAction(experimentId, c.id), c.id)}
             >
-              {pending && <Spinner />}
+              {pending && pendingKey === c.id && <Spinner />}
               Delete
             </button>
           </div>
@@ -83,12 +85,12 @@ export function ControlsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
-          aria-busy={pending}
+          aria-busy={pending && pendingKey === "add-control"}
           onClick={() =>
-            run(() => createControlAction(experimentId, controlType, description), () => setDescription(""))
+            run(() => createControlAction(experimentId, controlType, description), "add-control", () => setDescription(""))
           }
         >
-          {pending && <Spinner />}
+          {pending && pendingKey === "add-control" && <Spinner />}
           + Add control
         </button>
       </div>
