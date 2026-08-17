@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 import { createNewSeries } from "../actions";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 
 export default function NewSeriesPage() {
-  const [state, formAction] = useActionState<ActionResult | null, FormData>(createNewSeries, null);
+  const [state, formAction, isPending] = useActionState<ActionResult | null, FormData>(createNewSeries, null);
 
   return (
     <div>
@@ -27,7 +28,8 @@ export default function NewSeriesPage() {
           <label>Description</label>
           <textarea name="description" rows={2} />
         </div>
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" disabled={isPending} aria-busy={isPending}>
+          {isPending && <Spinner />}
           Create series
         </button>
       </form>

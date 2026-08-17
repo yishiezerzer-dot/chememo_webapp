@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { Experiment } from "@/lib/types";
 import type { CitedAnswer } from "@/lib/llm";
 import { CitedAnswerView } from "@/components/cited-answer";
+import { Spinner } from "@/components/spinner";
 
 // T3.6 D3 — two parts: (a) missing controls, deterministic and free — any
 // experiment in the set with zero recorded controls, straight from the
@@ -71,6 +72,7 @@ export function AiContradictionCheck({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending || experiments.length < 2}
+          aria-busy={pending}
           onClick={() =>
             start(async () => {
               setFailed(false);
@@ -81,7 +83,8 @@ export function AiContradictionCheck({
             })
           }
         >
-          {pending ? "Checking…" : "Check for contradictions & missing controls"}
+          {pending && <Spinner />}
+          Check for contradictions & missing controls
         </button>
       )}
     </div>

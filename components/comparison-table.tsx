@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { StatusBadge } from "@/components/status-badge";
 import type { ActionResult, Experiment } from "@/lib/types";
 
@@ -79,7 +80,8 @@ export function ComparisonTable({
                   <td className="td-center muted">{controlsCounts[e.id] ?? 0}</td>
                   {onRemove && (
                     <td>
-                      <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => remove(e.id)}>
+                      <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending} onClick={() => remove(e.id)}>
+                        {pending && <Spinner />}
                         Remove
                       </button>
                     </td>

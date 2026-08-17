@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { CitedAnswerView } from "@/components/cited-answer";
+import { Spinner } from "@/components/spinner";
 import type { CitedAnswer } from "@/lib/llm";
 
 export function GroupSummary({
@@ -32,6 +33,7 @@ export function GroupSummary({
         type="button"
         className="btn btn-ghost btn-sm"
         disabled={pending}
+        aria-busy={pending}
         onClick={() =>
           start(async () => {
             setFailed(false);
@@ -41,6 +43,7 @@ export function GroupSummary({
           })
         }
       >
+        {pending && <Spinner />}
         {pending ? "Summarising…" : `Summarise these ${ids.length} experiments`}
       </button>
       {failed && (

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { StatusBadge, STATUS_LABEL } from "@/components/status-badge";
 import { exportExperimentsCsvAction, saveViewAction, deleteViewAction } from "@/app/(app)/experiments/actions";
 import {
@@ -43,6 +44,7 @@ export function ExperimentsTable({
   const [pending, start] = useTransition();
   const [q, setQ] = useState(params.q ?? "");
   const [viewName, setViewName] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   function navigate(patch: Partial<ExperimentSearchParams>) {
     // Read the live URL, not the `params` prop -- that prop is a snapshot
@@ -75,16 +77,21 @@ export function ExperimentsTable({
   const projectLabel = Object.fromEntries(projects.map((p) => [p.id, p.label]));
 
   async function exportCsv() {
-    const csv = await exportExperimentsCsvAction(params);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `chememo-experiments-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    setExporting(true);
+    try {
+      const csv = await exportExperimentsCsvAction(params);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chememo-experiments-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   }
 
   function saveView() {
@@ -197,9 +204,12 @@ export function ExperimentsTable({
         <button
           type="button"
           className="btn btn-ghost btn-sm"
+          disabled={exporting}
+          aria-busy={exporting}
           onClick={exportCsv}
           title="Download every matching row (not just this page) as CSV"
         >
+          {exporting && <Spinner />}
           Export CSV
         </button>
       </div>
@@ -225,7 +235,8 @@ export function ExperimentsTable({
             placeholder="Save this view as…"
             style={{ maxWidth: 180 }}
           />
-          <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={saveView}>
+          <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending} onClick={saveView}>
+            {pending && <Spinner />}
             Save view
           </button>
         </div>

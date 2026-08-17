@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { totalVolumeLiters } from "@/lib/stoichiometry/calculate";
 import type {
   ActionResult,
@@ -102,7 +103,8 @@ export function InputsOutputsPanel({
     <div className="obs-box glass">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h4 style={{ margin: 0 }}>Inputs &amp; outputs</h4>
-        <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => run(recalculate)}>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending} onClick={() => run(recalculate)}>
+          {pending && <Spinner />}
           Recalculate stoichiometry
         </button>
       </div>
@@ -139,8 +141,10 @@ export function InputsOutputsPanel({
                   className="btn btn-ghost btn-sm"
                   style={{ marginLeft: "auto" }}
                   disabled={pending}
+                  aria-busy={pending}
                   onClick={() => run(() => removeInput(i.id))}
                 >
+                  {pending && <Spinner />}
                   Remove
                 </button>
               </div>
@@ -178,6 +182,7 @@ export function InputsOutputsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending || !inputSource}
+          aria-busy={pending}
           onClick={() => {
             const option = lotStockOptions.find((o) => o.id === inputSource);
             if (!option) return;
@@ -194,6 +199,7 @@ export function InputsOutputsPanel({
             });
           }}
         >
+          {pending && <Spinner />}
           + Add input
         </button>
       </div>
@@ -221,8 +227,10 @@ export function InputsOutputsPanel({
                   className="btn btn-ghost btn-sm"
                   style={{ marginLeft: "auto" }}
                   disabled={pending}
+                  aria-busy={pending}
                   onClick={() => run(() => removeOutput(o.id))}
                 >
+                  {pending && <Spinner />}
                   Remove
                 </button>
               </div>
@@ -260,6 +268,7 @@ export function InputsOutputsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending || (!outputMaterial && !outputName.trim())}
+          aria-busy={pending}
           onClick={() =>
             run(async () => {
               const res = await addOutput(
@@ -278,6 +287,7 @@ export function InputsOutputsPanel({
             })
           }
         >
+          {pending && <Spinner />}
           + Add output
         </button>
       </div>

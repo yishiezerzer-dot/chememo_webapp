@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { BrandMark } from "@/components/brand-mark";
+import { Spinner } from "@/components/spinner";
 
 type Mode = "signin" | "signup";
 
@@ -158,9 +159,11 @@ export default function LoginPage() {
               type="submit"
               className="btn btn-primary"
               disabled={loading}
+              aria-busy={loading}
               style={{ width: "100%", justifyContent: "center", marginTop: 6 }}
             >
-              {loading ? "…" : signin ? "Sign in" : "Sign up"}
+              {loading && <Spinner />}
+              {signin ? "Sign in" : "Sign up"}
             </button>
           </form>
           <div className="auth-toggle">

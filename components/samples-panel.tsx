@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { SAMPLE_RELATIONSHIP_TYPES, SAMPLE_EVENT_TYPES } from "@/lib/types";
 import type {
   ActionResult,
@@ -122,8 +123,10 @@ function ConditionProgramSection({
                     type="button"
                     className="btn btn-sm"
                     disabled={pending || !templateId}
+                    aria-busy={pending}
                     onClick={() => run(() => applyConditionProgramTemplateAction(experimentId, batchId, templateId))}
                   >
+                    {pending && <Spinner />}
                     Apply template
                   </button>
                 </>
@@ -141,6 +144,7 @@ function ConditionProgramSection({
                     type="button"
                     className="btn btn-sm"
                     disabled={pending || !name.trim()}
+                    aria-busy={pending}
                     onClick={() =>
                       run(
                         () =>
@@ -166,6 +170,7 @@ function ConditionProgramSection({
                       )
                     }
                   >
+                    {pending && <Spinner />}
                     Save program
                   </button>
                 </div>
@@ -213,6 +218,7 @@ function ConditionProgramSection({
                     type="button"
                     className="btn btn-sm"
                     disabled={pending || !cycleIndex}
+                    aria-busy={pending}
                     onClick={() =>
                       run(
                         () => {
@@ -242,6 +248,7 @@ function ConditionProgramSection({
                       )
                     }
                   >
+                    {pending && <Spinner />}
                     Save cycle
                   </button>
                 </div>
@@ -273,6 +280,7 @@ function ConditionProgramSection({
                   type="button"
                   className="btn btn-sm"
                   disabled={pending}
+                  aria-busy={pending}
                   onClick={() =>
                     run(() =>
                       saveEnvironmentalConditionsAction(experimentId, batchId, {
@@ -297,6 +305,7 @@ function ConditionProgramSection({
                     )
                   }
                 >
+                  {pending && <Spinner />}
                   Save
                 </button>
               </div>
@@ -464,6 +473,7 @@ function AnalysisRunsSection({
                             type="button"
                             className="btn btn-ghost btn-sm"
                             disabled={pending || !peakMz}
+                            aria-busy={pending}
                             onClick={() =>
                               run(async () => {
                                 const res2 = await addPeakAction(experimentId, res.id, {
@@ -489,6 +499,7 @@ function AnalysisRunsSection({
                               })
                             }
                           >
+                            {pending && <Spinner />}
                             + Peak
                           </button>
                         </div>
@@ -507,6 +518,7 @@ function AnalysisRunsSection({
                         type="button"
                         className="btn btn-ghost btn-sm"
                         disabled={pending}
+                        aria-busy={pending}
                         onClick={() =>
                           run(
                             () => createResultAction(experimentId, r.id, resultConfidence, resultSummary, {}),
@@ -517,6 +529,7 @@ function AnalysisRunsSection({
                           )
                         }
                       >
+                        {pending && <Spinner />}
                         + Add result
                       </button>
                     </div>
@@ -547,6 +560,7 @@ function AnalysisRunsSection({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !methodId}
+              aria-busy={pending}
               onClick={() =>
                 run(
                   () => createRunAction(experimentId, sampleId, methodId, status, operator),
@@ -558,6 +572,7 @@ function AnalysisRunsSection({
                 )
               }
             >
+              {pending && <Spinner />}
               + New run
             </button>
           </div>
@@ -672,12 +687,14 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !aliasValue.trim()}
+              aria-busy={pending}
               onClick={() => {
                 const v = aliasValue;
                 setAliasValue("");
                 run(() => addAlias(sample.id, v, ""));
               }}
             >
+              {pending && <Spinner />}
               + Alias
             </button>
           </div>
@@ -688,8 +705,15 @@ function SampleRow({
                 <div key={r.id}>
                   {r.relationship_type} {r.source_sample_id === sample.id ? "→" : "←"}{" "}
                   {allSamples.find((s) => s.id === (r.source_sample_id === sample.id ? r.target_sample_id : r.source_sample_id))?.vial_label ?? "?"}
-                  <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => run(() => deleteRelationship(r.id))}>
-                    ×
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ marginLeft: 8 }}
+                    disabled={pending}
+                    aria-busy={pending}
+                    onClick={() => run(() => deleteRelationship(r.id))}
+                  >
+                    {pending ? <Spinner /> : "×"}
                   </button>
                 </div>
               ))}
@@ -715,8 +739,10 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !relTarget}
+              aria-busy={pending}
               onClick={() => run(() => createRelationship(sample.id, relTarget, relType))}
             >
+              {pending && <Spinner />}
               + Link
             </button>
           </div>
@@ -727,12 +753,14 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !toLocation.trim()}
+              aria-busy={pending}
               onClick={() => {
                 const v = toLocation;
                 setToLocation("");
                 run(() => recordEvent(sample.id, "transfer", { to_location_path: v }));
               }}
             >
+              {pending && <Spinner />}
               + Record transfer
             </button>
           </div>
@@ -750,12 +778,14 @@ function SampleRow({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !weight}
+              aria-busy={pending}
               onClick={() => {
                 const v = weight;
                 setWeight("");
                 run(() => addMeasurement(sample.id, { sample_weight: { value: Number(v), unit_code: weightUnit } }, ""));
               }}
             >
+              {pending && <Spinner />}
               + Log measurement
             </button>
           </div>
@@ -932,6 +962,7 @@ export function SamplesPanel({
                 type="button"
                 className="btn btn-sm"
                 disabled={pending}
+                aria-busy={pending}
                 onClick={() => {
                   const originOption = lotStockOptions.find((o) => o.id === origin);
                   run(
@@ -950,6 +981,7 @@ export function SamplesPanel({
                   );
                 }}
               >
+                {pending && <Spinner />}
                 Save sample
               </button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddingToBatch(null)}>
@@ -972,6 +1004,7 @@ export function SamplesPanel({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending}
+              aria-busy={pending}
               onClick={() =>
                 run(() => createBatch(batchLabel, ""), () => {
                   setBatchLabel("");
@@ -979,6 +1012,7 @@ export function SamplesPanel({
                 })
               }
             >
+              {pending && <Spinner />}
               Save batch
             </button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewBatch(false)}>

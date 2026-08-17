@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { ExperimentTemplate, Project } from "@/lib/types";
 import type { CrewDraft, PlanFields } from "@/lib/ai/crew/types";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { createDraftExperimentFromPlan } from "@/app/(app)/plan/commit-actions";
 
 function deriveDefaultName(draft: CrewDraft): string {
@@ -161,8 +162,9 @@ export function PlanClient({ projects, templates }: { projects: Project[]; templ
         </p>
       </div>
 
-      <button type="button" className="btn" disabled={!notes.trim() || busy} onClick={run} style={{ marginTop: 4 }}>
-        {busy ? "Planning…" : "Run planning crew"}
+      <button type="button" className="btn" disabled={!notes.trim() || busy} aria-busy={busy} onClick={run} style={{ marginTop: 4 }}>
+        {busy && <Spinner />}
+        Run planning crew
       </button>
 
       <div role="status" aria-live="polite" style={{ marginTop: 14 }}>
@@ -373,9 +375,11 @@ export function PlanClient({ projects, templates }: { projects: Project[]; templ
                   type="button"
                   className="btn"
                   disabled={!commitName.trim() || committing}
+                  aria-busy={committing}
                   onClick={commit}
                 >
-                  {committing ? "Creating…" : "Confirm and create"}
+                  {committing && <Spinner />}
+                  Confirm and create
                 </button>
                 <button
                   type="button"

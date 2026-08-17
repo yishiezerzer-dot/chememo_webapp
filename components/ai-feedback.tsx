@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/spinner";
 
 // T3.4 D4 — thumbs up/down + optional note on a specific Ask answer, written
 // to ai_feedback via the server action passed in. Only rendered when the
@@ -21,10 +22,13 @@ export function AiFeedback({
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
   const [failed, setFailed] = useState(false);
+  const [sending, setSending] = useState<"up" | "down" | null>(null);
 
   async function send(rating: "up" | "down") {
     setFailed(false);
+    setSending(rating);
     const res = await action(requestId, rating, note.trim() || undefined);
+    setSending(null);
     if (res.ok) setSubmitted(rating);
     else setFailed(true);
   }
@@ -43,10 +47,24 @@ export function AiFeedback({
         <span className="muted" style={{ fontSize: 11.5 }}>
           Was this answer helpful?
         </span>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => send("up")}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={sending !== null}
+          aria-busy={sending === "up"}
+          onClick={() => send("up")}
+        >
+          {sending === "up" && <Spinner />}
           Helpful
         </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => send("down")}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={sending !== null}
+          aria-busy={sending === "down"}
+          onClick={() => send("down")}
+        >
+          {sending === "down" && <Spinner />}
           Not helpful
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNote((s) => !s)}>

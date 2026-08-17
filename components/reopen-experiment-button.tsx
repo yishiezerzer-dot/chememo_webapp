@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 
 // §18.5 — reopening a locked record requires a documented reason. The dialog
@@ -43,6 +44,7 @@ export function ReopenExperimentButton({
           type="button"
           className="btn btn-primary btn-sm"
           disabled={pending || !reason.trim()}
+          aria-busy={pending}
           onClick={() =>
             start(async () => {
               const res = await action(reason);
@@ -51,7 +53,8 @@ export function ReopenExperimentButton({
             })
           }
         >
-          {pending ? "Reopening…" : "Confirm reopen"}
+          {pending && <Spinner />}
+          Confirm reopen
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
           Cancel

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type {
   Material,
   MaterialIdentifier,
@@ -135,8 +136,10 @@ function StockRow({
             className="btn btn-ghost btn-sm"
             style={{ marginLeft: "auto" }}
             disabled={pending}
+            aria-busy={pending}
             onClick={() => run(() => verifyStockAction(stock.id))}
           >
+            {pending && <Spinner />}
             Mark verified
           </button>
         )}
@@ -169,6 +172,7 @@ function StockRow({
               type="button"
               className="btn btn-sm"
               disabled={pending}
+              aria-busy={pending}
               onClick={() =>
                 run(async () => {
                   const nextAttemptNumber = (attempts?.length ?? 0) + 1;
@@ -189,6 +193,7 @@ function StockRow({
                 })
               }
             >
+              {pending && <Spinner />}
               + Log attempt
             </button>
           </div>
@@ -257,6 +262,7 @@ function LotRow({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() =>
             start(async () => {
               const res = await deleteLotAction(lot.id);
@@ -265,6 +271,7 @@ function LotRow({
             })
           }
         >
+          {pending && <Spinner />}
           Delete
         </button>
       </div>
@@ -295,6 +302,7 @@ function LotRow({
                   type="button"
                   className="btn btn-sm"
                   disabled={pending}
+                  aria-busy={pending}
                   onClick={() =>
                     run(async () => {
                       const res = await createStockAction(lot.id, {
@@ -328,6 +336,7 @@ function LotRow({
                     })
                   }
                 >
+                  {pending && <Spinner />}
                   Save stock
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewStock(false)}>
@@ -405,8 +414,10 @@ function MaterialRow({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => run(() => deleteMaterialAction(material.id))}
         >
+          {pending && <Spinner />}
           Delete
         </button>
       </div>
@@ -437,6 +448,7 @@ function MaterialRow({
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={pending}
+                aria-busy={pending}
                 onClick={() =>
                   run(async () => {
                     const res = await addIdentifierAction(material.id, identifierType, identifierValue);
@@ -449,6 +461,7 @@ function MaterialRow({
                   })
                 }
               >
+                {pending && <Spinner />}
                 + Add
               </button>
             </div>
@@ -487,6 +500,7 @@ function MaterialRow({
                 type="button"
                 className="btn btn-sm"
                 disabled={pending}
+                aria-busy={pending}
                 onClick={() =>
                   run(async () => {
                     const res = await createLotAction(material.id, {
@@ -518,6 +532,7 @@ function MaterialRow({
                   })
                 }
               >
+                {pending && <Spinner />}
                 Save lot
               </button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(false)}>
@@ -587,6 +602,7 @@ export function MaterialsClient({
               type="button"
               className="btn btn-sm"
               disabled={pending}
+              aria-busy={pending}
               onClick={() =>
                 start(async () => {
                   const res = await createStorageLocationAction(storageName, storageConditions, "");
@@ -600,6 +616,7 @@ export function MaterialsClient({
                 })
               }
             >
+              {pending && <Spinner />}
               Save
             </button>
           </div>
@@ -637,7 +654,8 @@ export function MaterialsClient({
             <input name="stereochemistry" placeholder="Stereochemistry" />
           </div>
           <textarea name="safety_notes" placeholder="Safety notes" style={{ marginTop: 8, width: "100%" }} />
-          <button type="submit" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending}>
+          <button type="submit" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending} aria-busy={pending}>
+            {pending && <Spinner />}
             Save material
           </button>
         </form>

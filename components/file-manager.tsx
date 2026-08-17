@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 
 export function FileManager({
@@ -14,6 +15,7 @@ export function FileManager({
   const uploadFormRef = useRef<HTMLFormElement>(null);
   const linkFormRef = useRef<HTMLFormElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [linking, setLinking] = useState(false);
   const { showToast } = useToast();
 
   return (
@@ -63,13 +65,18 @@ export function FileManager({
       <form
         ref={linkFormRef}
         action={async (fd) => {
-          const res = await linkAction(fd);
-          if (!res.ok) {
-            showToast(res.error, "error");
-            return;
+          setLinking(true);
+          try {
+            const res = await linkAction(fd);
+            if (!res.ok) {
+              showToast(res.error, "error");
+              return;
+            }
+            linkFormRef.current?.reset();
+            showToast("Link added", "success");
+          } finally {
+            setLinking(false);
           }
-          linkFormRef.current?.reset();
-          showToast("Link added", "success");
         }}
       >
         <div className="field">
@@ -91,7 +98,8 @@ export function FileManager({
             </select>
           </div>
         </div>
-        <button type="submit" className="btn btn-ghost btn-sm">
+        <button type="submit" className="btn btn-ghost btn-sm" disabled={linking} aria-busy={linking}>
+          {linking && <Spinner />}
           + Add link
         </button>
       </form>

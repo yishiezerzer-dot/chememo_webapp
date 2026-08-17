@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Experiment } from "@/lib/types";
+import { Spinner } from "@/components/spinner";
 
 type Extract = (notes: string) => Promise<Partial<Experiment> | null>;
 
@@ -66,9 +67,11 @@ export function PasteNotes({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={!aiEnabled || busy || !notes.trim()}
+          aria-busy={busy}
           onClick={run}
         >
-          {busy ? "Extracting…" : "Extract fields"}
+          {busy && <Spinner />}
+          Extract fields
         </button>
         {msg && (
           <span className="muted" style={{ fontSize: 12.5 }}>

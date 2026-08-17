@@ -3,6 +3,7 @@
 import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { ComparisonTable } from "@/components/comparison-table";
 import { GroupSummary } from "@/components/group-summary";
 import { AiComparisonTable } from "@/components/ai-comparison-table";
@@ -54,6 +55,7 @@ export function SeriesDetailClient({
           type="button"
           className="btn btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => {
             const id = inputRef.current?.value.trim();
             if (!id) return;
@@ -64,6 +66,7 @@ export function SeriesDetailClient({
             });
           }}
         >
+          {pending && <Spinner />}
           Add experiment
         </button>
       </div>

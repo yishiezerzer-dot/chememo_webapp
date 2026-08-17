@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ConditionProgramTemplate, QuantityKind, Quantity } from "@/lib/types";
 import { createConditionProgramTemplateAction } from "@/app/(app)/condition-programs/actions";
 
@@ -146,7 +147,8 @@ export function ConditionProgramsClient({
           <QuantityRow label="Starting volume" kind={kind("starting_volume")} value={startingVolume} onChange={setStartingVolume} />
           <QuantityRow label="Rehydration volume" kind={kind("rehydration_volume")} value={rehydrationVolume} onChange={setRehydrationVolume} />
           <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ marginTop: 8, width: "100%" }} />
-          <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending || !name.trim()} onClick={save}>
+          <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending || !name.trim()} aria-busy={pending} onClick={save}>
+            {pending && <Spinner />}
             Save template
           </button>
         </div>

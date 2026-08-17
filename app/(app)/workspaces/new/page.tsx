@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 import { createWorkspaceAction } from "../../workspaces-actions";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 
 export default function NewWorkspacePage() {
-  const [state, formAction] = useActionState<ActionResult | null, FormData>(createWorkspaceAction, null);
+  const [state, formAction, isPending] = useActionState<ActionResult | null, FormData>(createWorkspaceAction, null);
 
   return (
     <div>
@@ -24,7 +25,8 @@ export default function NewWorkspacePage() {
           <label>Workspace name *</label>
           <input name="name" required placeholder="Moran Lab" />
         </div>
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" disabled={isPending} aria-busy={isPending}>
+          {isPending && <Spinner />}
           Create workspace
         </button>
       </form>

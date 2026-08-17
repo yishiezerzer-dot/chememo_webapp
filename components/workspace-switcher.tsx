@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Spinner } from "@/components/spinner";
 import type { WorkspaceMembership } from "@/lib/types";
 import { switchWorkspaceAction } from "@/app/(app)/workspaces-actions";
 
@@ -31,9 +32,12 @@ export function WorkspaceSwitcher({ memberships, activeId }: { memberships: Work
         className="btn btn-ghost btn-sm"
         style={{ width: "100%", justifyContent: "space-between" }}
         disabled={pending}
+        aria-busy={pending}
         onClick={() => setOpen((o) => !o)}
       >
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{active?.name ?? "Workspace"}</span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {pending && <Spinner />} {active?.name ?? "Workspace"}
+        </span>
         <span style={{ opacity: 0.6 }}>▾</span>
       </button>
       {open && (
@@ -47,8 +51,11 @@ export function WorkspaceSwitcher({ memberships, activeId }: { memberships: Work
               type="button"
               className="btn btn-ghost btn-sm"
               style={{ width: "100%", justifyContent: "flex-start", fontWeight: m.id === activeId ? 600 : 400 }}
+              disabled={pending}
+              aria-busy={pending}
               onClick={() => switchTo(m.id)}
             >
+              {pending && <Spinner />}
               {m.name} <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>{m.role}</span>
             </button>
           ))}

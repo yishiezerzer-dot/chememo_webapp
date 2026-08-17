@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 import type { TimelineEntry } from "@/lib/experiments/timeline";
 import type { DiffField } from "@/lib/diff";
@@ -80,6 +81,7 @@ function RestoreControl({
           type="button"
           className="btn btn-sm"
           disabled={pending || !reason.trim()}
+          aria-busy={pending}
           onClick={() =>
             start(async () => {
               const res = await restoreRevision(revisionId, reason);
@@ -88,7 +90,8 @@ function RestoreControl({
             })
           }
         >
-          {pending ? "Restoring…" : "Confirm restore"}
+          {pending && <Spinner />}
+          Confirm restore
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
           Cancel

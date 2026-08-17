@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import type { ActionResult, CriticalParameter, KnownFailureMode, ProtocolStep, QuantityKind } from "@/lib/types";
 import { ProtocolVersionEditor } from "@/components/protocol-version-editor";
+import { Spinner } from "@/components/spinner";
 
 export function ProtocolEditClient({
   action,
@@ -23,7 +24,7 @@ export function ProtocolEditClient({
   };
   quantityKinds: QuantityKind[];
 }) {
-  const [state, formAction] = useActionState<ActionResult | null, FormData>(action, null);
+  const [state, formAction, isPending] = useActionState<ActionResult | null, FormData>(action, null);
 
   return (
     <form action={formAction} className="obs-box glass" style={{ maxWidth: 720 }}>
@@ -33,7 +34,8 @@ export function ProtocolEditClient({
         </p>
       )}
       <ProtocolVersionEditor initial={initial} quantityKinds={quantityKinds} />
-      <button type="submit" className="btn btn-primary">
+      <button type="submit" className="btn btn-primary" disabled={isPending} aria-busy={isPending}>
+        {isPending && <Spinner />}
         Save protocol version
       </button>
     </form>

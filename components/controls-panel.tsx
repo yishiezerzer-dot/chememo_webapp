@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { CONTROL_TYPES } from "@/lib/types";
 import type { ActionResult, Control, ControlType } from "@/lib/types";
 import { createControlAction, deleteControlAction } from "@/app/(app)/experiments/[id]/conditions-actions";
@@ -59,8 +60,10 @@ export function ControlsPanel({
               className="btn btn-ghost btn-sm"
               style={{ marginLeft: "auto" }}
               disabled={pending}
+              aria-busy={pending}
               onClick={() => run(() => deleteControlAction(experimentId, c.id))}
             >
+              {pending && <Spinner />}
               Delete
             </button>
           </div>
@@ -80,10 +83,12 @@ export function ControlsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() =>
             run(() => createControlAction(experimentId, controlType, description), () => setDescription(""))
           }
         >
+          {pending && <Spinner />}
           + Add control
         </button>
       </div>

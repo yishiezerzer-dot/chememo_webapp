@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { Spinner } from "@/components/spinner";
 import {
   METHOD_OPTIONS,
   type ActionResult,
@@ -646,7 +647,8 @@ function ExperimentFormBody({
             className="btn btn-primary"
             style={{ width: "100%", justifyContent: "center" }}
           >
-            {pending ? "Saving…" : submitLabel}
+            {pending && <Spinner />}
+            {submitLabel}
           </button>
         </div>
       </aside>

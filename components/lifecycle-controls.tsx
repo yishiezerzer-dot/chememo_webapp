@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult, ExperimentStatus } from "@/lib/types";
 
 // Mirrors the DB trigger's legal-transition table (migration
@@ -88,6 +89,7 @@ export function LifecycleControls({
             type="button"
             className="btn btn-ghost btn-sm"
             disabled={pending || gated}
+            aria-busy={pending}
             title={
               gated
                 ? `This experiment has ${unresolvedOpenCount} unresolved item${unresolvedOpenCount === 1 ? "" : "s"} from its AI-generated plan. Resolve them before starting.`
@@ -95,6 +97,7 @@ export function LifecycleControls({
             }
             onClick={() => run(() => setStatusAction(m.next))}
           >
+            {pending && <Spinner />}
             {m.label}
           </button>
         );
@@ -104,9 +107,11 @@ export function LifecycleControls({
           type="button"
           className="btn btn-sm"
           disabled={pending}
+          aria-busy={pending}
           title={hasConclusion ? undefined : "A conclusion is required to complete (standard §15.2)."}
           onClick={() => run(completeAction)}
         >
+          {pending && <Spinner />}
           Complete
         </button>
       )}
@@ -115,8 +120,10 @@ export function LifecycleControls({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => run(reviewAction)}
         >
+          {pending && <Spinner />}
           Mark reviewed
         </button>
       )}

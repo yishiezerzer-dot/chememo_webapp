@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Project } from "@/lib/types";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { createProject, deleteProject } from "@/app/(app)/projects-actions";
 
 const ITEMS = [
@@ -220,6 +221,7 @@ export function SidebarNav({
                 aria-label={`Delete ${p.label}`}
                 onClick={() => handleDelete(p.id)}
                 disabled={busy}
+                aria-busy={busy}
                 className="btn-ghost btn-sm"
                 style={{
                   border: "none",
@@ -230,7 +232,7 @@ export function SidebarNav({
                   flex: "none",
                 }}
               >
-                ×
+                {busy ? <Spinner /> : "×"}
               </button>
             )}
           </div>
@@ -292,7 +294,8 @@ export function SidebarNav({
             ))}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button type="submit" className="btn btn-sm" disabled={busy}>
+            <button type="submit" className="btn btn-sm" disabled={busy} aria-busy={busy}>
+              {busy && <Spinner />}
               Add
             </button>
             <button

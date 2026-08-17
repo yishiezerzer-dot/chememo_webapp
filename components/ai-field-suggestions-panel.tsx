@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 import type { AiSuggestion } from "@/lib/ai/suggestions";
 
@@ -70,9 +71,11 @@ export function AiFieldSuggestionsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending || isLocked}
+          aria-busy={pending}
           title={isLocked ? "This experiment is locked; nothing can be applied here." : undefined}
           onClick={generate}
         >
+          {pending && <Spinner />}
           Check for missing details
         </button>
       </div>
@@ -86,15 +89,24 @@ export function AiFieldSuggestionsPanel({
                 <p style={{ margin: "4px 0", fontSize: 13 }}>{s.suggestedValue}</p>
                 <span className="muted" style={{ fontSize: 12 }}>{s.rationale}</span>
                 <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
-                  <button type="button" className="btn btn-sm" disabled={pending} onClick={() => resolve(s.id, true)}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={pending}
+                    aria-busy={pending}
+                    onClick={() => resolve(s.id, true)}
+                  >
+                    {pending && <Spinner />}
                     Agree
                   </button>
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
                     disabled={pending}
+                    aria-busy={pending}
                     onClick={() => resolve(s.id, false)}
                   >
+                    {pending && <Spinner />}
                     Dismiss
                   </button>
                 </div>

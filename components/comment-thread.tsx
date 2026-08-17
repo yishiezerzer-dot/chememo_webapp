@@ -3,6 +3,7 @@
 import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 import type { CommentView } from "@/lib/comments/service";
 
@@ -53,8 +54,10 @@ export function CommentThread({
             type="button"
             className="btn btn-ghost btn-sm"
             disabled={pending}
+            aria-busy={pending}
             onClick={() => run(() => (c.resolved_at ? reopenComment(c.id) : resolveComment(c.id)))}
           >
+            {pending && <Spinner />}
             {c.resolved_at ? "Reopen" : "Resolve"}
           </button>
         </div>
@@ -65,6 +68,7 @@ export function CommentThread({
           type="button"
           className="btn btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => {
             const body = bodyRef.current?.value.trim();
             if (!body) return;
@@ -75,6 +79,7 @@ export function CommentThread({
             });
           }}
         >
+          {pending && <Spinner />}
           Post
         </button>
       </div>

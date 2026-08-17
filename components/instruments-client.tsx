@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { METHOD_TYPES } from "@/lib/types";
 import type { ActionResult, Instrument, InstrumentMethod, MethodType } from "@/lib/types";
 import { createInstrumentAction, createMethodAction, getInstrumentMethodsAction } from "@/app/(app)/instruments/actions";
@@ -67,8 +68,10 @@ function InstrumentRow({ instrument }: { instrument: Instrument }) {
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending || !methodName.trim()}
+              aria-busy={pending}
               onClick={() => run(() => createMethodAction(instrument.id, methodName, methodType))}
             >
+              {pending && <Spinner />}
               + Add method
             </button>
           </div>
@@ -114,7 +117,8 @@ export function InstrumentsClient({ instruments }: { instruments: Instrument[] }
             <input name="serial_number" placeholder="Serial #" />
             <input name="location" placeholder="Location" />
           </div>
-          <button type="submit" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending}>
+          <button type="submit" className="btn btn-sm" style={{ marginTop: 8 }} disabled={pending} aria-busy={pending}>
+            {pending && <Spinner />}
             Save instrument
           </button>
         </form>

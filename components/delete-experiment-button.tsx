@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult, ExperimentStatus } from "@/lib/types";
 
 const TERMINAL: ExperimentStatus[] = ["completed", "reviewed", "failed", "cancelled"];
@@ -50,18 +51,22 @@ export function DeleteExperimentButton({
       );
     }
     return (
-      <form action={deleteAction} style={{ display: "inline-flex", gap: 8 }}>
+      <div style={{ display: "inline-flex", gap: 8 }}>
         <button
-          type="submit"
+          type="button"
           className="btn btn-sm"
+          disabled={pending}
+          aria-busy={pending}
           style={{ borderColor: "var(--rose)", color: "var(--rose)" }}
+          onClick={() => start(async () => { await deleteAction(); })}
         >
+          {pending && <Spinner />}
           Confirm delete
         </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMode("idle")}>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => setMode("idle")}>
           Cancel
         </button>
-      </form>
+      </div>
     );
   }
 
@@ -76,8 +81,9 @@ export function DeleteExperimentButton({
     }
     return (
       <div style={{ display: "inline-flex", gap: 8 }}>
-        <button type="button" className="btn btn-sm" disabled={pending} onClick={() => runArchive()}>
-          {pending ? "Archiving…" : "Confirm archive"}
+        <button type="button" className="btn btn-sm" disabled={pending} aria-busy={pending} onClick={() => runArchive()}>
+          {pending && <Spinner />}
+          Confirm archive
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMode("idle")}>
           Cancel
@@ -104,15 +110,19 @@ export function DeleteExperimentButton({
         type="button"
         className="btn btn-sm"
         disabled={pending || !hasConclusion}
+        aria-busy={pending}
         title={hasConclusion ? undefined : "A conclusion is required to complete (standard §15.2)."}
         onClick={() => runArchive("completed")}
       >
+        {pending && <Spinner />}
         Completed
       </button>
-      <button type="button" className="btn btn-sm" disabled={pending} onClick={() => runArchive("failed")}>
+      <button type="button" className="btn btn-sm" disabled={pending} aria-busy={pending} onClick={() => runArchive("failed")}>
+        {pending && <Spinner />}
         Failed
       </button>
-      <button type="button" className="btn btn-sm" disabled={pending} onClick={() => runArchive("cancelled")}>
+      <button type="button" className="btn btn-sm" disabled={pending} aria-busy={pending} onClick={() => runArchive("cancelled")}>
+        {pending && <Spinner />}
         Cancelled
       </button>
       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMode("idle")}>

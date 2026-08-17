@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 import { createNewTemplate } from "../actions";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 
 export default function NewTemplatePage() {
-  const [state, formAction] = useActionState<ActionResult | null, FormData>(createNewTemplate, null);
+  const [state, formAction, isPending] = useActionState<ActionResult | null, FormData>(createNewTemplate, null);
 
   return (
     <div>
@@ -27,7 +28,8 @@ export default function NewTemplatePage() {
           <label>Description</label>
           <textarea name="description" rows={2} />
         </div>
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" disabled={isPending} aria-busy={isPending}>
+          {isPending && <Spinner />}
           Create and add defaults
         </button>
       </form>

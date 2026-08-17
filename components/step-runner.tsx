@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult, Quantity, QuantityKind } from "@/lib/types";
 import type { StepDetail, DeviationInput } from "@/lib/experiment-steps/service";
 
@@ -222,16 +223,20 @@ function StepCard({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => run(() => updateStatus(step.id, "in_progress", { ph, quantities, atmosphere: atmosphere || null }))}
         >
+          {pending && <Spinner />}
           Start
         </button>
         <button
           type="button"
           className="btn btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => run(() => updateStatus(step.id, "completed", { ph, quantities, atmosphere: atmosphere || null }))}
         >
+          {pending && <Spinner />}
           Complete
         </button>
       </div>
@@ -251,6 +256,7 @@ function StepCard({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => {
             const note = noteRef.current?.value.trim();
             if (!note) return;
@@ -261,6 +267,7 @@ function StepCard({
             });
           }}
         >
+          {pending && <Spinner />}
           Add
         </button>
       </div>
@@ -314,6 +321,7 @@ export function StepRunner({
         type="button"
         className="btn btn-sm"
         disabled={pending}
+        aria-busy={pending}
         onClick={() =>
           start(async () => {
             const res = await instantiate();
@@ -322,6 +330,7 @@ export function StepRunner({
           })
         }
       >
+        {pending && <Spinner />}
         Instantiate steps
       </button>
     );

@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 
 type NotificationItem = {
@@ -57,6 +58,7 @@ export function NotificationsListClient({
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={pending}
+              aria-busy={pending}
               onClick={() =>
                 start(async () => {
                   const res = await markRead(item.id);
@@ -65,6 +67,7 @@ export function NotificationsListClient({
                 })
               }
             >
+              {pending && <Spinner />}
               Mark read
             </button>
           )}

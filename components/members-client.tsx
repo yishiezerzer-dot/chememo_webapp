@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { WORKSPACE_ROLES } from "@/lib/types";
 import type { WorkspaceRole } from "@/lib/types";
 import type { InvitationView, MemberView } from "@/lib/workspaces/service";
@@ -70,8 +71,10 @@ export function MembersClient({
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={pending}
+                aria-busy={pending}
                 onClick={() => run(() => removeMemberAction(m.userId))}
               >
+                {pending && <Spinner />}
                 Remove
               </button>
             )}
@@ -98,6 +101,7 @@ export function MembersClient({
               type="button"
               className="btn btn-sm"
               disabled={pending}
+              aria-busy={pending}
               onClick={() => {
                 const email = emailRef.current?.value.trim();
                 if (!email) return;
@@ -112,6 +116,7 @@ export function MembersClient({
                 });
               }}
             >
+              {pending && <Spinner />}
               + Invite
             </button>
           </div>

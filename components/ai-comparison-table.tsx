@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { ComparisonTableSuggestion } from "@/lib/llm";
+import { Spinner } from "@/components/spinner";
 
 // T3.6 D2 — condition/result table generation. Same opt-in button pattern as
 // GroupSummary: nothing generates until the human clicks, and the output is
@@ -60,6 +61,7 @@ export function AiComparisonTable({
         type="button"
         className="btn btn-ghost btn-sm"
         disabled={pending}
+        aria-busy={pending}
         onClick={() =>
           start(async () => {
             setFailed(false);
@@ -69,7 +71,8 @@ export function AiComparisonTable({
           })
         }
       >
-        {pending ? "Generating…" : "Generate comparison table"}
+        {pending && <Spinner />}
+        Generate comparison table
       </button>
       {failed && (
         <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>

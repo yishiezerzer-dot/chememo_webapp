@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { FILE_ROLES } from "@/lib/types";
 import type { ActionResult, ExperimentFile, FileRole, FileVersion } from "@/lib/types";
 import {
@@ -48,6 +49,7 @@ function RemoveButton({ action }: { action: () => Promise<ActionResult> }) {
       type="button"
       className="btn btn-sm"
       disabled={pending}
+      aria-busy={pending}
       style={{ borderColor: "var(--rose)", color: "var(--rose)", padding: "4px 9px" }}
       onClick={() =>
         start(async () => {
@@ -57,7 +59,8 @@ function RemoveButton({ action }: { action: () => Promise<ActionResult> }) {
         })
       }
     >
-      {pending ? "Removing…" : "Remove"}
+      {pending && <Spinner />}
+      Remove
     </button>
   );
 }
@@ -142,7 +145,8 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                 style={{ marginBottom: 8 }}
               >
                 <input ref={replaceInputRef} type="file" name="file" required disabled={pending} />
-                <button type="submit" className="btn btn-ghost btn-sm" disabled={pending}>
+                <button type="submit" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending}>
+                  {pending && <Spinner />}
                   Replace with new version
                 </button>
               </form>
@@ -201,6 +205,7 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={pending}
+                aria-busy={pending}
                 style={{ marginBottom: 8 }}
                 onClick={() =>
                   run(() =>
@@ -216,6 +221,7 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                   )
                 }
               >
+                {pending && <Spinner />}
                 Save metadata
               </button>
 
@@ -232,8 +238,10 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                   type="button"
                   className="btn btn-ghost btn-sm"
                   disabled={pending || !runId}
+                  aria-busy={pending}
                   onClick={() => run(() => linkFileToRunAction(experimentId, file.id, runId))}
                 >
+                  {pending && <Spinner />}
                   Link
                 </button>
                 {file.analysis_run_id && (
@@ -241,8 +249,10 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
                     type="button"
                     className="btn btn-ghost btn-sm"
                     disabled={pending}
+                    aria-busy={pending}
                     onClick={() => run(() => unlinkFileFromRunAction(experimentId, file.id))}
                   >
+                    {pending && <Spinner />}
                     Unlink
                   </button>
                 )}

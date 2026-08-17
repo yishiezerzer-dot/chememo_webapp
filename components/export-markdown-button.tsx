@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 
 // T1.11 D7 — same Blob-download pattern experiments-table.tsx's CSV export
 // already uses, scoped to one experiment's Markdown export.
@@ -35,7 +36,8 @@ export function ExportMarkdownButton({
   }
 
   return (
-    <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={run}>
+    <button type="button" className="btn btn-ghost btn-sm" disabled={pending} aria-busy={pending} onClick={run}>
+      {pending && <Spinner />}
       Export Markdown
     </button>
   );

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { CitedAnswer } from "@/lib/llm";
 import { CitedAnswerView } from "@/components/cited-answer";
+import { Spinner } from "@/components/spinner";
 
 // T3.6 D6 — reactive gap-spotting for a single experiment: opt-in (a click,
 // never ambient) and display-only (never persisted), same D4 pattern as
@@ -33,6 +34,7 @@ export function AiNextExperimentSuggestion({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() =>
             start(async () => {
               setFailed(false);
@@ -43,7 +45,8 @@ export function AiNextExperimentSuggestion({
             })
           }
         >
-          {pending ? "Thinking…" : "Suggest a next experiment"}
+          {pending && <Spinner />}
+          Suggest a next experiment
         </button>
       )}
     </div>

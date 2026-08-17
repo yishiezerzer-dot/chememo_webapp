@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 import type { CrewProvenance } from "@/lib/ai/crew/provenance";
 import type { AiSuggestion } from "@/lib/ai/suggestions";
@@ -115,9 +116,11 @@ export function CrewProvenancePanel({
                         type="button"
                         className="btn btn-ghost btn-sm"
                         disabled={pending}
+                        aria-busy={pending}
                         onClick={() => resolve(i)}
                         style={{ marginLeft: 8 }}
                       >
+                        {pending && <Spinner />}
                         Resolve
                       </button>
                     )}
@@ -126,10 +129,12 @@ export function CrewProvenancePanel({
                         type="button"
                         className="btn btn-ghost btn-sm"
                         disabled={pending || isLocked}
+                        aria-busy={pending}
                         title={isLocked ? "This experiment is locked; nothing can be applied here." : undefined}
                         onClick={() => generateAiResolution(i)}
                         style={{ marginLeft: 8 }}
                       >
+                        {pending && <Spinner />}
                         Resolve with AI
                       </button>
                     )}
@@ -142,16 +147,20 @@ export function CrewProvenancePanel({
                             type="button"
                             className="btn btn-sm"
                             disabled={pending}
+                            aria-busy={pending}
                             onClick={() => resolveAiSuggestion(aiSuggestion.id, true)}
                           >
+                            {pending && <Spinner />}
                             Agree
                           </button>
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
                             disabled={pending}
+                            aria-busy={pending}
                             onClick={() => resolveAiSuggestion(aiSuggestion.id, false)}
                           >
+                            {pending && <Spinner />}
                             Dismiss
                           </button>
                         </div>

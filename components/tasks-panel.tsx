@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { TASK_STATUSES } from "@/lib/types";
 import type { ActionResult, TaskStatus, TaskType } from "@/lib/types";
 import type { TaskView } from "@/lib/tasks/service";
@@ -94,6 +95,7 @@ export function TasksPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => {
             const title = titleRef.current?.value.trim();
             if (!title) return;
@@ -107,6 +109,7 @@ export function TasksPanel({
             });
           }}
         >
+          {pending && <Spinner />}
           + Add
         </button>
       </div>

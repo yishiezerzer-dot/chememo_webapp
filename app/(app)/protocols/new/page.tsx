@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 import { createNewProtocol } from "../actions";
+import { Spinner } from "@/components/spinner";
 import type { ActionResult } from "@/lib/types";
 
 export default function NewProtocolPage() {
-  const [state, formAction] = useActionState<ActionResult | null, FormData>(createNewProtocol, null);
+  const [state, formAction, isPending] = useActionState<ActionResult | null, FormData>(createNewProtocol, null);
 
   return (
     <div>
@@ -23,7 +24,8 @@ export default function NewProtocolPage() {
           <label>Name *</label>
           <input name="name" required placeholder="Wet-dry dry-down, standard" />
         </div>
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" disabled={isPending} aria-busy={isPending}>
+          {isPending && <Spinner />}
           Create and add steps
         </button>
       </form>

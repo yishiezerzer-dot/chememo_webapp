@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
+import { Spinner } from "@/components/spinner";
 import { RELATIONSHIP_TYPES, RELATIONSHIP_LABEL } from "@/lib/types";
 import type { ActionResult, ExperimentSeries, RelationshipType } from "@/lib/types";
 import type { RelationshipView } from "@/lib/relationships/service";
@@ -70,8 +71,10 @@ export function RelationshipsPanel({
                     className="btn btn-ghost btn-sm"
                     style={{ marginLeft: "auto" }}
                     disabled={pending}
+                    aria-busy={pending}
                     onClick={() => run(() => deleteRelationship(r.relationship.id))}
                   >
+                    {pending && <Spinner />}
                     Remove
                   </button>
                 </div>
@@ -103,6 +106,7 @@ export function RelationshipsPanel({
           type="button"
           className="btn btn-ghost btn-sm"
           disabled={pending}
+          aria-busy={pending}
           onClick={() => {
             const target = targetRef.current?.value.trim();
             if (!target) return;
@@ -113,6 +117,7 @@ export function RelationshipsPanel({
             });
           }}
         >
+          {pending && <Spinner />}
           + Add relationship
         </button>
       </div>
@@ -146,8 +151,10 @@ export function RelationshipsPanel({
             type="button"
             className="btn btn-ghost btn-sm"
             disabled={pending || !seriesToAdd}
+            aria-busy={pending}
             onClick={() => run(() => addToSeries(seriesToAdd))}
           >
+            {pending && <Spinner />}
             Add
           </button>
         </div>

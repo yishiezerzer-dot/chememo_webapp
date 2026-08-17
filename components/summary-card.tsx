@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/spinner";
 
 type Props = {
   aiEnabled: boolean;
@@ -51,9 +52,11 @@ export function SummaryCard({ aiEnabled, summary, action }: Props) {
             type="submit"
             className="btn btn-ghost btn-sm"
             disabled={busy}
+            aria-busy={busy}
             style={{ width: "100%", justifyContent: "center" }}
           >
-            {busy ? "Generating…" : summary ? "Regenerate" : "Generate summary"}
+            {busy && <Spinner />}
+            {summary ? "Regenerate" : "Generate summary"}
           </button>
         </form>
       )}
