@@ -161,7 +161,22 @@ export async function commitCrewDraft(
 
   // D7 — never silent: an unchecked/blank proposal always leaves project
   // null plus an explicit unresolved item, never a guessed assignment.
-  const unresolved = [...draft.unresolved, ...addedUnresolved];
+  //
+  // Bug fix 2026-08-17: the crew's own unresolved items name fields using
+  // PlanFields' vocabulary (e.g. "primary_outcomes", "risks"), not the DB's
+  // (FIELD_MAP already renames these on `input` above but never touched
+  // `unresolved` itself) — so "Resolve with AI" silently never matched the
+  // AI_SUGGESTIBLE_FIELDS allowlist (DB-named) for exactly those two fields.
+  // Apply the same rename here so every unresolved item's `field` uses the
+  // real column name, same as `addedUnresolved`'s template-required items
+  // already do.
+  const unresolved = [
+    ...draft.unresolved.map((u) => {
+      const dbField = FIELD_MAP[u.field as keyof PlanFields];
+      return dbField ? { ...u, field: dbField } : u;
+    }),
+    ...addedUnresolved,
+  ];
   if (opts.newProjectName && opts.newProjectName.trim()) {
     input.project = await createProject(supabase, userId, workspaceId, opts.newProjectName.trim(), "#3ee0c4");
   } else {

@@ -114,6 +114,8 @@ function makeFakeSupabase(insertError: { message: string } | null = null) {
   const experimentsCalls: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const aiSuggestionInserts: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const provenanceInserts: any[] = [];
   const from = vi.fn((table: string) => {
     if (table === "experiments") {
       return {
@@ -128,7 +130,12 @@ function makeFakeSupabase(insertError: { message: string } | null = null) {
       };
     }
     if (table === "experiment_crew_provenance") {
-      return { insert: vi.fn(async () => ({ error: insertError })) };
+      return {
+        insert: vi.fn(async (row: unknown) => {
+          provenanceInserts.push(row);
+          return { error: insertError };
+        }),
+      };
     }
     if (table === "experiment_ai_suggestions") {
       return {
@@ -140,7 +147,7 @@ function makeFakeSupabase(insertError: { message: string } | null = null) {
     }
     throw new Error(`unexpected table ${table}`);
   });
-  return { client: { from } as never, experimentsCalls, aiSuggestionInserts };
+  return { client: { from } as never, experimentsCalls, aiSuggestionInserts, provenanceInserts };
 }
 
 vi.mock("@/lib/experiments/service", () => ({
@@ -150,6 +157,30 @@ vi.mock("@/lib/experiments/service", () => ({
 vi.mock("@/lib/projects/service", () => ({
   createProject: vi.fn(async () => "new-project-id"),
 }));
+
+describe("commitCrewDraft — unresolved field-name bug fix (2026-08-17)", () => {
+  it("renames unresolved items' field the same way buildCommitInput renames ExperimentInput's, so Resolve with AI can match them", async () => {
+    const { client, provenanceInserts } = makeFakeSupabase();
+    const draft = makeDraft({}, [
+      { field: "primary_outcomes", issue: "Not stated.", candidates: [] },
+      { field: "risks", issue: "Not stated.", candidates: [] },
+      { field: "hypothesis", issue: "Not stated.", candidates: [] }, // unchanged name, should pass through
+    ]);
+    await commitCrewDraft(client, "user-1", "ws-1", draft, {
+      name: "Test experiment",
+      templateVersionId: null,
+      template: null,
+      newProjectName: null,
+    });
+    const [row] = provenanceInserts;
+    const fields = (row.unresolved as { field: string }[]).map((u) => u.field);
+    expect(fields).toContain("primary_outcome");
+    expect(fields).toContain("risks_failure_modes");
+    expect(fields).toContain("hypothesis");
+    expect(fields).not.toContain("primary_outcomes");
+    expect(fields).not.toContain("risks");
+  });
+});
 
 describe("commitCrewDraft — D5/D7", () => {
   it("never calls UPDATE or DELETE against experiments on the commit path", async () => {
