@@ -419,7 +419,7 @@ export async function generateResolutionSuggestion(
   supabase: Supabase,
   userId: string,
   experimentId: string,
-  unresolvedIndex: number
+  unresolvedItemId: string
 ): Promise<{ count: number } | null> {
   const startedAt = Date.now();
   const { data: exp } = await supabase
@@ -433,7 +433,7 @@ export async function generateResolutionSuggestion(
   if (experiment.locked_at) return null; // D9
 
   const provenance = await getCrewProvenance(supabase, experimentId);
-  const item = provenance?.unresolved[unresolvedIndex];
+  const item = provenance?.unresolved.find((u) => u.id === unresolvedItemId);
   if (!item || !(AI_SUGGESTIBLE_FIELDS as readonly string[]).includes(item.field)) return null;
   const field = item.field as SuggestibleField;
 
@@ -451,7 +451,7 @@ export async function generateResolutionSuggestion(
         suggested_value: s.suggestedValue,
         rationale: s.rationale,
         source: "crew_resolve" as const,
-        unresolved_index: unresolvedIndex,
+        unresolved_item_id: unresolvedItemId,
         model: activeChatModel(),
         created_by: userId,
       });

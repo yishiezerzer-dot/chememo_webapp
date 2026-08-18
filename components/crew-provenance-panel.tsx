@@ -31,7 +31,7 @@ export function CrewProvenancePanel({
   isOwner,
   isLocked,
   resolveAction,
-  aiSuggestionsByField,
+  aiSuggestionsByItemId,
   generateAiResolutionAction,
   resolveAiSuggestionAction,
 }: {
@@ -45,8 +45,10 @@ export function CrewProvenancePanel({
   // hand-authored experiment simply omits it entirely.
   isLocked?: boolean;
   resolveAction: (experimentId: string, itemIndex: number) => Promise<ActionResult>;
-  aiSuggestionsByField?: Map<string, AiSuggestion>;
-  generateAiResolutionAction?: (experimentId: string, itemIndex: number) => Promise<ActionResult>;
+  // Keyed by the unresolved item's own id, never by field name — a field can
+  // legitimately appear on several items at once.
+  aiSuggestionsByItemId?: Map<string, AiSuggestion>;
+  generateAiResolutionAction?: (experimentId: string, itemId: string) => Promise<ActionResult>;
   resolveAiSuggestionAction?: (experimentId: string, suggestionId: string, accept: boolean) => Promise<ActionResult>;
 }) {
   const [rawOpen, setRawOpen] = useState(false);
@@ -69,10 +71,10 @@ export function CrewProvenancePanel({
     });
   }
 
-  function generateAiResolution(index: number) {
-    setPendingKey(`ai-${index}`);
+  function generateAiResolution(itemId: string) {
+    setPendingKey(`ai-${itemId}`);
     start(async () => {
-      const res = await generateAiResolutionAction!(experimentId, index);
+      const res = await generateAiResolutionAction!(experimentId, itemId);
       if (!res.ok) showToast(res.error, "error");
       else router.refresh();
     });
@@ -113,11 +115,11 @@ export function CrewProvenancePanel({
             </h4>
             <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
               {provenance.unresolved.map((u, i) => {
-                const aiSuggestion = aiSuggestionsByField?.get(u.field);
+                const aiSuggestion = aiSuggestionsByItemId?.get(u.id);
                 const resolveBusy = pending && pendingKey === `resolve-${i}`;
-                const aiBusy = pending && pendingKey === `ai-${i}`;
+                const aiBusy = pending && pendingKey === `ai-${u.id}`;
                 return (
-                  <li key={i}>
+                  <li key={u.id}>
                     <strong>{u.field}</strong> — {u.issue}
                     {u.candidates.length > 0 && (
                       <span className="muted"> (candidates: {u.candidates.join(", ")})</span>
@@ -142,7 +144,7 @@ export function CrewProvenancePanel({
                         disabled={pending || isLocked}
                         aria-busy={aiBusy}
                         title={isLocked ? "This experiment is locked; nothing can be applied here." : undefined}
-                        onClick={() => generateAiResolution(i)}
+                        onClick={() => generateAiResolution(u.id)}
                         style={{ marginLeft: 8 }}
                       >
                         {aiBusy && <Spinner />}

@@ -11,6 +11,17 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_LOCAL_SERVICE_ROLE_KEY;
 const ANON_KEY = process.env.SUPABASE_LOCAL_ANON_KEY;
 const ready = !!URL && !!SERVICE_ROLE_KEY && !!ANON_KEY;
 
+// An unresolved checklist item as commitCrewDraft persists one: every item
+// carries its own stable id, which is what a suggestion binds to. Field name
+// deliberately is NOT unique across items -- several tests below depend on
+// being able to build two items sharing a field.
+const item = (field: string, issue = "not stated") => ({
+  id: randomUUID(),
+  field,
+  issue,
+  candidates: [] as string[],
+});
+
 describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
   let admin: SupabaseClient;
   let ownerClient: SupabaseClient;
@@ -187,10 +198,8 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
 
   it("D3 — accepting a crew_resolve suggestion also decrements the linked unresolved_open_count", async () => {
     const id = await makeExperiment();
-    const unresolved = [
-      { field: "hypothesis", issue: "not stated", candidates: [] },
-      { field: "conclusion", issue: "not stated", candidates: [] },
-    ];
+    const hypothesisItem = item("hypothesis");
+    const unresolved = [hypothesisItem, item("conclusion")];
     const { error: provErr } = await admin.from("experiment_crew_provenance").insert({
       experiment_id: id,
       raw_source: "raw notes",
@@ -207,7 +216,7 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
     const suggestionId = await makeSuggestion(id, {
       field: "hypothesis",
       source: "crew_resolve",
-      unresolved_index: 0,
+      unresolved_item_id: hypothesisItem.id,
     });
 
     const { error } = await ownerClient.rpc("apply_ai_suggestion", { p_suggestion_id: suggestionId, p_accept: true });
@@ -222,12 +231,10 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
     expect((prov?.unresolved as { field: string }[]).map((u) => u.field)).toEqual(["conclusion"]);
   });
 
-  it("field-based lookup — resolves a crew_resolve suggestion correctly even when its stored position has gone stale (2026-08-17 fix)", async () => {
+  it("id-based lookup — resolves a crew_resolve suggestion correctly even when its stored position has gone stale (2026-08-18 fix)", async () => {
     const id = await makeExperiment();
-    const unresolved = [
-      { field: "hypothesis", issue: "not stated", candidates: [] },
-      { field: "conclusion", issue: "not stated", candidates: [] },
-    ];
+    const conclusionItem = item("conclusion");
+    const unresolved = [item("hypothesis"), conclusionItem];
     await admin.from("experiment_crew_provenance").insert({
       experiment_id: id,
       raw_source: "raw notes",
@@ -240,20 +247,18 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
       created_by: ownerId,
     });
 
-    // Suggestion generated for index 1 ("conclusion") ...
+    // Suggestion generated for the "conclusion" item, then sitting at index 1 ...
     const suggestionId = await makeSuggestion(id, {
       field: "conclusion",
       suggested_value: "Confirmed by m/z 297.",
       source: "crew_resolve",
-      unresolved_index: 1,
+      unresolved_item_id: conclusionItem.id,
     });
     // ... but item 0 gets resolved first, shifting "conclusion" to index 0.
-    // The suggestion's STORED index (1) is now stale.
     await ownerClient.rpc("resolve_crew_unresolved_item", { p_experiment_id: id, p_item_index: 0 });
 
-    // apply_ai_suggestion searches the CURRENT array for the field by name
-    // rather than trusting unresolved_index, so this succeeds and resolves
-    // the right item despite the shift.
+    // apply_ai_suggestion locates the item by its id in the CURRENT array,
+    // so the shift is irrelevant.
     const { error } = await ownerClient.rpc("apply_ai_suggestion", { p_suggestion_id: suggestionId, p_accept: true });
     expect(error).toBeNull();
 
@@ -272,9 +277,55 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
     expect(prov?.unresolved).toEqual([]);
   });
 
-  it("refuses when the suggested field is no longer unresolved by any means", async () => {
+  // The 2026-08-18 bug, reproduced: the crew's four agents each append
+  // independently, so one field routinely carries several items. Matching by
+  // field name cleared whichever came FIRST, not the one the scientist
+  // clicked -- confirmed live on EXP-1373 (Agree on the third hypothesis item
+  // cleared the first and left the clicked one still open).
+  it("clears the exact item a suggestion is bound to, not the first sharing its field", async () => {
     const id = await makeExperiment();
-    const unresolved = [{ field: "conclusion", issue: "not stated", candidates: [] }];
+    const first = item("hypothesis", "No explicit predicted outcome is stated.");
+    const second = item("hypothesis", "No explicit hypothesis is provided.");
+    const third = item("hypothesis", "No explicit, testable prediction is stated.");
+    await admin.from("experiment_crew_provenance").insert({
+      experiment_id: id,
+      raw_source: "raw notes",
+      unresolved: [first, second, third],
+      unresolved_open_count: 3,
+      normalization: [],
+      crew_version: "1.0",
+      prompt_versions: { intake: 1, design: 1, controls: 1, critic: 1 },
+      model: "test-model",
+      created_by: ownerId,
+    });
+
+    // Bound to the THIRD item specifically.
+    const suggestionId = await makeSuggestion(id, {
+      field: "hypothesis",
+      suggested_value: "Cycling yields detectable depsipeptide masses.",
+      source: "crew_resolve",
+      unresolved_item_id: third.id,
+    });
+
+    const { error } = await ownerClient.rpc("apply_ai_suggestion", { p_suggestion_id: suggestionId, p_accept: true });
+    expect(error).toBeNull();
+
+    const { data: prov } = await admin
+      .from("experiment_crew_provenance")
+      .select("unresolved, unresolved_open_count")
+      .eq("experiment_id", id)
+      .single();
+    expect(prov?.unresolved_open_count).toBe(2);
+    // The third is gone; the two the scientist did NOT act on remain.
+    const remainingIds = (prov?.unresolved as { id: string }[]).map((u) => u.id);
+    expect(remainingIds).toEqual([first.id, second.id]);
+    expect(remainingIds).not.toContain(third.id);
+  });
+
+  it("refuses when the suggested item is no longer unresolved by any means", async () => {
+    const id = await makeExperiment();
+    const conclusionItem = item("conclusion");
+    const unresolved = [conclusionItem];
     await admin.from("experiment_crew_provenance").insert({
       experiment_id: id,
       raw_source: "raw notes",
@@ -290,10 +341,10 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
     const suggestionId = await makeSuggestion(id, {
       field: "conclusion",
       source: "crew_resolve",
-      unresolved_index: 0,
+      unresolved_item_id: conclusionItem.id,
     });
     // The item gets resolved by other means (a plain manual Resolve) before
-    // the suggestion is ever applied -- no item with this field remains.
+    // the suggestion is ever applied -- that exact item no longer exists.
     await ownerClient.rpc("resolve_crew_unresolved_item", { p_experiment_id: id, p_item_index: 0 });
 
     const { error } = await ownerClient.rpc("apply_ai_suggestion", { p_suggestion_id: suggestionId, p_accept: true });

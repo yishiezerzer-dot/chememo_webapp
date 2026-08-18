@@ -1,13 +1,15 @@
 import "server-only";
 import type { createClient } from "@/lib/supabase/server";
-import type { UnresolvedItem, Recommendation } from "./types";
+import type { PersistedUnresolvedItem, Recommendation } from "./types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export type CrewProvenance = {
   experimentId: string;
   rawSource: string;
-  unresolved: UnresolvedItem[];
+  // Every item carries a stable id — minted at commit time for new drafts,
+  // backfilled for pre-existing rows by migration 20260828120000.
+  unresolved: PersistedUnresolvedItem[];
   unresolvedOpenCount: number;
   normalization: Recommendation[];
   crewVersion: string;
@@ -27,7 +29,7 @@ export async function getCrewProvenance(supabase: Supabase, experimentId: string
   return {
     experimentId: data.experiment_id,
     rawSource: data.raw_source,
-    unresolved: data.unresolved as unknown as UnresolvedItem[],
+    unresolved: data.unresolved as unknown as PersistedUnresolvedItem[],
     unresolvedOpenCount: data.unresolved_open_count,
     normalization: data.normalization as unknown as Recommendation[],
     crewVersion: data.crew_version,

@@ -951,6 +951,7 @@ export type Database = {
           status: string
           suggested_value: string
           unresolved_index: number | null
+          unresolved_item_id: string | null
           workspace_id: string | null
         }
         Insert: {
@@ -967,6 +968,7 @@ export type Database = {
           status?: string
           suggested_value: string
           unresolved_index?: number | null
+          unresolved_item_id?: string | null
           workspace_id?: string | null
         }
         Update: {
@@ -983,6 +985,7 @@ export type Database = {
           status?: string
           suggested_value?: string
           unresolved_index?: number | null
+          unresolved_item_id?: string | null
           workspace_id?: string | null
         }
         Relationships: [
@@ -3668,6 +3671,10 @@ export type Database = {
       }
       resolve_crew_unresolved_item: {
         Args: { p_experiment_id: string; p_item_index: number }
+        Returns: undefined
+      }
+      resolve_crew_unresolved_item_by_id: {
+        Args: { p_experiment_id: string; p_item_id: string }
         Returns: undefined
       }
       upsert_evidence_chunk: {

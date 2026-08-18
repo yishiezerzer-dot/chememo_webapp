@@ -39,7 +39,7 @@ export async function generateGapSuggestionsAction(experimentId: string): Promis
 
 export async function generateResolutionSuggestionAction(
   experimentId: string,
-  unresolvedIndex: number
+  unresolvedItemId: string
 ): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
   if (!isLlmEnabled()) return { ok: false, error: "AI suggestions are not configured for this deployment." };
@@ -51,7 +51,7 @@ export async function generateResolutionSuggestionAction(
     return toActionResult("generateResolutionSuggestion", e);
   }
   try {
-    const result = await generateResolutionSuggestion(supabase, user.id, experimentId, unresolvedIndex);
+    const result = await generateResolutionSuggestion(supabase, user.id, experimentId, unresolvedItemId);
     if (result === null) return { ok: false, error: "No confident AI suggestion for this item." };
   } catch (e) {
     return toActionResult("generateResolutionSuggestion", e);

@@ -220,14 +220,14 @@ describe("commitCrewDraft — D5/D7", () => {
 });
 
 describe("commitCrewDraft — plan-time AI suggestions", () => {
-  it("generates and inserts a suggestion linked to the matching unresolved item's index, only for narrative-field items", async () => {
+  it("generates and inserts a suggestion linked to the matching unresolved item's id, only for narrative-field items", async () => {
     const { isLlmEnabled, suggestFieldsForPlan } = await import("@/lib/llm");
     vi.mocked(isLlmEnabled).mockReturnValue(true);
     vi.mocked(suggestFieldsForPlan).mockResolvedValue([
       { field: "hypothesis", suggestedValue: "Zn2+ templates the depsipeptide.", rationale: "Pattern from the Zn analog." },
     ]);
 
-    const { client, aiSuggestionInserts } = makeFakeSupabase();
+    const { client, aiSuggestionInserts, provenanceInserts } = makeFakeSupabase();
     const draft = makeDraft({}, [
       { field: "controls", issue: "Blank control not mentioned.", candidates: [] },
       { field: "hypothesis", issue: "No hypothesis stated.", candidates: [] },
@@ -243,15 +243,55 @@ describe("commitCrewDraft — plan-time AI suggestions", () => {
     expect(suggestFieldsForPlan).toHaveBeenCalledWith(expect.anything(), draft.rawSource, ["hypothesis"]);
     expect(aiSuggestionInserts).toHaveLength(1);
     const [rows] = aiSuggestionInserts;
+    // Bound to the hypothesis item's own id, never to its array position
+    // (which shifts) or to the bare field name (which is not unique).
+    const persisted = provenanceInserts[0].unresolved as { id: string; field: string }[];
+    const hypothesisItem = persisted.find((u) => u.field === "hypothesis")!;
+    expect(hypothesisItem.id).toBeTruthy();
     expect(rows).toEqual([
       expect.objectContaining({
         field: "hypothesis",
         suggested_value: "Zn2+ templates the depsipeptide.",
         source: "crew_resolve",
-        unresolved_index: 1, // "hypothesis" is unresolved[1] — "controls" (index 0) has no suggestion
+        unresolved_item_id: hypothesisItem.id,
         created_by: "user-1",
       }),
     ]);
+  });
+
+  // Regression for the 2026-08-18 wrong-item-cleared bug: the crew's four
+  // agents each append independently, so one field routinely carries several
+  // items. Keying a suggestion by field name attached it to all of them and
+  // cleared whichever came first rather than the one the scientist clicked.
+  it("gives duplicate same-field items distinct ids and binds the suggestion to exactly one of them", async () => {
+    const { isLlmEnabled, suggestFieldsForPlan } = await import("@/lib/llm");
+    vi.mocked(isLlmEnabled).mockReturnValue(true);
+    vi.mocked(suggestFieldsForPlan).mockResolvedValue([
+      { field: "hypothesis", suggestedValue: "Zn2+ templates the depsipeptide.", rationale: "Pattern from the Zn analog." },
+    ]);
+
+    const { client, aiSuggestionInserts, provenanceInserts } = makeFakeSupabase();
+    const draft = makeDraft({}, [
+      { field: "hypothesis", issue: "No explicit predicted outcome is stated.", candidates: [] },
+      { field: "hypothesis", issue: "No explicit hypothesis is provided.", candidates: [] },
+      { field: "hypothesis", issue: "No explicit, testable prediction is stated.", candidates: [] },
+    ]);
+    await commitCrewDraft(client, "user-1", "ws-1", draft, {
+      name: "Test experiment",
+      templateVersionId: null,
+      template: null,
+      newProjectName: null,
+    });
+
+    const persisted = provenanceInserts[0].unresolved as { id: string; field: string }[];
+    const hypothesisItems = persisted.filter((u) => u.field === "hypothesis");
+    expect(hypothesisItems).toHaveLength(3);
+    expect(new Set(hypothesisItems.map((u) => u.id)).size).toBe(3);
+
+    // Exactly one suggestion, pointing at exactly one of the three.
+    const [rows] = aiSuggestionInserts;
+    expect(rows).toHaveLength(1);
+    expect(hypothesisItems.map((u) => u.id)).toContain(rows[0].unresolved_item_id);
   });
 
   it("never blocks draft creation when suggestion generation throws", async () => {

@@ -160,15 +160,16 @@ export default async function ExperimentDetailPage({
   const isLocked = e.locked_at !== null;
   const aiSuggestions = isOwner ? await getPendingAiSuggestions(supabase, e.id) : [];
   const gapSuggestions = aiSuggestions.filter((s) => s.source === "gap_scan");
-  // Matched by field name, not the suggestion's stored unresolved_index --
-  // that index is only a snapshot from generation time, and resolving any
-  // EARLIER item shifts every later item's position, which would otherwise
-  // attach a suggestion to the wrong checklist item (bug found 2026-08-17:
-  // "resolves with AI but the thing that needs input doesn't go down").
-  const resolveSuggestionsByField = new Map(
+  // Matched by the checklist item's own stable id. Array position was wrong
+  // (resolving an earlier item shifts every later one) and so was field name
+  // (the four agents each append independently, so one field routinely has
+  // several items — keying by field rendered ONE suggestion against ALL of
+  // them, and accepting it cleared whichever came first rather than the one
+  // clicked). See migration 20260828120000_unresolved_item_ids.sql.
+  const resolveSuggestionsByItemId = new Map(
     aiSuggestions
-      .filter((s) => s.source === "crew_resolve")
-      .map((s) => [s.field, s])
+      .filter((s) => s.source === "crew_resolve" && s.unresolvedItemId !== null)
+      .map((s) => [s.unresolvedItemId as string, s])
   );
 
   const projectLabel = projects.find((p) => p.id === e.project)?.label ?? e.project;
@@ -266,7 +267,7 @@ export default async function ExperimentDetailPage({
           isOwner={isOwner}
           isLocked={isLocked}
           resolveAction={resolveUnresolvedItemAction}
-          aiSuggestionsByField={resolveSuggestionsByField}
+          aiSuggestionsByItemId={resolveSuggestionsByItemId}
           generateAiResolutionAction={generateResolutionSuggestionAction}
           resolveAiSuggestionAction={resolveAiSuggestionAction}
         />

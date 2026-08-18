@@ -7,7 +7,8 @@ import { activeChatModel, isLlmEnabled, suggestFieldsForPlan, AI_SUGGESTIBLE_FIE
 import { AppError } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import type { ExperimentInput, ExperimentTemplateVersion } from "@/lib/types";
-import type { CrewDraft, PlanFields, UnresolvedItem } from "./types";
+import type { CrewDraft, PersistedUnresolvedItem, PlanFields, UnresolvedItem } from "./types";
+import { randomUUID } from "node:crypto";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -170,18 +171,26 @@ export async function commitCrewDraft(
   // Apply the same rename here so every unresolved item's `field` uses the
   // real column name, same as `addedUnresolved`'s template-required items
   // already do.
-  const unresolved = [
+  //
+  // Bug fix 2026-08-18: every item also gets a stable uuid here, at the one
+  // point where the final array is assembled. Nothing downstream may identify
+  // an item by array position (shifts whenever an earlier item is resolved)
+  // or by field name (not unique — the four agents each append findings
+  // independently, so one field routinely appears several times). Both have
+  // already shipped as wrong-item-cleared bugs. See migration
+  // 20260828120000_unresolved_item_ids.sql.
+  const unresolved: PersistedUnresolvedItem[] = [
     ...draft.unresolved.map((u) => {
       const dbField = FIELD_MAP[u.field as keyof PlanFields];
-      return dbField ? { ...u, field: dbField } : u;
+      return { ...u, field: dbField ?? u.field, id: randomUUID() };
     }),
-    ...addedUnresolved,
+    ...addedUnresolved.map((u) => ({ ...u, id: randomUUID() })),
   ];
   if (opts.newProjectName && opts.newProjectName.trim()) {
     input.project = await createProject(supabase, userId, workspaceId, opts.newProjectName.trim(), "#3ee0c4");
   } else {
     input.project = null;
-    unresolved.push({ field: "project", issue: "No project assigned.", candidates: [] });
+    unresolved.push({ field: "project", issue: "No project assigned.", candidates: [], id: randomUUID() });
   }
 
   const experimentId = await createExperiment(supabase, userId, workspaceId, input, {
@@ -218,29 +227,37 @@ export async function commitCrewDraft(
   // "project" unresolved item has no AI-suggestible answer.
   if (isLlmEnabled()) {
     try {
-      const suggestible = unresolved
-        .map((item, index) => ({ item, index }))
-        .filter(({ item }) => (AI_SUGGESTIBLE_FIELDS as readonly string[]).includes(item.field));
-      const targetFields = [...new Set(suggestible.map(({ item }) => item.field))] as SuggestibleField[];
+      const suggestible = unresolved.filter((item) =>
+        (AI_SUGGESTIBLE_FIELDS as readonly string[]).includes(item.field)
+      );
+      const targetFields = [...new Set(suggestible.map((item) => item.field))] as SuggestibleField[];
 
       if (targetFields.length > 0) {
         const suggestions = await suggestFieldsForPlan(input, draft.rawSource, targetFields);
         if (suggestions && suggestions.length > 0) {
+          // One suggestion per field (D6 asks the model for one value per
+          // field), but a field may have several checklist items. Attach it
+          // to the first item of that field and to that item only — binding
+          // it to the field itself would make one suggestion render against
+          // every item sharing the field, which is precisely the defect this
+          // change exists to remove. The remaining items keep their own
+          // "Resolve with AI" button.
+          const claimed = new Set<string>();
           const rows = suggestions
             .map((s) => {
-              const match = suggestible.find(({ item }) => item.field === s.field);
-              return match
-                ? {
-                    experiment_id: experimentId,
-                    field: s.field,
-                    suggested_value: s.suggestedValue,
-                    rationale: s.rationale,
-                    source: "crew_resolve" as const,
-                    unresolved_index: match.index,
-                    model: activeChatModel(),
-                    created_by: userId,
-                  }
-                : null;
+              const match = suggestible.find((item) => item.field === s.field && !claimed.has(item.id));
+              if (!match) return null;
+              claimed.add(match.id);
+              return {
+                experiment_id: experimentId,
+                field: s.field,
+                suggested_value: s.suggestedValue,
+                rationale: s.rationale,
+                source: "crew_resolve" as const,
+                unresolved_item_id: match.id,
+                model: activeChatModel(),
+                created_by: userId,
+              };
             })
             .filter((r): r is NonNullable<typeof r> => r !== null);
 

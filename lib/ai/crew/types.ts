@@ -11,6 +11,16 @@ export type UnresolvedItem = {
   candidates: string[];
 };
 
+// The same item once persisted. The id is minted at commit time, never by an
+// agent — the model's own output is not something structurally privileged
+// (the discipline D7 applies to field names), and agents legitimately produce
+// several items for one field, so field name cannot serve as identity.
+// Everything that later points at a checklist item — a suggestion, a resolve
+// call — joins on this id rather than on array position or field name, both
+// of which have already shipped as bugs. See migration
+// 20260828120000_unresolved_item_ids.sql.
+export type PersistedUnresolvedItem = UnresolvedItem & { id: string };
+
 export type Recommendation = {
   field: string;
   suggestion: string;

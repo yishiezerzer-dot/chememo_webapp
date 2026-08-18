@@ -9,7 +9,9 @@ export type AiSuggestion = {
   suggestedValue: string;
   rationale: string;
   source: "gap_scan" | "crew_resolve";
-  unresolvedIndex: number | null;
+  // The specific checklist item this answers. Replaces the old positional
+  // unresolvedIndex, which could not tell two items sharing a field apart.
+  unresolvedItemId: string | null;
 };
 
 // Read-only: only ever pending suggestions are shown — accepted/dismissed
@@ -17,7 +19,7 @@ export type AiSuggestion = {
 export async function getPendingAiSuggestions(supabase: Supabase, experimentId: string): Promise<AiSuggestion[]> {
   const { data } = await supabase
     .from("experiment_ai_suggestions")
-    .select("id, field, suggested_value, rationale, source, unresolved_index")
+    .select("id, field, suggested_value, rationale, source, unresolved_item_id")
     .eq("experiment_id", experimentId)
     .eq("status", "pending")
     .order("created_at", { ascending: true });
@@ -27,6 +29,6 @@ export async function getPendingAiSuggestions(supabase: Supabase, experimentId: 
     suggestedValue: row.suggested_value,
     rationale: row.rationale,
     source: row.source as "gap_scan" | "crew_resolve",
-    unresolvedIndex: row.unresolved_index,
+    unresolvedItemId: row.unresolved_item_id,
   }));
 }
