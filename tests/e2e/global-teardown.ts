@@ -110,6 +110,27 @@ export default async function globalTeardown(): Promise<void> {
     }
   }
 
+  // Lab-shared entities the specs also create. These do NOT hang off an
+  // experiment, so deleting experiments leaves them behind entirely: after
+  // the experiments were cleared, dev still held 67 "E2E series", 171
+  // protocols, 110 templates and 84 saved views, which made the series
+  // picker on every experiment page unusable.
+  //
+  // Scoped by creator for the same reason as above, and it matters more
+  // here: 2 of those 110 templates and 1 of the 67 series were made by real
+  // users, so a name-prefix sweep would have destroyed real work.
+  for (const [table, ownerColumn] of [
+    ["experiment_series", "created_by"],
+    ["protocols", "created_by"],
+    ["experiment_templates", "created_by"],
+    ["saved_views", "owner_id"],
+    ["instruments", "created_by"],
+    ["condition_program_templates", "created_by"],
+  ] as const) {
+    const { error } = await admin.from(table).delete().eq(ownerColumn, e2eUser.id);
+    if (error) errors.push(`${table}: ${error.message}`);
+  }
+
   // Deliberately loud, and fatal. The first version logged failures with
   // console.warn and carried on, so a cleanup that did only 70% of its job
   // looked identical to a complete one and dev kept filling up unnoticed.
