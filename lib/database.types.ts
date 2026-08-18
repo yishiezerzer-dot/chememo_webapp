@@ -3628,6 +3628,7 @@ export type Database = {
         Args: { p_ended_as?: string; p_id: string }
         Returns: undefined
       }
+      create_workspace_with_owner: { Args: { p_name: string }; Returns: string }
       effective_role: {
         Args: { proj_id: string; uid: string; ws_id: string }
         Returns: Database["public"]["Enums"]["workspace_role"]

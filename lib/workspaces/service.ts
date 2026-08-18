@@ -23,20 +23,24 @@ export async function listMyWorkspaces(supabase: Supabase, userId: string): Prom
 
 // D1 — self-serve creation: any signed-in user can create a workspace and
 // becomes its owner.
-export async function createWorkspace(supabase: Supabase, userId: string, name: string): Promise<string> {
+// Goes through create_workspace_with_owner (migration 20260831120000) rather
+// than inserting directly. Two client-side inserts could never have worked:
+// workspaces_read is `is_workspace_member(id, auth.uid())`, and the
+// membership row that satisfies it was only written by the SECOND insert, so
+// reading back the id of the workspace you had just created was blocked by
+// RLS and creation failed outright with 42501. The function also makes the
+// pair atomic — a failure on the second insert previously left an orphan
+// workspace with no members, which nobody could then see or delete.
+//
+// userId is kept in the signature for call-site clarity, but the function
+// derives the owner from auth.uid() itself: the creator is always the owner
+// and no caller can nominate someone else.
+export async function createWorkspace(supabase: Supabase, _userId: string, name: string): Promise<string> {
   const trimmed = name.trim();
   if (!trimmed) throw new AppError("validation", "Enter a workspace name.");
-  const { data: ws, error } = await supabase
-    .from("workspaces")
-    .insert({ name: trimmed, created_by: userId })
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc("create_workspace_with_owner", { p_name: trimmed });
   if (error) throw new AppError("conflict", "Could not create the workspace.", { cause: error });
-  const { error: memberError } = await supabase
-    .from("workspace_members")
-    .insert({ workspace_id: ws.id, user_id: userId, role: "owner" });
-  if (memberError) throw new AppError("conflict", "Could not add you to the new workspace.", { cause: memberError });
-  return ws.id as string;
+  return data as string;
 }
 
 export type MemberView = { userId: string; role: WorkspaceRole; fullName: string | null; initials: string | null };
