@@ -8,8 +8,16 @@ export type HealthSnapshot = {
   db: { ok: boolean };
   indexJobs: { pending: number; failed: number };
   evidenceChunks: { pending: number; failed: number };
-  ai: { recentSampleSize: number; recentErrorRate: number };
+  ai: { recentSampleSize: number; recentErrorRate: number; windowHours: number };
 };
+
+// "Recent" used to mean "the last 50 ai_requests rows, whenever they
+// happened" — no time bound at all. On a low-traffic environment that
+// silently became "the last several weeks": dev reported a live 23% error
+// rate built entirely out of 11 crew_plan failures dated 2026-08-10 to
+// 08-16, every one of them from before the D11 fix that fixed them. A rate
+// with no window can never fall, so it stops describing the present.
+const AI_ERROR_WINDOW_HOURS = 24;
 
 export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   const admin = createAdminClient();
@@ -18,22 +26,35 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   // row bodies -- unlike a plain .select() (previously used here), they
   // aren't subject to Supabase/PostgREST's ~1000-row response cap, so these
   // stay accurate no matter how large index_jobs/evidence_chunks get.
-  const [dbCheck, pendingJobsCheck, failedJobsCheck, pendingChunksCheck, failedChunksCheck, aiCheck] =
-    await Promise.all([
-      admin.from("experiments").select("id").limit(1),
-      admin.from("index_jobs").select("id", { count: "exact", head: true }).in("status", ["pending", "processing"]),
-      admin.from("index_jobs").select("id", { count: "exact", head: true }).eq("status", "failed"),
-      admin
-        .from("evidence_chunks")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["pending", "processing"]),
-      admin.from("evidence_chunks").select("id", { count: "exact", head: true }).eq("status", "failed"),
-      admin
-        .from("ai_requests")
-        .select("status")
-        .order("created_at", { ascending: false })
-        .limit(50),
-    ]);
+  // Job/chunk counts deliberately ignore rows whose experiment is
+  // soft-deleted: a deleted record's failed embedding is not a problem
+  // anybody can or should act on, and counting it pins `status` to
+  // `degraded` forever. This is the same bug T0.10 already fixed for
+  // getIndexVersionStatus's indexedCount, never carried across to the
+  // failure counts. evidence_chunks is polymorphic with no experiment FK, so
+  // that side is done in SQL (health_evidence_chunk_counts, migration
+  // 20260829120000); index_jobs has a real experiment_id and can use the
+  // ordinary inner-join filter.
+  const [dbCheck, pendingJobsCheck, failedJobsCheck, chunkCounts, aiCheck] = await Promise.all([
+    admin.from("experiments").select("id").limit(1),
+    admin
+      .from("index_jobs")
+      .select("id, experiments!inner(deleted_at)", { count: "exact", head: true })
+      .in("status", ["pending", "processing"])
+      .is("experiments.deleted_at", null),
+    admin
+      .from("index_jobs")
+      .select("id, experiments!inner(deleted_at)", { count: "exact", head: true })
+      .eq("status", "failed")
+      .is("experiments.deleted_at", null),
+    admin.rpc("health_evidence_chunk_counts"),
+    admin
+      .from("ai_requests")
+      .select("status")
+      .gte("created_at", new Date(Date.now() - AI_ERROR_WINDOW_HOURS * 3_600_000).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
 
   const dbOk = !dbCheck.error;
   if (dbCheck.error) logError("health-service", "db check failed", { error: dbCheck.error });
@@ -41,8 +62,10 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   const pendingJobs = pendingJobsCheck.count ?? 0;
   const failedJobs = failedJobsCheck.count ?? 0;
 
-  const pendingChunks = pendingChunksCheck.count ?? 0;
-  const failedChunks = failedChunksCheck.count ?? 0;
+  if (chunkCounts.error) logError("health-service", "chunk count failed", { error: chunkCounts.error });
+  const chunkRow = chunkCounts.data?.[0];
+  const pendingChunks = Number(chunkRow?.pending ?? 0);
+  const failedChunks = Number(chunkRow?.failed ?? 0);
 
   const aiRows = aiCheck.data ?? [];
   const aiErrors = aiRows.filter((r) => r.status === "error").length;
@@ -56,6 +79,7 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
     ai: {
       recentSampleSize: aiRows.length,
       recentErrorRate: aiRows.length ? aiErrors / aiRows.length : 0,
+      windowHours: AI_ERROR_WINDOW_HOURS,
     },
   };
 }
@@ -207,14 +231,12 @@ export type FailedEvidenceChunk = {
   nextAttemptAt: string;
 };
 
+// Goes through SQL so it applies the identical soft-deleted-experiment
+// filter as the count in getHealthSnapshot -- otherwise the page shows a
+// tile reading 25 directly above a list of 107.
 export async function getFailedEvidenceChunks(): Promise<FailedEvidenceChunk[]> {
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("evidence_chunks")
-    .select("id, source_type, source_id, attempts, last_error, next_attempt_at")
-    .eq("status", "failed")
-    .order("next_attempt_at", { ascending: false })
-    .limit(20);
+  const { data } = await admin.rpc("health_failed_evidence_chunks", { p_limit: 20 });
   return (data ?? []).map((c) => ({
     id: c.id,
     sourceType: c.source_type,

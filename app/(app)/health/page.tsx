@@ -7,6 +7,21 @@ import {
   getRecentAiErrors,
   BACKUP_TEST_STATUS,
 } from "@/lib/health/service";
+import { RequeueFailedButton } from "@/components/requeue-failed-button";
+import { requeueFailedAction } from "./actions";
+
+// Provider errors arrive as whole JSON bodies and repeat verbatim across
+// every row that failed in the same incident — 107 identical truncated
+// Gemini 429 blobs made this page unreadable. Show each message once with a
+// count instead.
+function groupByError<T extends { lastError: string | null }>(rows: T[]) {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = (row.lastError ?? "no error message").slice(0, 160);
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  return [...groups.entries()];
+}
 
 // T0.10 — any authenticated user can see this (no admin/role concept exists
 // yet; that's T2.1's job). Gated by the (app) layout's existing auth check.
@@ -50,7 +65,12 @@ export default async function HealthPage() {
         </div>
         <div className="stat glass">
           <div className="num">{Math.round(snapshot.ai.recentErrorRate * 100)}%</div>
-          <div className="lbl">Recent AI error rate ({snapshot.ai.recentSampleSize} sampled)</div>
+          <div className="lbl">
+            AI error rate · last {snapshot.ai.windowHours} h
+            {snapshot.ai.recentSampleSize === 0
+              ? " (no requests)"
+              : ` (${snapshot.ai.recentSampleSize} requests)`}
+          </div>
         </div>
       </div>
 
@@ -79,17 +99,31 @@ export default async function HealthPage() {
       </div>
 
       <div className="obs-box glass" style={{ marginTop: 20 }}>
-        <h4>Failed evidence chunks</h4>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <h4 style={{ margin: 0 }}>Failed evidence chunks</h4>
+          {failedChunks.length > 0 && (
+            <RequeueFailedButton table="evidence_chunks" label="Retry all" action={requeueFailedAction} />
+          )}
+        </div>
         {failedChunks.length === 0 ? (
           <p className="muted">None.</p>
         ) : (
-          <ul>
-            {failedChunks.map((c) => (
-              <li key={c.id}>
-                {c.sourceType}/{c.sourceId} — {c.attempts} attempts — {c.lastError ?? "no error message"}
-              </li>
+          <>
+            <p className="muted" style={{ fontSize: 12.5 }}>
+              Chunks whose experiment has been deleted are excluded — they are not actionable and
+              would otherwise pin the overall status to degraded forever.
+            </p>
+            {groupByError(failedChunks).map(([message, rows]) => (
+              <div key={message} style={{ marginTop: 10 }}>
+                <p style={{ margin: 0, fontSize: 13 }}>
+                  <strong>{rows.length}×</strong> {message}
+                </p>
+                <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>
+                  {rows.map((c) => `${c.sourceType}/${c.sourceId} (${c.attempts} attempts)`).join(", ")}
+                </p>
+              </div>
             ))}
-          </ul>
+          </>
         )}
       </div>
 
@@ -105,17 +139,25 @@ export default async function HealthPage() {
       </div>
 
       <div className="obs-box glass" style={{ marginTop: 20 }}>
-        <h4>Failed index jobs (legacy, retired by T3.1)</h4>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <h4 style={{ margin: 0 }}>Failed index jobs (legacy, retired by T3.1)</h4>
+          {failedJobs.length > 0 && (
+            <RequeueFailedButton table="index_jobs" label="Retry all" action={requeueFailedAction} />
+          )}
+        </div>
         {failedJobs.length === 0 ? (
           <p className="muted">None.</p>
         ) : (
-          <ul>
-            {failedJobs.map((j) => (
-              <li key={j.experimentId}>
-                {j.experimentId} — {j.attempts} attempts — {j.lastError ?? "no error message"}
-              </li>
-            ))}
-          </ul>
+          groupByError(failedJobs).map(([message, rows]) => (
+            <div key={message} style={{ marginTop: 10 }}>
+              <p style={{ margin: 0, fontSize: 13 }}>
+                <strong>{rows.length}×</strong> {message}
+              </p>
+              <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>
+                {rows.map((j) => `${j.experimentId} (${j.attempts} attempts)`).join(", ")}
+              </p>
+            </div>
+          ))
         )}
       </div>
 

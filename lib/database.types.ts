@@ -3632,6 +3632,24 @@ export type Database = {
         Args: { proj_id: string; uid: string; ws_id: string }
         Returns: Database["public"]["Enums"]["workspace_role"]
       }
+      health_evidence_chunk_counts: {
+        Args: never
+        Returns: {
+          failed: number
+          pending: number
+        }[]
+      }
+      health_failed_evidence_chunks: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          id: string
+          last_error: string
+          next_attempt_at: string
+          source_id: string
+          source_type: string
+        }[]
+      }
       is_workspace_admin: {
         Args: { uid: string; ws_id: string }
         Returns: boolean
@@ -3665,10 +3683,15 @@ export type Database = {
       }
       next_experiment_id: { Args: never; Returns: string }
       next_protocol_id: { Args: never; Returns: string }
+      reclaim_stale_queue_rows: {
+        Args: { p_stale_minutes?: number; p_table: string }
+        Returns: number
+      }
       reopen_experiment: {
         Args: { p_id: string; p_reason: string }
         Returns: undefined
       }
+      requeue_failed_queue_rows: { Args: { p_table: string }; Returns: number }
       resolve_crew_unresolved_item: {
         Args: { p_experiment_id: string; p_item_index: number }
         Returns: undefined

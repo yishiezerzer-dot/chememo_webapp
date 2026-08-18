@@ -81,6 +81,17 @@ export async function runEvidenceChunkJob(chunkId: string): Promise<void> {
 
 async function pollOnce(): Promise<void> {
   const admin = createAdminClient();
+
+  // A row is set to 'processing' and then worked in a separate statement
+  // below, so a process death in between leaves it there forever — this
+  // select only ever sees 'pending'. Put abandoned rows back first (bug
+  // found 2026-08-18: one stuck since 2026-08-09, attempts still 0).
+  const { data: reclaimed, error: reclaimError } = await admin.rpc("reclaim_stale_queue_rows", {
+    p_table: "evidence_chunks",
+  });
+  if (reclaimError) logError("evidence-chunks", "reclaim failed", { error: reclaimError });
+  else if (reclaimed) logInfo("evidence-chunks", "reclaimed stale processing rows", { count: reclaimed });
+
   const { data: chunks, error } = await admin
     .from("evidence_chunks")
     .select("id")

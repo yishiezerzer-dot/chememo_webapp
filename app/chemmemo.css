@@ -449,12 +449,23 @@ a { color: inherit; }
   display: block; font-size: 12px; color: var(--ink-dim);
   margin-bottom: 6px; font-weight: 500; letter-spacing: .03em;
 }
-.field input, .field select, .field textarea {
+/* The :not() guards matter: this rule used to catch every input inside
+   .field, checkboxes included — width:100% stretched one to ~870px and
+   appearance:none stripped its native rendering entirely, leaving a control
+   with NO perceivable checked state at all (found 2026-08-18 on the /plan
+   "Also create a new project" checkbox). Text-like inputs are what want
+   full-width field styling; toggles never did. */
+.field input:not([type="checkbox"]):not([type="radio"]), .field select, .field textarea {
   width: 100%; padding: 11px 13px; border-radius: 11px;
   border: 1px solid var(--border); background: var(--field-bg);
   color: var(--ink); font-family: var(--ui); font-size: 14px;
   transition: border-color .16s, box-shadow .16s, background .16s;
   appearance: none; -webkit-appearance: none;
+}
+/* Checkboxes/radios inside .field keep their native rendering, sized to sit
+   inline with their label rather than filling the row. */
+.field input[type="checkbox"], .field input[type="radio"] {
+  width: 16px; height: 16px; flex: none; margin: 0; accent-color: var(--teal); cursor: pointer;
 }
 .field input:focus, .field select:focus, .field textarea:focus {
   border-color: var(--teal); box-shadow: 0 0 0 3px rgba(62,224,196,.14);

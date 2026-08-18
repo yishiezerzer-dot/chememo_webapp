@@ -65,6 +65,16 @@ export async function runIndexJob(experimentId: string): Promise<void> {
 
 async function pollOnce(): Promise<void> {
   const admin = createAdminClient();
+
+  // See lib/evidence-chunks.ts — same stranded-'processing' flaw, same fix:
+  // nothing but this poller ever looks at these rows, and it only selects
+  // 'pending', so a worker that dies mid-job orphans the row permanently.
+  const { data: reclaimed, error: reclaimError } = await admin.rpc("reclaim_stale_queue_rows", {
+    p_table: "index_jobs",
+  });
+  if (reclaimError) logError("index-jobs", "reclaim failed", { error: reclaimError });
+  else if (reclaimed) logInfo("index-jobs", "reclaimed stale processing rows", { count: reclaimed });
+
   const { data: jobs, error } = await admin
     .from("index_jobs")
     .select("experiment_id")
