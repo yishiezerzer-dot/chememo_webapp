@@ -96,6 +96,11 @@ export default async function HealthPage() {
           Indexed range: {chunkIndex.indexedAtRange.earliest ?? "—"} →{" "}
           {chunkIndex.indexedAtRange.latest ?? "—"}
         </p>
+        <p className="muted" style={{ fontSize: 12 }}>
+          Raw index composition — counts every row, including chunks belonging to deleted
+          experiments. The &ldquo;evidence chunks failed&rdquo; tile above deliberately excludes
+          those, so the two numbers differ by design.
+        </p>
       </div>
 
       <div className="obs-box glass" style={{ marginTop: 20 }}>
