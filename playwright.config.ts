@@ -13,6 +13,10 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Deletes the rows this suite created, scoped to the dedicated e2e account.
+  // Inert unless E2E_CLEANUP_ENABLED=true, so a manual run never quietly
+  // removes anything — see the file header for the full safety argument.
+  globalTeardown: "./tests/e2e/global-teardown.ts",
   fullyParallel: false,
   // All specs sign in with the same shared E2E test account; concurrent
   // logins from multiple workers raced and corrupted each other's sessions.

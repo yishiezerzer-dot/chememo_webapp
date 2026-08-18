@@ -15,6 +15,13 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
       E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      # Opt in to the post-run cleanup (tests/e2e/global-teardown.ts). Before
+      # this, every CI run left its fixtures behind on the shared dev project
+      # forever: 1414 of dev's 1443 experiments were e2e leftovers, and the
+      # dashboard's "Recent experiments" panel showed nothing but test data.
+      # Scoped to rows owned by the dedicated e2e account, and hard-refuses to
+      # run against the production project.
+      E2E_CLEANUP_ENABLED: "true"
     steps:
       # fetch-depth: 0 (full history) so gitleaks-action below can resolve its
       # commit-range diff. actions/checkout@v4 defaults to a depth-1 shallow
