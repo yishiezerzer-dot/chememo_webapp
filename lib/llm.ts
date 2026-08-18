@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { resolveMetalAlias, resolveReactionAlias, type SearchFilters } from "@/lib/search";
 import { METHOD_OPTIONS, type Experiment, type ExperimentInput } from "@/lib/types";
-import { logWarn } from "@/lib/logger";
+import { logInfo, logWarn } from "@/lib/logger";
 
 // T3.4 D5 — version tag for each system prompt below, registered in
 // prompt_versions (migration 20260819120000). Bump the relevant entry by
@@ -261,7 +261,24 @@ export function parseJson(text: string): Record<string, unknown> | null {
 // rejecting the whole response when one field is malformed — same tolerant
 // per-field degrade as before, just centralized in one schema.
 const routeIntentSchema = z.object({
-  mode: z.enum(["filter", "semantic", "both"]).catch("filter"),
+  // Degrades to "both", never "filter". These .catch() fallbacks exist so one
+  // malformed field doesn't sink the whole plan, but the fallback for `mode`
+  // decides what happens on a bad response, and "filter" was the worst
+  // possible choice: retrieveRecords skips semantic search entirely in filter
+  // mode, so a degraded plan (filter mode, no filters parsed) retrieves
+  // nothing at all AND loses the semantic safety net that would have caught
+  // it. Worse, safeParse still succeeds, so routerFailed stays false and the
+  // user is told "No matching experiments found in your lab" — a confident
+  // claim about their data — when the truth is that no usable plan was ever
+  // produced. "both" degrades the other way: run everything and let ranking
+  // sort it out.
+  //
+  // Found 2026-08-18: every fuzzy question returned nothing, including the
+  // router prompt's own example ("which samples produced droplets?"), while
+  // parametric ones answered correctly — with the vectors, the chunk content,
+  // the workspace scoping and match_evidence_chunks all verified healthy
+  // (EXP-001 matched itself at similarity 1.0 through the real RPC).
+  mode: z.enum(["filter", "semantic", "both"]).catch("both"),
   compounds: z.array(z.string()).catch([]),
   metals: z.array(z.string()).catch([]),
   methods: z.array(z.string()).catch([]),
@@ -291,10 +308,22 @@ Schema:
 }
 Use "filter" for exact/parametric questions (pH, compound, metal, method, m/z), "semantic" for fuzzy descriptions ("looked cloudy", "droplets"), "both" when the question mixes them.`;
 
-  const text = await chatComplete({ system, user: query, maxTokens: 500 });
-  if (!text) return null;
+  // 1400, not 500: on a reasoning-tier model maxTokens is a single budget
+  // shared by hidden reasoning AND visible output, so a tight cap can be
+  // spent thinking before any JSON is emitted. That is exactly the failure
+  // D11 diagnosed for the crew agents and for suggestFieldsFromRecord; the
+  // router was left on its original budget and has the same shape. It is a
+  // cheap call and the ceiling only costs anything when it is actually used.
+  const text = await chatComplete({ system, user: query, maxTokens: 1400 });
+  if (!text) {
+    logWarn("llm", "router returned no text", { query: query.slice(0, 80) });
+    return null;
+  }
   const j = parseJson(text);
-  if (!j) return null;
+  if (!j) {
+    logWarn("llm", "router response was not parseable JSON", { query: query.slice(0, 80) });
+    return null;
+  }
   const parsed = routeIntentSchema.safeParse(j);
   if (!parsed.success) return null;
   const d = parsed.data;
@@ -311,7 +340,22 @@ Use "filter" for exact/parametric questions (pH, compound, metal, method, m/z), 
     ph: d.ph,
     reactionLike: d.reaction ? resolveReactionAlias(d.reaction) : null,
   };
-  return { mode: d.mode, filters, semanticQuery: d.semanticQuery };
+  // retrieveRecords needs BOTH a non-filter mode and a non-null semanticQuery
+  // before it will run semantic search, so a plan that asks for semantic but
+  // omits the query string is just as inert as the bad-mode case above. The
+  // user's own question is always a serviceable semantic query — it is what
+  // the keyless path searches with — so fall back to it rather than silently
+  // retrieving nothing.
+  const semanticQuery = d.semanticQuery ?? (d.mode === "filter" ? null : query);
+
+  logInfo("llm", "router plan", {
+    mode: d.mode,
+    hasSemanticQuery: semanticQuery !== null,
+    filterCount:
+      filters.compounds.length + filters.metals.length + filters.methods.length + filters.mz.length,
+  });
+
+  return { mode: d.mode, filters, semanticQuery };
 }
 
 function formatRecord(e: Experiment): string {

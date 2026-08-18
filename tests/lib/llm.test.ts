@@ -49,6 +49,40 @@ function record(id: string, name: string): Experiment {
   return { id, name } as unknown as Experiment;
 }
 
+// Regression for the 2026-08-18 "No matching experiments found in your lab"
+// bug: a degraded router plan used to fall back to mode "filter", which makes
+// retrieveRecords skip semantic search entirely — so a malformed response
+// retrieved nothing AND lost the safety net that would have covered for it,
+// while still reporting success rather than a router failure.
+describe("routeQuery — degrading safely", () => {
+  it("falls back to 'both', never 'filter', when the model omits mode", async () => {
+    mockGeminiText(JSON.stringify({ semanticQuery: "formed droplets" }));
+    const intent = await routeQuery("which samples produced droplets?");
+    expect(intent?.mode).toBe("both");
+  });
+
+  it("falls back to 'both' when mode is not one of the allowed values", async () => {
+    mockGeminiText(JSON.stringify({ mode: "fuzzy", semanticQuery: "cloudy" }));
+    const intent = await routeQuery("anything look cloudy?");
+    expect(intent?.mode).toBe("both");
+  });
+
+  it("uses the raw question as the semantic query when the model omits one", async () => {
+    mockGeminiText(JSON.stringify({ mode: "semantic" }));
+    const intent = await routeQuery("where did we see turbidity");
+    // A semantic plan with no query string never runs semantic search at all.
+    expect(intent?.semanticQuery).toBe("where did we see turbidity");
+  });
+
+  it("leaves semanticQuery null for a genuine filter-only plan", async () => {
+    mockGeminiText(JSON.stringify({ mode: "filter", mz: [297] }));
+    const intent = await routeQuery("experiments with m/z 297");
+    expect(intent?.mode).toBe("filter");
+    expect(intent?.semanticQuery).toBeNull();
+    expect(intent?.filters.mz).toEqual([297]);
+  });
+});
+
 describe("generateCitedAnswer", () => {
   it("drops a hallucinated citation label not present in the retrieved evidence", async () => {
     mockGeminiText(
@@ -159,11 +193,15 @@ describe("prompt-injection hardening", () => {
 });
 
 describe("routeQuery (zod validation regression)", () => {
-  it("degrades an invalid mode to 'filter' while keeping other valid fields", async () => {
+  // Updated 2026-08-18: this asserted the old fallback of 'filter', which was
+  // the bug — filter mode skips semantic search, so a degraded plan retrieved
+  // nothing while still reporting success. The valid fields must still
+  // survive alongside the safer fallback.
+  it("degrades an invalid mode to 'both' while keeping other valid fields", async () => {
     mockGeminiText(JSON.stringify({ mode: "banana", compounds: ["Histidine"], semanticQuery: null }));
     const intent = await routeQuery("find histidine experiments");
     expect(intent).not.toBeNull();
-    expect(intent!.mode).toBe("filter");
+    expect(intent!.mode).toBe("both");
     expect(intent!.filters.compounds).toEqual(["Histidine"]);
   });
 
