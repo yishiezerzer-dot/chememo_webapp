@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 
 // T1.2 D6 — 3 options, not the plan text's 5: "Continue a series" needs
 // T1.7's experiment_series (not built) and "Import" names no source
@@ -15,9 +16,20 @@ import { createClient } from "@/lib/supabase/server";
 export default async function NewExperimentMenuPage() {
   const supabase = await createClient();
 
+  // Counted within the active workspace, not across every workspace the user
+  // belongs to. Without this the cards stayed "available" in a brand-new
+  // empty workspace because another workspace happened to have templates —
+  // the same union-of-all-workspaces trap that made the browse lists wrong.
+  const workspaceId = await activeWorkspaceId();
+  const templateQuery = supabase.from("experiment_templates").select("id", { count: "exact", head: true });
+  const experimentQuery = supabase
+    .from("experiments")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null);
+
   const [{ count: templateCount }, { count: experimentCount }] = await Promise.all([
-    supabase.from("experiment_templates").select("id", { count: "exact", head: true }),
-    supabase.from("experiments").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    workspaceId ? templateQuery.eq("workspace_id", workspaceId) : templateQuery,
+    workspaceId ? experimentQuery.eq("workspace_id", workspaceId) : experimentQuery,
   ]);
 
   const options = [
