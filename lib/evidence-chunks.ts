@@ -35,13 +35,17 @@ export async function runEvidenceChunkJob(chunkId: string): Promise<void> {
   if (chunkErr || !chunk) return;
 
   try {
+    // Embeddings are enabled but the provider returned nothing — a transient
+    // failure (rate limit, outage, truncated response), not a completed job.
+    // This used to mark the chunk `done`, which made a failure indistinguish-
+    // able from a success: the row looked processed forever while being
+    // permanently invisible to semantic search, with no failed status and no
+    // error for anyone to see. Found 2026-08-18 with 20 chunks sitting `done`
+    // with a null embedding_model. Throw instead, and let the catch below
+    // record the attempt and schedule a retry like any other failure.
     const embedding = await embedText(chunk.content);
     if (!embedding) {
-      await admin
-        .from("evidence_chunks")
-        .update({ status: "done", updated_at: new Date().toISOString() })
-        .eq("id", chunkId);
-      return;
+      throw new Error("embedding provider returned no vector");
     }
     await admin
       .from("evidence_chunks")
