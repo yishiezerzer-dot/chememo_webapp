@@ -8,7 +8,8 @@ import {
   BACKUP_TEST_STATUS,
 } from "@/lib/health/service";
 import { RequeueFailedButton } from "@/components/requeue-failed-button";
-import { requeueFailedAction } from "./actions";
+import { ReindexEmbeddingsButton } from "@/components/reindex-embeddings-button";
+import { requeueFailedAction, reindexStaleEmbeddingsAction } from "./actions";
 
 // Provider errors arrive as whole JSON bodies and repeat verbatim across
 // every row that failed in the same incident — 107 identical truncated
@@ -73,6 +74,25 @@ export default async function HealthPage() {
           </div>
         </div>
       </div>
+
+      {snapshot.embeddings.staleChunks > 0 && (
+        <div className="obs-box glass" style={{ marginTop: 20, borderColor: "var(--amber)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <h4 style={{ margin: 0 }}>Semantic search is degraded</h4>
+            <ReindexEmbeddingsButton action={reindexStaleEmbeddingsAction} />
+          </div>
+          <p style={{ marginBottom: 4 }}>
+            <strong>{snapshot.embeddings.staleChunks}</strong> chunk
+            {snapshot.embeddings.staleChunks === 1 ? " is" : "s are"} embedded with a different model
+            than the one in use ({snapshot.embeddings.activeModel}).
+          </p>
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+            Vectors from two models still compare without error when their dimensions match, so
+            nothing fails loudly — those records simply stop matching any question and quietly
+            disappear from semantic search. Re-indexing re-embeds them with the current model.
+          </p>
+        </div>
+      )}
 
       <div className="obs-box glass" style={{ marginTop: 20 }}>
         <h4>Evidence chunk index</h4>

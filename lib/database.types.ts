@@ -3650,6 +3650,10 @@ export type Database = {
           source_type: string
         }[]
       }
+      health_stale_embedding_chunks: {
+        Args: { p_active_model: string }
+        Returns: number
+      }
       is_workspace_admin: {
         Args: { uid: string; ws_id: string }
         Returns: boolean
@@ -3692,6 +3696,10 @@ export type Database = {
         Returns: undefined
       }
       requeue_failed_queue_rows: { Args: { p_table: string }; Returns: number }
+      requeue_stale_embedding_chunks: {
+        Args: { p_active_model: string }
+        Returns: number
+      }
       resolve_crew_unresolved_item: {
         Args: { p_experiment_id: string; p_item_index: number }
         Returns: undefined

@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { embeddingModel } from "@/lib/embeddings";
 import { logError } from "@/lib/logger";
 
 export type HealthSnapshot = {
@@ -9,6 +10,11 @@ export type HealthSnapshot = {
   indexJobs: { pending: number; failed: number };
   evidenceChunks: { pending: number; failed: number };
   ai: { recentSampleSize: number; recentErrorRate: number; windowHours: number };
+  // Chunks embedded with a model other than the one now in use. Non-zero
+  // means semantic search is quietly returning nothing for them: the vectors
+  // still compare without error (same dimension), they just no longer mean
+  // anything, so every hit falls under MIN_SIM. See migration 20260830120000.
+  embeddings: { activeModel: string; staleChunks: number };
 };
 
 // "Recent" used to mean "the last 50 ai_requests rows, whenever they
@@ -35,7 +41,8 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   // that side is done in SQL (health_evidence_chunk_counts, migration
   // 20260829120000); index_jobs has a real experiment_id and can use the
   // ordinary inner-join filter.
-  const [dbCheck, pendingJobsCheck, failedJobsCheck, chunkCounts, aiCheck] = await Promise.all([
+  const activeModel = embeddingModel();
+  const [dbCheck, pendingJobsCheck, failedJobsCheck, chunkCounts, aiCheck, staleCheck] = await Promise.all([
     admin.from("experiments").select("id").limit(1),
     admin
       .from("index_jobs")
@@ -54,6 +61,7 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
       .gte("created_at", new Date(Date.now() - AI_ERROR_WINDOW_HOURS * 3_600_000).toISOString())
       .order("created_at", { ascending: false })
       .limit(200),
+    admin.rpc("health_stale_embedding_chunks", { p_active_model: activeModel }),
   ]);
 
   const dbOk = !dbCheck.error;
@@ -70,8 +78,14 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
   const aiRows = aiCheck.data ?? [];
   const aiErrors = aiRows.filter((r) => r.status === "error").length;
 
+  if (staleCheck.error) logError("health-service", "stale embedding check failed", { error: staleCheck.error });
+  const staleChunks = Number(staleCheck.data ?? 0);
+
   return {
-    status: !dbOk ? "down" : failedJobs > 0 || failedChunks > 0 ? "degraded" : "ok",
+    // Stale embeddings degrade the status deliberately: they break semantic
+    // search completely and silently, which is worse than a failed job that
+    // at least announces itself.
+    status: !dbOk ? "down" : failedJobs > 0 || failedChunks > 0 || staleChunks > 0 ? "degraded" : "ok",
     timestamp: new Date().toISOString(),
     db: { ok: dbOk },
     indexJobs: { pending: pendingJobs, failed: failedJobs },
@@ -81,6 +95,7 @@ export async function getHealthSnapshot(): Promise<HealthSnapshot> {
       recentErrorRate: aiRows.length ? aiErrors / aiRows.length : 0,
       windowHours: AI_ERROR_WINDOW_HOURS,
     },
+    embeddings: { activeModel, staleChunks },
   };
 }
 

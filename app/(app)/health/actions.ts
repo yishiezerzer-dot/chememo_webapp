@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/authorization/policies";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { embeddingModel } from "@/lib/embeddings";
 import { toActionResult } from "@/lib/errors";
 import type { ActionResult } from "@/lib/types";
 
@@ -30,6 +31,28 @@ export async function requeueFailedAction(
     if (error) return toActionResult("requeueFailed", error);
   } catch (e) {
     return toActionResult("requeueFailed", e);
+  }
+
+  revalidatePath("/health");
+  return { ok: true };
+}
+
+// Re-embeds every chunk whose stored embedding_model is not the one now in
+// use. Needed because switching AI_PROVIDER changes the embedding model
+// without invalidating anything: the old vectors keep the same dimension, so
+// pgvector compares them without complaint and semantic search just quietly
+// stops matching. Only the poller does the actual work — this simply moves
+// the rows back to 'pending'.
+export async function reindexStaleEmbeddingsAction(): Promise<ActionResult> {
+  try {
+    await requireUser();
+    const admin = createAdminClient();
+    const { error } = await admin.rpc("requeue_stale_embedding_chunks", {
+      p_active_model: embeddingModel(),
+    });
+    if (error) return toActionResult("reindexStaleEmbeddings", error);
+  } catch (e) {
+    return toActionResult("reindexStaleEmbeddings", e);
   }
 
   revalidatePath("/health");

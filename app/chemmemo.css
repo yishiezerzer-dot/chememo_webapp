@@ -774,6 +774,19 @@ table.exp-table {
 .ask-box > svg { width: 18px; height: 18px; color: var(--ink-mute); flex: none; transition: color .2s; }
 .ask-box:focus-within { border-color: var(--teal); box-shadow: 0 0 0 4px rgba(62,224,196,.12), var(--shadow-lg); }
 .ask-box:focus-within > svg { color: var(--teal); }
+/* The Ask page nests a .searchbox inside .ask-box (components/ask-client.tsx),
+   but .searchbox is sized for the compact header search: flex: 0 1 260px.
+   A flex-grow of 0 pinned it to that 260px basis inside a ~1250px form, so
+   the notebook's headline input rendered about a fifth of its container and
+   truncated its own placeholder to "Ask anything — e.g. which", while the
+   inline maxWidth: 640 the component asks for could never be reached.
+   Letting it grow also makes .ask-box the single visual frame, which is what
+   .ask-box input below already assumes, so the inner border and background
+   come off and the doubled-box look goes with them. */
+.ask-box .searchbox {
+  flex: 1 1 auto; max-width: none; border: none; background: none; border-radius: 0;
+}
+.ask-box .searchbox:focus-within { border-color: transparent; box-shadow: none; }
 .ask-box input {
   flex: 1; background: none; border: none; color: var(--ink);
   font-family: var(--ui); font-size: 15px; padding: 10px 4px; outline: none; min-width: 0;
