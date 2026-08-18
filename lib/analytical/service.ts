@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { Json } from "@/lib/database.types";
 import type {
   Instrument,
@@ -22,7 +23,11 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export async function listInstruments(): Promise<Instrument[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("instruments").select("*").order("name");
+  // Scoped to the active workspace — see activeWorkspaceId().
+  const workspaceId = await activeWorkspaceId();
+  let query = supabase.from("instruments").select("*");
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query.order("name");
   if (error) throw error;
   return (data ?? []) as Instrument[];
 }

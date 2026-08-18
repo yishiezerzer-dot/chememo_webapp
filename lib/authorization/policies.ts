@@ -28,6 +28,37 @@ const WORKSPACE_COOKIE = "cm_workspace";
 // a real membership, else the oldest membership (the single backfilled
 // workspace, for everyone who hasn't created/joined a second one yet).
 // Redirects to /workspaces/new if the user belongs to none at all.
+// The read-path counterpart to requireWorkspace (2026-08-18). RLS confines a
+// user to workspaces they belong to, but it cannot know which one they are
+// currently *looking at* — so every list query returned the union of all of
+// them. Switching workspace changed where new records were written while
+// every list still showed everything, which flatly contradicts the promise
+// on /workspaces/new that "a workspace is its own private space".
+//
+// Deliberately returns null rather than redirecting: this is called from read
+// paths, including ones that render before a workspace has ever been chosen,
+// and a redirect from inside a data fetch is a far worse failure mode than an
+// unscoped-but-RLS-safe read. Callers treat null as "no active workspace, do
+// not filter", which is exactly the previous behaviour.
+export async function activeWorkspaceId(): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const memberships = await listMyWorkspaces(supabase, user.id);
+  if (memberships.length === 0) return null;
+
+  const cookieStore = await cookies();
+  const cookieWorkspaceId = cookieStore.get(WORKSPACE_COOKIE)?.value;
+  // Same resolution rule as requireWorkspace, membership check included: a
+  // stale or forged cookie naming a workspace you are not in falls back to
+  // your first one, it never scopes you into someone else's data.
+  const active = memberships.find((m) => m.id === cookieWorkspaceId) ?? memberships[0];
+  return active.id;
+}
+
 export async function requireWorkspace() {
   const { supabase, user } = await requireUser();
   const memberships = await listMyWorkspaces(supabase, user.id);

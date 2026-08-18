@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { SampleMatrixRow } from "@/lib/types";
 
 // T2.9 D5 — the four already-real fields a matrix view can defensibly pivot
@@ -25,9 +26,13 @@ function dimensionValue(row: SampleMatrixRow, dimension: MatrixDimension): strin
 
 export async function getMatrixPivot(dimensionX: MatrixDimension, dimensionY: MatrixDimension): Promise<MatrixPivot> {
   const supabase = await createClient();
-  // RLS scopes this to the caller's accessible experiments, same as every
-  // other experiments query in this app — no explicit workspace filter needed.
-  const { data, error } = await supabase.from("experiments").select("id, sample_matrix").is("deleted_at", null);
+  // The comment that used to sit here said RLS made an explicit workspace
+  // filter unnecessary. That was precisely the bug: RLS scopes to workspaces
+  // the caller BELONGS to — all of them at once — not the one being viewed.
+  const workspaceId = await activeWorkspaceId();
+  let query = supabase.from("experiments").select("id, sample_matrix").is("deleted_at", null);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query;
   if (error) throw error;
 
   const cells: Record<string, Record<string, MatrixCell>> = {};

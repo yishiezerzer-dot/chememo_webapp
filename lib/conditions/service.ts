@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { Json } from "@/lib/database.types";
 import type {
   ConditionProgramTemplate,
@@ -32,7 +33,11 @@ export type ConditionProgramFields = {
 
 export async function listConditionProgramTemplates(): Promise<ConditionProgramTemplate[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("condition_program_templates").select("*").order("name");
+  // Scoped to the active workspace — see activeWorkspaceId().
+  const workspaceId = await activeWorkspaceId();
+  let query = supabase.from("condition_program_templates").select("*");
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query.order("name");
   if (error) throw error;
   return (data ?? []) as ConditionProgramTemplate[];
 }

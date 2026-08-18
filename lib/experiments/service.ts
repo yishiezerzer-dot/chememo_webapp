@@ -5,6 +5,7 @@ import { nextExperimentId } from "@/lib/experiment-id";
 import { runIndexJob } from "@/lib/index-jobs";
 import { deleteAllFiles } from "@/lib/files/service";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import { logError } from "@/lib/logger";
 import type {
   Experiment,
@@ -21,11 +22,14 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export async function listExperiments(): Promise<Experiment[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("experiments")
-    .select("*")
-    .is("deleted_at", null)
-    .order("date", { ascending: false });
+  // Scoped to the workspace currently being viewed. RLS alone only limits
+  // this to workspaces the user BELONGS to, which is the union of all of
+  // them — so before this, switching workspace changed where new records
+  // were written while every list still showed everything.
+  const workspaceId = await activeWorkspaceId();
+  let query = supabase.from("experiments").select("*").is("deleted_at", null);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query.order("date", { ascending: false });
   if (error) throw error;
   // Array/timestamp columns are DB-nullable but every write path sets them
   // (defaults + never written null) — see the narrowing note in lib/types.ts.

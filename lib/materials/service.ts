@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import { convert } from "@/lib/quantities/convert";
 import { deriveMoles, determineLimitingReagent, calculateYield } from "@/lib/stoichiometry/calculate";
 import type { Json } from "@/lib/database.types";
@@ -27,7 +28,11 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export async function listMaterials(): Promise<Material[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("materials").select("*").order("preferred_name");
+  // Scoped to the active workspace — see activeWorkspaceId().
+  const workspaceId = await activeWorkspaceId();
+  let query = supabase.from("materials").select("*");
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query.order("preferred_name");
   if (error) throw error;
   return (data ?? []) as Material[];
 }

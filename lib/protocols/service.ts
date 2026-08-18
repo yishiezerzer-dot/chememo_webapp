@@ -1,13 +1,17 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { Protocol, ProtocolVersion, ProtocolStep, CriticalParameter, KnownFailureMode } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export async function listProtocols(includeArchived = false): Promise<Protocol[]> {
   const supabase = await createClient();
+  // Scoped to the active workspace — see activeWorkspaceId().
+  const workspaceId = await activeWorkspaceId();
   let query = supabase.from("protocols").select("*").order("created_at", { ascending: false });
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
   if (!includeArchived) query = query.eq("archived", false);
   const { data, error } = await query;
   if (error) throw error;

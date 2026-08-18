@@ -1,13 +1,20 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { Project } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export async function listProjects(): Promise<Project[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("projects").select("*").order("label");
+  // Scoped to the active workspace — RLS only narrows this to workspaces the
+  // user belongs to, so the sidebar previously listed every project from all
+  // of them at once. See activeWorkspaceId().
+  const workspaceId = await activeWorkspaceId();
+  let query = supabase.from("projects").select("*");
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query.order("label");
   if (error) throw error;
   return data ?? [];
 }

@@ -1,13 +1,18 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { ExperimentInput, ExperimentTemplate, ExperimentTemplateVersion } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export async function listTemplates(includeArchived = false): Promise<ExperimentTemplate[]> {
   const supabase = await createClient();
+  // Scoped to the active workspace (see activeWorkspaceId) — templates are
+  // lab-shared within a workspace, not across every workspace you belong to.
+  const workspaceId = await activeWorkspaceId();
   let query = supabase.from("experiment_templates").select("*").order("created_at", { ascending: false });
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
   if (!includeArchived) query = query.eq("archived", false);
   const { data, error } = await query;
   if (error) throw error;

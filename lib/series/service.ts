@@ -1,13 +1,20 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { Experiment, ExperimentSeries } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export async function listSeries(): Promise<ExperimentSeries[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("experiment_series").select("*").order("created_at", { ascending: false });
+  // Scoped to the active workspace — see activeWorkspaceId(). This feeds the
+  // "Add to series" picker on every experiment page, so an unscoped list
+  // offered series belonging to entirely unrelated workspaces.
+  const workspaceId = await activeWorkspaceId();
+  let query = supabase.from("experiment_series").select("*");
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as ExperimentSeries[];
 }

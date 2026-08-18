@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { encodeCursor, decodeCursor } from "@/lib/experiments/search-params";
+import { activeWorkspaceId } from "@/lib/authorization/policies";
 import type { Experiment, ExperimentSearchParams, ExperimentSortKey } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -19,9 +20,15 @@ const SORT_COLUMN: Record<ExperimentSortKey, string> = {
 // T1.6 D5 — the one filter-building function shared by the page query, the
 // facet counts, and the CSV export, so all three always agree on "what
 // matches the current search."
+// workspaceId is applied here rather than at the three call sites because
+// this is the one place every experiment query in this module passes
+// through — search, facet counts and the unlimited CSV export. Missing it on
+// any one of them would leak another workspace's records into a count or an
+// export while the visible list still looked correctly scoped.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyFilters(query: any, params: ExperimentSearchParams) {
+function applyFilters(query: any, params: ExperimentSearchParams, workspaceId?: string | null) {
   let q = query.is("deleted_at", null);
+  if (workspaceId) q = q.eq("workspace_id", workspaceId);
   if (params.q?.trim()) {
     // websearch_to_tsquery handles quoted phrases and "-exclude" the way
     // users actually type, unlike plainto_tsquery (D1).
@@ -65,7 +72,8 @@ export async function searchExperiments(
   const sortCol = SORT_COLUMN[sortKey];
   const ascending = dir === "asc";
 
-  let q = applyFilters((supabase.from("experiments") as Query).select("*"), params);
+  const workspaceId = await activeWorkspaceId();
+  let q = applyFilters((supabase.from("experiments") as Query).select("*"), params, workspaceId);
 
   const cursor = opts.cursor ? decodeCursor(opts.cursor) : null;
   if (cursor) {
@@ -94,7 +102,7 @@ export async function searchExperiments(
       ? encodeCursor({ value: (last[sortCol] as string | number | null) ?? null, id: last.id })
       : null;
 
-  const facets = await computeFacets(supabase, params);
+  const facets = await computeFacets(supabase, params, workspaceId);
 
   return { rows: pageRows, nextCursor, facets };
 }
@@ -128,7 +136,8 @@ async function fetchAllRows<T>(
 // the "exclude this dimension" faceted-search convention.
 async function computeFacets(
   supabase: Supabase,
-  params: ExperimentSearchParams
+  params: ExperimentSearchParams,
+  workspaceId: string | null
 ): Promise<ExperimentSearchResult["facets"]> {
   const rows = await fetchAllRows<{
     status: string | null;
@@ -138,7 +147,8 @@ async function computeFacets(
   }>((from, to) =>
     applyFilters(
       (supabase.from("experiments") as Query).select("status, project, reaction_type, methods"),
-      params
+      params,
+      workspaceId
     ).range(from, to)
   );
 
@@ -160,8 +170,9 @@ async function computeFacets(
 // match, not just the current page). Same filter logic as searchExperiments.
 export async function searchAllExperiments(params: ExperimentSearchParams): Promise<Experiment[]> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   return fetchAllRows<Experiment>((from, to) =>
-    applyFilters((supabase.from("experiments") as Query).select("*"), params)
+    applyFilters((supabase.from("experiments") as Query).select("*"), params, workspaceId)
       .order("date", { ascending: false })
       .range(from, to)
   );
