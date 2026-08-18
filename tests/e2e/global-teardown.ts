@@ -53,38 +53,70 @@ export default async function globalTeardown(): Promise<void> {
     return;
   }
 
-  const { data: owned, error: selectError } = await admin
-    .from("experiments")
-    .select("id")
-    .eq("owner_id", e2eUser.id);
-  if (selectError) {
-    console.warn("[e2e-teardown] could not list e2e experiments — skipping.", selectError.message);
-    return;
-  }
-  const ids = (owned ?? []).map((e) => e.id);
-  if (ids.length === 0) return;
+  // Loop rather than select-once: PostgREST caps ANY select at ~1000 rows
+  // regardless of the query, silently, with no error and no truncation flag.
+  // The first version of this file selected once and deleted what it got, so
+  // against dev's 1414 accumulated fixtures it removed exactly 1000 and left
+  // 414 behind while reporting success. (The same cap is already documented
+  // in lib/health/service.ts — it is a recurring trap in this codebase.)
+  // Looping until the table is empty also mops up anything created while the
+  // teardown itself was running.
+  const errors: string[] = [];
+  let removed = 0;
 
-  // evidence_chunks references its source polymorphically (source_type/
-  // source_id) with no foreign key, so deleting an experiment does NOT take
-  // its chunks with it — that is how dev accumulated failed chunks belonging
-  // to experiments that no longer exist. Clear them first, while the
-  // experiment ids are still known.
-  for (let i = 0; i < ids.length; i += 100) {
-    const batch = ids.slice(i, i + 100);
-    const { error } = await admin
-      .from("evidence_chunks")
-      .delete()
-      .in("metadata->>experiment_id", batch);
-    if (error) console.warn("[e2e-teardown] chunk cleanup failed", error.message);
+  for (;;) {
+    const { data: owned, error: selectError } = await admin
+      .from("experiments")
+      .select("id")
+      .eq("owner_id", e2eUser.id)
+      .limit(1000);
+    if (selectError) {
+      errors.push(`list: ${selectError.message}`);
+      break;
+    }
+    const ids = (owned ?? []).map((e) => e.id);
+    if (ids.length === 0) break;
+
+    // evidence_chunks references its source polymorphically (source_type/
+    // source_id) with no foreign key, so deleting an experiment does NOT
+    // take its chunks with it — that is how dev accumulated failed chunks
+    // belonging to experiments that no longer exist. Clear them first, while
+    // the experiment ids are still known.
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      const { error } = await admin
+        .from("evidence_chunks")
+        .delete()
+        .in("metadata->>experiment_id", batch);
+      if (error) errors.push(`chunks: ${error.message}`);
+    }
+
+    // Everything else (files, provenance, samples, comments, jobs) hangs off
+    // experiments with ON DELETE CASCADE and goes with them.
+    let deletedThisPass = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      const { error } = await admin.from("experiments").delete().in("id", batch);
+      if (error) errors.push(`experiments: ${error.message}`);
+      else deletedThisPass += batch.length;
+    }
+    removed += deletedThisPass;
+
+    // Nothing went this pass, so the next would see the same rows and spin
+    // forever. Stop and report instead.
+    if (deletedThisPass === 0) {
+      errors.push(`stalled with ${ids.length} row(s) still present`);
+      break;
+    }
   }
 
-  // Everything else (files, provenance, samples, comments, jobs) hangs off
-  // experiments with ON DELETE CASCADE and goes with them.
-  for (let i = 0; i < ids.length; i += 100) {
-    const batch = ids.slice(i, i + 100);
-    const { error } = await admin.from("experiments").delete().in("id", batch);
-    if (error) console.warn("[e2e-teardown] experiment cleanup failed", error.message);
+  // Deliberately loud, and fatal. The first version logged failures with
+  // console.warn and carried on, so a cleanup that did only 70% of its job
+  // looked identical to a complete one and dev kept filling up unnoticed.
+  if (errors.length > 0) {
+    console.error(`[e2e-teardown] removed ${removed}, then failed:\n  ${errors.join("\n  ")}`);
+    throw new Error("[e2e-teardown] cleanup did not complete — see errors above.");
   }
 
-  console.log(`[e2e-teardown] removed ${ids.length} experiments created by ${email}.`);
+  console.log(`[e2e-teardown] removed ${removed} experiments created by ${email}.`);
 }
