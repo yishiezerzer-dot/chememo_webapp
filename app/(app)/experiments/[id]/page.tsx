@@ -159,7 +159,14 @@ export default async function ExperimentDetailPage({
   const crewProvenance = await getCrewProvenance(supabase, e.id);
   const isLocked = e.locked_at !== null;
   const aiSuggestions = isOwner ? await getPendingAiSuggestions(supabase, e.id) : [];
-  const gapSuggestions = aiSuggestions.filter((s) => s.source === "gap_scan");
+  // Suggestions that answer no specific checklist item: a general gap scan,
+  // or a crew_resolve suggestion whose item could not be identified (its
+  // stored index had gone stale — see migration 20260828130000). Both belong
+  // in the standalone panel; without this the latter would render nowhere at
+  // all and could never be agreed or dismissed.
+  const unboundSuggestions = aiSuggestions.filter(
+    (s) => s.source === "gap_scan" || s.unresolvedItemId === null
+  );
   // Matched by the checklist item's own stable id. Array position was wrong
   // (resolving an earlier item shifts every later one) and so was field name
   // (the four agents each append independently, so one field routinely has
@@ -276,7 +283,7 @@ export default async function ExperimentDetailPage({
       {isOwner && (
         <AiFieldSuggestionsPanel
           experimentId={e.id}
-          suggestions={gapSuggestions}
+          suggestions={unboundSuggestions}
           isOwner={isOwner}
           isLocked={isLocked}
           generateAction={generateGapSuggestionsAction}
