@@ -892,6 +892,14 @@ table.exp-table {
 .entry-menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
 .entry-menu-card { display: block; text-decoration: none; color: inherit; transition: border-color .15s; }
 .entry-menu-card:hover { border-color: var(--border-strong); }
+/* An option that cannot work yet (no templates to start from, no experiments
+   to clone). Dimmed rather than hidden, so the capability stays discoverable
+   — a new user should learn the feature exists and what would unlock it,
+   not silently lose two thirds of the menu. The inner "fix" link stays fully
+   interactive. */
+.entry-menu-card.is-unavailable { opacity: .62; cursor: default; }
+.entry-menu-card.is-unavailable:hover { border-color: var(--border); }
+.entry-menu-card.is-unavailable .btn { opacity: 1; }
 
 /* T1.2 — §8.2 sample matrix. 19 columns, so a small monospace-ish density
    and a forced horizontal scroll (a11y region already applied in the

@@ -38,7 +38,19 @@ export default async function ExperimentMapPage({
         </button>
       </form>
 
-      {!projectId ? (
+      {projects.length === 0 ? (
+        // Telling someone to select a project when the dropdown holds only
+        // its own placeholder is a dead end: nothing to pick, and no hint
+        // that projects are the missing piece.
+        <div className="empty-state">
+          <div className="big">No projects yet</div>
+          <p style={{ margin: "6px 0 0" }}>
+            This map draws the links between experiments in a project — replicates, controls and
+            follow-ups. Create a project, assign a few experiments to it, and their relationships
+            appear here.
+          </p>
+        </div>
+      ) : !projectId ? (
         <div className="empty-state">
           <div className="big">Select a project to see its relationship map.</div>
         </div>

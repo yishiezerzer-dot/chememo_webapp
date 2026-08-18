@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
@@ -43,6 +44,20 @@ export function ExperimentsTable({
   const { showToast } = useToast();
   const [pending, start] = useTransition();
   const [q, setQ] = useState(params.q ?? "");
+  // "No results" and "nothing here yet" are different states and deserve
+  // different copy. sort/dir are excluded deliberately — they are always
+  // present and narrow nothing.
+  const hasActiveFilters = Boolean(
+    params.q ||
+      params.project ||
+      params.status ||
+      params.reactionType ||
+      params.methods?.length ||
+      params.dateFrom ||
+      params.dateTo ||
+      params.phMin != null ||
+      params.phMax != null
+  );
   const [viewName, setViewName] = useState("");
   const [exporting, setExporting] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -313,8 +328,24 @@ export function ExperimentsTable({
           </table>
           {rows.length === 0 && (
             <div className="empty-state">
-              <div className="big">No experiments match</div>
-              Try clearing the search or filters.
+              {hasActiveFilters ? (
+                <>
+                  <div className="big">No experiments match</div>
+                  Try clearing the search or filters.
+                </>
+              ) : (
+                // A brand-new notebook has nothing to clear, so the old copy
+                // told a first-time user to undo something they never did.
+                <>
+                  <div className="big">No experiments yet</div>
+                  <p style={{ margin: "6px 0 12px" }}>
+                    Every record you log shows up here, searchable by compound, pH, method or m/z.
+                  </p>
+                  <Link href="/new" className="btn btn-sm">
+                    Log your first experiment
+                  </Link>
+                </>
+              )}
             </div>
           )}
         </div>

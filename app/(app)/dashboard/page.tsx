@@ -58,7 +58,9 @@ export default async function DashboardPage() {
         </div>
         <div className="band-inner">
           <span className="eyebrow">Dashboard</span>
-          <h2>Welcome back, {name}</h2>
+          {/* "Welcome back" on someone's first ever visit is a small lie, and
+              first impressions are the whole point of this screen. */}
+          <h2>{experiments.length === 0 ? `Welcome, ${name}` : `Welcome back, ${name}`}</h2>
           <p>
             Your MFP lab notebook — structured records, linked files, and exact
             keyless search across every experiment.

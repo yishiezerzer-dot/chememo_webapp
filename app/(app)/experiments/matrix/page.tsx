@@ -69,7 +69,19 @@ export default async function MatrixPage({
       )}
 
       {pivot.xValues.length === 0 || pivot.yValues.length === 0 ? (
-        <p className="muted">No sample matrix rows have both {DIMENSION_LABELS[dimensionX]} and {DIMENSION_LABELS[dimensionY]} set.</p>
+        <div className="empty-state">
+          {/* Phrased as a gap in existing data, the old copy read as a fault
+              in a brand-new notebook that simply has no records at all. Say
+              what the view is for and what fills it, rather than naming two
+              fields the reader has never seen. */}
+          <div className="big">Nothing to plot yet</div>
+          <p style={{ margin: "6px 0 0" }}>
+            This view pivots your sample matrix into a screen grid — one axis against another, so a
+            systematic series can be read at a glance. It fills in once experiments have sample
+            matrix rows with both {DIMENSION_LABELS[dimensionX]} and {DIMENSION_LABELS[dimensionY]}{" "}
+            set.
+          </p>
+        </div>
       ) : (
         <div className="table-scroll">
           <div className="table-scroll-inner" tabIndex={0} role="region" aria-label="Screen matrix, scrollable">
