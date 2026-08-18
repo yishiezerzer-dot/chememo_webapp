@@ -9,6 +9,7 @@ import {
   type EvidenceSource,
 } from "@/lib/llm";
 import { embedText } from "@/lib/embeddings";
+import { logInfo } from "@/lib/logger";
 import type { Experiment } from "@/lib/types";
 
 // T3.3 D1 — RRF's standard damping constant: large enough that rank 1 vs
@@ -132,15 +133,31 @@ export async function semanticSearch(semanticQuery: string, k = 8): Promise<Chun
   });
   if (error) throw error;
 
-  const hits = ((data ?? []) as {
+  const candidates = (data ?? []) as {
     id: string;
     source_type: string;
     source_id: string;
     section_type: string;
     metadata: Record<string, unknown>;
     similarity: number;
-  }[]).filter((r) => r.similarity >= MIN_SIM);
-  if (hits.length === 0) return { experiments: [], evidence: new Map() };
+  }[];
+
+  const hits = candidates.filter((r) => r.similarity >= MIN_SIM);
+
+  // A query that retrieves nothing used to leave no trace anywhere: no
+  // ai_requests row (the route returns before logging one) and no
+  // ai_retrieval_event either, so the questions most worth learning from were
+  // the only ones invisible. Log what the vector search actually scored, so
+  // "nothing was close" can be told apart from "everything scored just under
+  // the threshold" without attaching a debugger to production.
+  if (hits.length === 0) {
+    logInfo("rag", "semantic search returned nothing", {
+      candidates: candidates.length,
+      topSimilarity: candidates[0]?.similarity ?? null,
+      minSim: MIN_SIM,
+    });
+    return { experiments: [], evidence: new Map() };
+  }
 
   const experimentIds = await resolveChunkExperimentIds(hits, supabase);
   const orderedIds: string[] = [];
