@@ -43,8 +43,31 @@ export type MatchExplanation = {
 };
 
 // Only semantic hits at/above this cosine similarity count as a real match.
-// Empirically: on-topic chemistry ≈ 0.59–0.70, off-topic ≈ 0.41–0.43.
-const MIN_SIM = Number(process.env.SEMANTIC_MIN_SIMILARITY) || 0.5;
+//
+// The old default of 0.5 sat between the numbers this comment used to quote
+// — on-topic chemistry 0.59-0.70, off-topic 0.41-0.43 — but those were
+// measured with gemini-embedding-001 (scripts/probe-sim.ts), and cosine
+// similarity is not comparable across embedding models. When the provider
+// switched to OpenAI nothing re-measured them, and text-embedding-3-small
+// scores query-to-document pairs far lower: 0.2-0.45 is normal for genuinely
+// related text, because a short question and a full record are different
+// kinds of object. Document-to-document stays high on both models, which is
+// exactly why this looked healthy from the outside — EXP-001 matches EXP-008
+// at 0.85 through the same RPC.
+//
+// Net effect: a threshold tuned for one model silently rejected every real
+// hit under another. Ask AI answered parametric questions perfectly (that
+// path never touches embeddings) while every free-text question about the
+// lab's own science returned "No matching experiments found in your lab" —
+// most pointedly "which samples produced droplets?", the router prompt's own
+// example of a semantic query.
+//
+// 0.3 is deliberately conservative for the new model rather than a
+// re-derived optimum: the numbers above need re-measuring on
+// text-embedding-3-small before this is tuned properly. semanticSearch now
+// logs the candidate count and top similarity whenever it returns nothing,
+// so that tuning can come from real traffic instead of a one-off probe.
+const MIN_SIM = Number(process.env.SEMANTIC_MIN_SIMILARITY) || 0.3;
 
 // Unified result for the Ask screen. `mode` = keyless (no key) vs ai. When
 // `grounded` is false in ai mode, the answer is general knowledge, not the lab's.
