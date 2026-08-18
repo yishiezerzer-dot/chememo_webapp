@@ -63,17 +63,29 @@ comment on column experiment_ai_suggestions.unresolved_item_id is
 comment on column experiment_ai_suggestions.unresolved_index is
   'Superseded 2026-08-18 by unresolved_item_id; retained for historical rows only. Never read by apply_ai_suggestion().';
 
--- 3. Map still-pending suggestions onto the ids just minted. Their stored
---    index is the best available evidence of intent, and it is correct
---    whenever nothing has been resolved since the suggestion was generated.
---    A row whose index no longer resolves is deliberately left null: it then
---    writes its field on Agree but clears no checklist item, which is the
---    safe failure -- never clearing the wrong one.
+-- 3. Map still-pending suggestions onto the ids just minted, using the stored
+--    index -- but ONLY where the item now at that index still carries the
+--    suggestion's own field. The index is trustworthy evidence of intent only
+--    while nothing has been resolved since the suggestion was generated; once
+--    something has, every later item shifted and the index points at an
+--    unrelated item. Requiring the field to agree is what distinguishes those
+--    two cases, and it is the whole point of this migration not to hand a
+--    suggestion the wrong item.
+--
+--    (Caught on dev by checking the result of an earlier version of this
+--    migration against the database: it bound a risks_failure_modes
+--    suggestion to a replicate_kind item, because one item had been resolved
+--    between generation and backfill.)
+--
+--    A row that fails the check is deliberately left null: on Agree it then
+--    writes its field but clears no checklist item, which is the safe
+--    failure -- never clearing the wrong one.
 update experiment_ai_suggestions s
 set unresolved_item_id = (
   select ((p.unresolved -> s.unresolved_index) ->> 'id')::uuid
   from experiment_crew_provenance p
   where p.experiment_id = s.experiment_id
+    and (p.unresolved -> s.unresolved_index) ->> 'field' = s.field
 )
 where s.unresolved_index is not null
   and s.unresolved_item_id is null
