@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useRef } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult } from "@/lib/types";
 import type { CommentView } from "@/lib/comments/service";
 
@@ -22,20 +21,8 @@ export function CommentThread({
   resolveComment: (commentId: string) => Promise<ActionResult>;
   reopenComment: (commentId: string) => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending, pendingKey } = useRunAction();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
-
-  function run(action: () => Promise<ActionResult>, key: string) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
-  }
 
   return (
     <div>

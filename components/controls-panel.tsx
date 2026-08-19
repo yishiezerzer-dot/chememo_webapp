@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { CONTROL_TYPES } from "@/lib/types";
-import type { ActionResult, Control, ControlType } from "@/lib/types";
+import type { Control, ControlType } from "@/lib/types";
 import { createControlAction, deleteControlAction } from "@/app/(app)/experiments/[id]/conditions-actions";
 import { requiredControlsPresent } from "@/lib/conditions/rules";
 
@@ -18,26 +17,11 @@ export function ControlsPanel({
   controls: Control[];
   hasConditionProgram: boolean;
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending, pendingKey } = useRunAction();
   const [controlType, setControlType] = useState<ControlType>(CONTROL_TYPES[0]);
   const [description, setDescription] = useState("");
 
   const check = requiredControlsPresent(controls, hasConditionProgram);
-
-  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
-      else {
-        router.refresh();
-        after?.();
-      }
-    });
-  }
 
   return (
     <div className="obs-box glass">

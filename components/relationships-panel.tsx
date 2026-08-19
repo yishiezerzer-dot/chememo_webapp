@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useRef, useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { RELATIONSHIP_TYPES, RELATIONSHIP_LABEL } from "@/lib/types";
 import type { ActionResult, ExperimentSeries, RelationshipType } from "@/lib/types";
 import type { RelationshipView } from "@/lib/relationships/service";
@@ -27,24 +26,13 @@ export function RelationshipsPanel({
   addToSeries: (seriesId: string) => Promise<ActionResult>;
   removeFromSeries: (seriesId: string) => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending, pendingKey } = useRunAction();
   const targetRef = useRef<HTMLInputElement>(null);
   const [type, setType] = useState<RelationshipType>("replicate_of");
   const memberSeriesIds = new Set(memberSeries.map((s) => s.id));
   const availableSeries = allSeries.filter((s) => !memberSeriesIds.has(s.id));
   const [seriesToAdd, setSeriesToAdd] = useState("");
 
-  function run(action: () => Promise<ActionResult>, key: string) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
-  }
 
   return (
     <div className="obs-box glass">

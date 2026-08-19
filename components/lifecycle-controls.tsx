@@ -1,9 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult, ExperimentStatus } from "@/lib/types";
 
 // Mirrors the DB trigger's legal-transition table (migration
@@ -60,20 +58,8 @@ export function LifecycleControls({
   completeAction: () => Promise<ActionResult>;
   reviewAction: () => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
 
-  function run(action: () => Promise<ActionResult>) {
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      // revalidatePath (called server-side by the action) only marks the
-      // route stale; a direct action call (not a <form action> submit)
-      // needs this to actually re-fetch and show the new status.
-      else router.refresh();
-    });
-  }
 
   // A legacy null-status row is classified through the Edit page's first
   // save, not here (§19.4 — name the gap rather than guessing a state).

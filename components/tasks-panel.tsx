@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { TASK_STATUSES } from "@/lib/types";
 import type { ActionResult, TaskStatus, TaskType } from "@/lib/types";
 import type { TaskView } from "@/lib/tasks/service";
@@ -27,9 +26,7 @@ export function TasksPanel({
   }) => Promise<ActionResult>;
   updateStatus: (taskId: string, status: TaskStatus, blockerNote: string | null) => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
   // Controlled, not a ref. As an uncontrolled input read through
   // titleRef.current at click time, "+ Add" could do nothing at all — no
   // request, no toast, no task — whenever that ref was not attached to the
@@ -42,13 +39,6 @@ export function TasksPanel({
   const [title, setTitle] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("task");
 
-  function run(action: () => Promise<ActionResult>) {
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
-  }
 
   function changeStatus(task: TaskView, status: TaskStatus) {
     let blockerNote = task.blocker_note;
