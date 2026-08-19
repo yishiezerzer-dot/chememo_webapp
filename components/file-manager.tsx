@@ -60,10 +60,14 @@ export function FileManager({
       >
         <label className="field">
           <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>Upload a file</span>
+          {/* accept must stay in step with ALLOWED_EXTENSIONS in
+              lib/files/service.ts — it previously omitted .nmr/.mzml/.raw/.tif/
+              .tiff, so the instrument formats the server does accept were
+              hidden from the dialog unless you switched it to "All files". */}
           <input
             type="file"
             name="file"
-            accept="image/*,.pdf,.csv,.xlsx,.xls,.fid"
+            accept="image/*,.tif,.tiff,.pdf,.csv,.xlsx,.xls,.fid,.nmr,.mzml,.raw"
             required
             onChange={() => uploadFormRef.current?.requestSubmit()}
             disabled={uploading}
