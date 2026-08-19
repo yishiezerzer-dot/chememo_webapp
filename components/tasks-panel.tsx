@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
@@ -30,7 +30,16 @@ export function TasksPanel({
   const [pending, start] = useTransition();
   const { showToast } = useToast();
   const router = useRouter();
-  const titleRef = useRef<HTMLInputElement>(null);
+  // Controlled, not a ref. As an uncontrolled input read through
+  // titleRef.current at click time, "+ Add" could do nothing at all — no
+  // request, no toast, no task — whenever that ref was not attached to the
+  // input actually on screen, because the guard below returns silently on an
+  // empty title. Reproduced on dev 2026-08-19: the visible input held text,
+  // the button was enabled, and clicking it issued zero network calls.
+  // Holding the value in state removes the failure mode, and the button now
+  // disables itself when there is nothing to add rather than looking live and
+  // doing nothing.
+  const [title, setTitle] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("task");
 
   function run(action: () => Promise<ActionResult>) {
@@ -86,7 +95,12 @@ export function TasksPanel({
       )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <input ref={titleRef} placeholder={taskType === "review" ? "What needs review?" : "New task…"} style={{ flex: 1, minWidth: 160 }} />
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={taskType === "review" ? "What needs review?" : "New task…"}
+          style={{ flex: 1, minWidth: 160 }}
+        />
         <select value={taskType} onChange={(e) => setTaskType(e.target.value as TaskType)}>
           <option value="task">Task</option>
           <option value="review">Request review</option>
@@ -94,17 +108,17 @@ export function TasksPanel({
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          disabled={pending}
+          disabled={pending || !title.trim()}
           aria-busy={pending}
           onClick={() => {
-            const title = titleRef.current?.value.trim();
-            if (!title) return;
+            const trimmed = title.trim();
+            if (!trimmed) return;
             run(async () => {
               const res = await createTask({
-                taskType, title, status: "not_started", blockerNote: null,
+                taskType, title: trimmed, status: "not_started", blockerNote: null,
                 assigneeId: null, dueAt: null, checklist: null,
               });
-              if (res.ok && titleRef.current) titleRef.current.value = "";
+              if (res.ok) setTitle("");
               return res;
             });
           }}
