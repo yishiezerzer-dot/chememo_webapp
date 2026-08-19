@@ -33,7 +33,6 @@ export function RelationshipsPanel({
   const availableSeries = allSeries.filter((s) => !memberSeriesIds.has(s.id));
   const [seriesToAdd, setSeriesToAdd] = useState("");
 
-
   return (
     <div className="obs-box glass">
       <h4>Relationships</h4>

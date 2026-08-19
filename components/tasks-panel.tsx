@@ -39,7 +39,6 @@ export function TasksPanel({
   const [title, setTitle] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("task");
 
-
   function changeStatus(task: TaskView, status: TaskStatus) {
     let blockerNote = task.blocker_note;
     if (status === "blocked" || status === "waiting") {

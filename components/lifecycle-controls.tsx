@@ -60,7 +60,6 @@ export function LifecycleControls({
 }) {
   const { run, pending } = useRunAction();
 
-
   // A legacy null-status row is classified through the Edit page's first
   // save, not here (§19.4 — name the gap rather than guessing a state).
   if (status === null) return null;
