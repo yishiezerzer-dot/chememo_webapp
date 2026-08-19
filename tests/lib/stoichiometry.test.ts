@@ -23,7 +23,24 @@ describe("deriveMoles", () => {
   it("accounts for purity < 100% (impure material yields fewer real moles per gram)", () => {
     const pure = deriveMoles({ kind: "solid_mass", massG: 1, molecularWeight: 100, purityFraction: 1 }).moles;
     const impure = deriveMoles({ kind: "solid_mass", massG: 1, molecularWeight: 100, purityFraction: 0.5 }).moles;
-    expect(impure).toBeGreaterThan(pure);
+    // This assertion used to read toBeGreaterThan, contradicting the test's own
+    // name and locking in a real chemistry error: purity divided instead of
+    // multiplying, so the less pure a reagent was, the more moles it was
+    // credited with. 1 g of 50%-pure material is 0.5 g of compound = 0.005 mol.
+    expect(impure).toBeLessThan(pure);
+    expect(impure).toBeCloseTo(0.005, 6);
+  });
+
+  it("scales a liquid's moles by purity too", () => {
+    // 1 mL at 1 g/mL = 1 g; at 50% purity and 100 g/mol -> 0.005 mol.
+    const { moles } = deriveMoles({
+      kind: "liquid_volume",
+      volumeMl: 1,
+      densityGPerMl: 1,
+      molecularWeight: 100,
+      purityFraction: 0.5,
+    });
+    expect(moles).toBeCloseTo(0.005, 6);
   });
 
   it("computes moles from a liquid's volume, density, molecular weight, and purity", () => {

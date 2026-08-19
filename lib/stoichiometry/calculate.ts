@@ -22,11 +22,16 @@ export function deriveMoles(source: MolesSource): { moles: number; calculation: 
       };
     }
     case "solid_mass": {
-      const moles = source.massG / source.molecularWeight / source.purityFraction;
+      // Purity MULTIPLIES. Weighing 10 g of a 95%-pure reagent puts 9.5 g of
+      // the actual compound in the flask, so an impure solid yields FEWER
+      // moles per gram, never more. Dividing by purity answers the inverse
+      // question -- what mass to weigh out to obtain a target number of
+      // moles -- which is not what this function does.
+      const moles = (source.massG * source.purityFraction) / source.molecularWeight;
       return {
         moles,
         calculation: {
-          formula: "moles = mass_g / molecular_weight / purity_fraction",
+          formula: "moles = (mass_g * purity_fraction) / molecular_weight",
           inputs: {
             mass_g: source.massG,
             molecular_weight: source.molecularWeight,
@@ -37,11 +42,13 @@ export function deriveMoles(source: MolesSource): { moles: number; calculation: 
     }
     case "liquid_volume": {
       const massG = source.volumeMl * source.densityGPerMl;
-      const moles = massG / source.molecularWeight / source.purityFraction;
+      // Same correction as solid_mass above: purity scales the amount of real
+      // compound present, so it multiplies.
+      const moles = (massG * source.purityFraction) / source.molecularWeight;
       return {
         moles,
         calculation: {
-          formula: "moles = (volume_mL * density_g_per_mL) / molecular_weight / purity_fraction",
+          formula: "moles = (volume_mL * density_g_per_mL * purity_fraction) / molecular_weight",
           inputs: {
             volume_mL: source.volumeMl,
             density_g_per_mL: source.densityGPerMl,
