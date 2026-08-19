@@ -84,9 +84,16 @@ function RestoreControl({
           aria-busy={pending}
           onClick={() =>
             start(async () => {
-              const res = await restoreRevision(revisionId, reason);
-              if (!res.ok) showToast(res.error, "error");
-              else router.refresh();
+              try {
+                const res = await restoreRevision(revisionId, reason);
+                if (!res.ok) showToast(res.error, "error");
+                else router.refresh();
+              } catch {
+                // requireUser() runs before the action's own try block, so an
+                // expired session rejects here instead of returning an error
+                // result — without this, that takes down the whole page.
+                showToast("Could not restore that version. Please try again.", "error");
+              }
             })
           }
         >
