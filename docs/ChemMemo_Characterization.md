@@ -1,7 +1,16 @@
 ---
-type: note
-project: CM
-title: ChemMemo — Characterization
+type: vision
+project: ChemMemo
+title: ChemMemo — Characterization (Vision & MVP)
+status: reference
+aliases:
+  - ChemMemo Characterization
+  - ChemMemo Vision
+tags:
+  - chememo
+  - chememo/vision
+created: 2026-07-01
+updated: 2026-07-21
 ---
 
 # ChemMemo — Characterization
@@ -35,28 +44,30 @@ Information is scattered across paper notebooks, Excel, LC-MS folders, microscop
 ## 5. MVP — the course minimum (must-have to "ship")
 This is the gradeable, demonstrable core. Maps to the concept PDF §10.
 
-- [ ] **Auth**: sign up / sign in; gated app; session persists on refresh.
-- [ ] **Supabase DB** connected with the core schema + row-level security.
-- [ ] **Add experiment** via the structured form → saved to Postgres (typed fields).
-- [ ] **Experiments table**: view / search / sort / filter all accessible experiments.
-- [ ] **Experiment detail** page: full record + linked files.
-- [ ] **Ask AI (NL query)**: at least the exact-match + semantic paths working on the 7 example questions.
-- [ ] **Grounded answer** with inline `[EXP-###]` citations + a Sources list.
-- [ ] **Single-experiment AI summary**, grounded in that record.
-- [ ] **Deployed** to a public URL (Railway) for the demo.
+- [x] **Auth**: sign up / sign in; gated app; session persists on refresh.
+- [x] **Supabase DB** connected with the core schema + row-level security.
+- [x] **Add experiment** via the structured form → saved to Postgres (typed fields).
+- [x] **Experiments table**: view / search / sort / filter all accessible experiments.
+- [x] **Experiment detail** page: full record + linked files.
+- [x] **Ask AI (NL query)**: at least the exact-match + semantic paths working on the 7 example questions.
+- [x] **Grounded answer** with inline `[EXP-###]` citations + a Sources list.
+- [x] **Single-experiment AI summary**, grounded in that record.
+- [x] **Deployed** to a public URL (Railway) for the demo. → https://chememowebapp-production.up.railway.app
 
 > MVP retrieval can start simple (structured filters + basic semantic search). Sophistication is layered on after.
+>
+> **✅ MVP fully shipped — checkboxes above were never updated during the build; verified against the live app and ticked 2026-07-21.**
 
 ## 6. Good-to-have (post-MVP, still within reach for a strong project)
-- [ ] **LLM-assisted entry** — paste raw notes → auto-fill structured fields (biggest adoption lever).
-- [ ] **File uploads** to Supabase Storage (images, spectra screenshots) + external links for big folders.
-- [ ] **Compound/metal autocomplete** from existing entries + light alias normalization (ZnCl₂ ≈ zinc chloride ≈ Zn).
-- [ ] **Group summaries** — summarize a filtered set of experiments, not just one.
-- [ ] **Projects / groups** UI (wet–dry, depsipeptides, LC-MS/MS, microscopy) with per-project views.
-- [ ] **Retrieval eval set** — a handful of Q→expected-records pairs to measure/score retrieval accuracy (great course story + guards against regressions).
-- [ ] **CSV/Excel import & export** of experiments.
-- [ ] **Edit history / audit trail**.
-- [ ] Dark/light theme + reduced-motion (already in the mockup — carry over).
+- [x] **LLM-assisted entry** — paste raw notes → auto-fill structured fields (biggest adoption lever). *(Phase 9, `paste-notes.tsx`)*
+- [x] **File uploads** to Supabase Storage (images, spectra screenshots) + external links for big folders. *(Phase 4)*
+- [x] **Compound/metal autocomplete** from existing entries + light alias normalization. *(#20, commit `ac83f1e`)*
+- [x] **Group summaries** — summarize a filtered set of experiments, not just one. *(#21, commit `ac83f1e`)*
+- [x] **Projects / groups** UI with per-project views — now **user-managed**, not just the original 4 hardcoded categories. *(Sprint S3 + [[ChemMemo_Feature_ProjectManagement_Spec]], shipped 2026-07-21)*
+- [x] **Retrieval eval set** — `npm run eval:retrieval`, 100% recall on dev. *(Sprint S5)*
+- [ ] **CSV/Excel import & export** of experiments — **only export shipped** (#22, "Export CSV" button). **Import was never built.** This is the one real gap found in this pass — not blocking (lab members can still log experiments via the form or AI paste-notes), but worth knowing if bulk-importing existing lab records is ever wanted.
+- [x] **Edit history / audit trail**. *(#24, `experiment_revisions` table + trigger)*
+- [x] Dark/light theme + reduced-motion (already in the mockup — carry over). *(Phase 1)*
 
 ## 7. Future expansion (explicitly out of scope for the course)
 - Wet–dry cycling **analyzer** module: read attached Excel/LC-MS files and auto-plot trends.
