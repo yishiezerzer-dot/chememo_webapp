@@ -259,6 +259,7 @@ export default async function ExperimentDetailPage({
         <LifecycleControls
           status={e.status}
           hasConclusion={!!e.conclusion?.trim()}
+          hasAcceptanceCriteria={!!e.acceptance_criteria?.trim()}
           unresolvedOpenCount={crewProvenance?.unresolvedOpenCount ?? 0}
           setStatusAction={setStatus.bind(null, e.id)}
           completeAction={completeExperiment.bind(null, e.id)}

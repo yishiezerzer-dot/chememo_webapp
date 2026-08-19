@@ -52,8 +52,15 @@ export function PasteNotes({
           ? "Paste raw lab notes and let AI pre-fill the form. You confirm and edit everything before saving — nothing is saved automatically."
           : "LLM-assisted entry activates in Phase 10, once API keys are added. For now, fill the form directly below."}
       </p>
+      {/* Nothing sized this: it sits in .fsec, not .field, so the
+          `.field textarea { width: 100% }` rule never reached it and the
+          browser's ~20-column default applied — about 195px wide, with the
+          placeholder truncated mid-sentence and a scrollbar after four lines.
+          For the one input explicitly meant to receive a pasted page of bench
+          notes, that was the worst possible default. */}
       <textarea
-        rows={4}
+        rows={8}
+        style={{ width: "100%" }}
         value={notes}
         onChange={(e) => {
           setNotes(e.target.value);

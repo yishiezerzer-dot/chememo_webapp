@@ -39,6 +39,7 @@ const NEXT_MOVES: Record<ExperimentStatus, { label: string; next: ExperimentStat
 export function LifecycleControls({
   status,
   hasConclusion,
+  hasAcceptanceCriteria = true,
   unresolvedOpenCount = 0,
   setStatusAction,
   completeAction,
@@ -46,6 +47,10 @@ export function LifecycleControls({
 }: {
   status: ExperimentStatus | null;
   hasConclusion: boolean;
+  // Defaults to true so a caller that hasn't been updated keeps today's
+  // behaviour (the trigger still refuses), rather than silently disabling
+  // Start everywhere.
+  hasAcceptanceCriteria?: boolean;
   // T3.8 D4 — a crew-authored draft's own moves off 'draft' are disabled
   // here as the user-facing explanation; the DB trigger (branch g) is the
   // real backstop. Cancel is not gated: rejecting a bad AI proposal is
@@ -83,17 +88,26 @@ export function LifecycleControls({
     <div className="filter-chips">
       {moves.map((m) => {
         const gated = status === "draft" && m.next !== "cancelled" && unresolvedOpenCount > 0;
+        // §8.6 is enforced by the DB trigger, which refuses the transition
+        // with a clear sentence — but only after the click. The button looked
+        // perfectly available, so the rule was discoverable solely by failing
+        // at it. Surfaced up front the same way the unresolved-items gate
+        // already is; the trigger remains the real backstop either way.
+        const needsCriteria = m.next === "in_progress" && !hasAcceptanceCriteria;
+        const blocked = gated || needsCriteria;
         return (
           <button
             key={m.next}
             type="button"
             className="btn btn-ghost btn-sm"
-            disabled={pending || gated}
+            disabled={pending || blocked}
             aria-busy={pending}
             title={
               gated
                 ? `This experiment has ${unresolvedOpenCount} unresolved item${unresolvedOpenCount === 1 ? "" : "s"} from its AI-generated plan. Resolve them before starting.`
-                : undefined
+                : needsCriteria
+                  ? "Write the acceptance criteria before starting — what result would count as success (standard section 8.6). Add them from Edit."
+                  : undefined
             }
             onClick={() => run(() => setStatusAction(m.next))}
           >
