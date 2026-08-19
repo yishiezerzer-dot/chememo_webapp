@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
 import { FILE_ROLES } from "@/lib/types";
+import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from "@/lib/files/limits";
 import type { ActionResult, ExperimentFile, FileRole, FileVersion } from "@/lib/types";
 import {
   replaceFileAction,
@@ -105,12 +106,18 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
   function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
     setPendingKey(key);
     start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
-      else {
-        router.refresh();
-        setVersions(await listVersionsAction(file.id));
-        after?.();
+      try {
+        const res = await action();
+        if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
+        else {
+          router.refresh();
+          setVersions(await listVersionsAction(file.id));
+          after?.();
+        }
+      } catch {
+        // Without this, a rejected action (e.g. a body Next refuses outright)
+        // escapes to the error boundary and takes the experiment page down.
+        showToast("Something went wrong. Please try again.", "error");
       }
     });
   }
@@ -140,11 +147,19 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
           {isOwner && (
             <>
               <form
-                action={(fd) =>
+                action={(fd) => {
+                  // Same reason as the upload form: an oversized body never
+                  // reaches the action, so check before sending it.
+                  const picked = fd.get("file");
+                  if (picked instanceof File && picked.size > MAX_UPLOAD_BYTES) {
+                    showToast(TOO_LARGE_MESSAGE, "error");
+                    if (replaceInputRef.current) replaceInputRef.current.value = "";
+                    return;
+                  }
                   run(() => replaceFileAction(experimentId, file.id, fd), "replace", () => {
                     if (replaceInputRef.current) replaceInputRef.current.value = "";
-                  })
-                }
+                  });
+                }}
                 style={{ marginBottom: 8 }}
               >
                 <input ref={replaceInputRef} type="file" name="file" required disabled={pending} />

@@ -2,13 +2,13 @@ import "server-only";
 import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from "@/lib/files/limits";
 import type { Json } from "@/lib/database.types";
 import type { ExperimentFile, FileRole, FileRetentionState, FileVersion } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 const BUCKET = "experiment-files";
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // matches the bucket's file_size_limit
 const ALLOWED_EXTENSIONS = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "tif", "tiff",
   "xls", "xlsx", "csv",
@@ -55,7 +55,7 @@ export async function uploadFile(
 ): Promise<void> {
   if (!file || file.size === 0) throw new AppError("validation", "No file selected.");
   if (file.size > MAX_UPLOAD_BYTES) {
-    throw new AppError("validation", "File is too large (max 10 MB).");
+    throw new AppError("validation", TOO_LARGE_MESSAGE);
   }
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   if (!ALLOWED_EXTENSIONS.has(ext)) {
@@ -128,7 +128,7 @@ export async function replaceFile(
 ): Promise<void> {
   if (!file || file.size === 0) throw new AppError("validation", "No file selected.");
   if (file.size > MAX_UPLOAD_BYTES) {
-    throw new AppError("validation", "File is too large (max 10 MB).");
+    throw new AppError("validation", TOO_LARGE_MESSAGE);
   }
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   if (!ALLOWED_EXTENSIONS.has(ext)) {

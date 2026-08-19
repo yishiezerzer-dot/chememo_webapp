@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from "@/lib/files/limits";
 import type { ActionResult } from "@/lib/types";
 
 export function FileManager({
@@ -28,6 +29,16 @@ export function FileManager({
       <form
         ref={uploadFormRef}
         action={async (fd) => {
+          // Check the size here as well as on the server: an oversized body is
+          // rejected by Next before the action runs, which surfaces as a page
+          // crash rather than a message. This also spares the user uploading
+          // megabytes that are certain to be refused.
+          const picked = fd.get("file");
+          if (picked instanceof File && picked.size > MAX_UPLOAD_BYTES) {
+            showToast(TOO_LARGE_MESSAGE, "error");
+            uploadFormRef.current?.reset();
+            return;
+          }
           setUploading(true);
           try {
             const res = await uploadAction(fd);
@@ -37,6 +48,11 @@ export function FileManager({
             }
             uploadFormRef.current?.reset();
             showToast("File uploaded", "success");
+          } catch {
+            // A rejected action (network drop, or a body Next refuses outright)
+            // would otherwise escape to the error boundary and take the whole
+            // experiment page down.
+            showToast("Upload failed. Please try again.", "error");
           } finally {
             setUploading(false);
           }
