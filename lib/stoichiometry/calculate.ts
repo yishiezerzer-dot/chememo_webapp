@@ -104,16 +104,24 @@ export function calculateYield(
 // D5 — total reaction volume and per-input final concentration, computed
 // live from already-stored quantities; never persisted (would just be a
 // cache that could drift).
-export function totalVolumeLiters(inputs: { quantities: Record<string, Quantity> }[]): number {
-  return inputs.reduce((sum, i) => {
+// Returns null when any input's volume cannot be converted. Skipping such a
+// row instead would under-count the total, which inflates every final
+// concentration derived from it -- a wrong-but-plausible number, exactly what
+// convert() throws to avoid. One unconvertible row makes the TOTAL unknown,
+// not merely that row, so the honest answer is no value at all (D2: reported,
+// never guessed). The caller already hides the figure when there is none.
+export function totalVolumeLiters(inputs: { quantities: Record<string, Quantity> }[]): number | null {
+  let sum = 0;
+  for (const i of inputs) {
     const vol = i.quantities.input_amount_volume;
-    if (!vol) return sum;
+    if (!vol) continue;
     try {
-      return sum + convert(vol.value, vol.unit_code, "L");
+      sum += convert(vol.value, vol.unit_code, "L");
     } catch {
-      return sum;
+      return null;
     }
-  }, 0);
+  }
+  return sum;
 }
 
 export function finalConcentrationMolarPerL(moles: number | null, totalVolumeL: number): number | null {

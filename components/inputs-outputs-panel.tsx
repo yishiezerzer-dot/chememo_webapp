@@ -99,7 +99,10 @@ export function InputsOutputsPanel({
   }
 
   const ratioLabel = molarRatioLabel(inputs, lotStockOptions);
+  // null when an input's unit could not be converted: the total is then
+  // unknown rather than zero, and showing nothing beats showing too little.
   const totalVolumeL = totalVolumeLiters(inputs);
+  const showVolume = totalVolumeL !== null && totalVolumeL > 0;
 
   return (
     <div className="obs-box glass">
@@ -110,11 +113,11 @@ export function InputsOutputsPanel({
           Recalculate stoichiometry
         </button>
       </div>
-      {(ratioLabel || totalVolumeL > 0) && (
+      {(ratioLabel || showVolume) && (
         <p className="muted" style={{ fontSize: 12.5, margin: "6px 0 12px" }}>
           {ratioLabel && <>{ratioLabel}</>}
-          {ratioLabel && totalVolumeL > 0 && " · "}
-          {totalVolumeL > 0 && <>Total volume: {(totalVolumeL * 1000).toFixed(3)} mL</>}
+          {ratioLabel && showVolume && " · "}
+          {showVolume && <>Total volume: {(totalVolumeL * 1000).toFixed(3)} mL</>}
         </p>
       )}
 

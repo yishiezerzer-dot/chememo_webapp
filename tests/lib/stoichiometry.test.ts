@@ -110,4 +110,16 @@ describe("totalVolumeLiters / finalConcentrationMolarPerL", () => {
     expect(finalConcentrationMolarPerL(null, 0.1)).toBeNull();
     expect(finalConcentrationMolarPerL(0.01, 0)).toBeNull();
   });
+
+  it("reports no total at all when a volume unit cannot be converted", () => {
+    // Skipping the bad row would under-count the total and so inflate every
+    // concentration derived from it. One unconvertible row makes the whole
+    // total unknown, not just that row.
+    expect(
+      totalVolumeLiters([
+        { quantities: { input_amount_volume: { value: 1, unit_code: "mL" } } },
+        { quantities: { input_amount_volume: { value: 1, unit_code: "furlongs" } } },
+      ] as Parameters<typeof totalVolumeLiters>[0])
+    ).toBeNull();
+  });
 });
