@@ -146,7 +146,7 @@ export default async function ExperimentDetailPage({
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
   // TEMPORARY CI diagnostic -- remove once the refresh failure is pinned down.
-  console.log(JSON.stringify({ diag: "page-render", id, status: e.status, name: e.name, at: new Date().toISOString() }));
+  console.error(JSON.stringify({ diag: "page-render", id, status: e.status, name: e.name, at: new Date().toISOString() }));
   const [timeline, stepDetails] = await Promise.all([
     listTimeline(id, e, files),
     e.protocol_version_id ? listStepDetails(e.id) : Promise.resolve([]),
@@ -578,7 +578,7 @@ async function TasksSection({ experimentId }: { experimentId: string }) {
 async function CommentsSection({ experimentId }: { experimentId: string }) {
   const comments = await listComments("experiment", experimentId);
   // TEMPORARY CI diagnostic -- remove once the refresh failure is pinned down.
-  console.log(JSON.stringify({ diag: "comments-render", experimentId, count: comments.length, at: new Date().toISOString() }));
+  console.error(JSON.stringify({ diag: "comments-render", experimentId, count: comments.length, at: new Date().toISOString() }));
   return (
     <div className="obs-box glass">
       <h4>Comments</h4>

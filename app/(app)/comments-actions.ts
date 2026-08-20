@@ -23,7 +23,7 @@ export async function createCommentAction(
   }
   revalidatePath(`/experiments/${experimentId}`);
   // TEMPORARY CI diagnostic -- remove once the refresh failure is pinned down.
-  console.log(JSON.stringify({ diag: "comment-created", experimentId, at: new Date().toISOString() }));
+  console.error(JSON.stringify({ diag: "comment-created", experimentId, at: new Date().toISOString() }));
   return { ok: true };
 }
 

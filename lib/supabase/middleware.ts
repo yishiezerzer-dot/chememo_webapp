@@ -35,6 +35,19 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
+  // TEMPORARY CI diagnostic -- remove once the refresh failure is pinned down.
+  if (path.startsWith("/experiments/EXP-")) {
+    console.error(
+      JSON.stringify({
+        diag: "mw",
+        path,
+        rsc: request.headers.get("rsc"),
+        prefetch: request.headers.get("next-router-prefetch"),
+        user: user ? "yes" : "NULL",
+        at: new Date().toISOString(),
+      })
+    );
+  }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
