@@ -191,7 +191,6 @@ export function SidebarNav({
         <Link
           key={item.href}
           href={item.href}
-          prefetch={false}
           className={`nav-item${pathname.startsWith(item.href) ? " active" : ""}`}
         >
           {item.icon} {item.label}
@@ -209,7 +208,6 @@ export function SidebarNav({
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Link
               href={`/experiments?project=${p.id}`}
-              prefetch={false}
               className="nav-item"
               style={{ fontSize: 13.5, flex: 1, minWidth: 0 }}
             >
