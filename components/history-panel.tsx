@@ -79,7 +79,16 @@ function RestoreControl({
           className="btn btn-sm"
           disabled={pending || !reason.trim()}
           aria-busy={pending}
-          onClick={() => run(() => restoreRevision(revisionId, reason))}
+          // Close on success. A restore adds a lock event at the top of the
+          // timeline, so every entry below shifts down one -- leaving this box
+          // open parks a filled-in reason and an armed "Confirm restore"
+          // against a DIFFERENT revision than the one just restored.
+          onClick={() =>
+            run(() => restoreRevision(revisionId, reason), undefined, () => {
+              setReason("");
+              setOpen(false);
+            })
+          }
         >
           {pending && <Spinner />}
           Confirm restore
