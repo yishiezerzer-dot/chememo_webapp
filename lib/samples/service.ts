@@ -37,9 +37,26 @@ export async function listBatches(experimentId: string): Promise<Batch[]> {
 }
 
 export async function createBatch(supabase: Supabase, experimentId: string, label: string, notes: string | null): Promise<string> {
+  // workspace_id has to be set explicitly here. B1 arrives via the trigger on
+  // experiment insert, which fills it in; this insert is the only other way a
+  // batch is ever created, and it left the column null -- so batches_write's
+  // WITH CHECK, is_workspace_writer(workspace_id, auth.uid()), was being asked
+  // about a null workspace and refused every time. "+ New batch (repeat
+  // preparation)" has therefore never worked since T2.3 shipped it; found by
+  // click-through on 2026-08-23.
+  //
+  // Taken from the experiment rather than from the caller's active workspace:
+  // a batch belongs to its experiment's workspace, and the two can differ.
+  const { data: experiment, error: experimentErr } = await supabase
+    .from("experiments")
+    .select("workspace_id")
+    .eq("id", experimentId)
+    .single();
+  if (experimentErr) throw new AppError("conflict", "Could not find the experiment.", { cause: experimentErr });
+
   const { data, error } = await supabase
     .from("batches")
-    .insert({ experiment_id: experimentId, label, notes })
+    .insert({ experiment_id: experimentId, label, notes, workspace_id: experiment.workspace_id })
     .select("id")
     .single();
   if (error) throw new AppError("conflict", "Could not create the batch.", { cause: error });
