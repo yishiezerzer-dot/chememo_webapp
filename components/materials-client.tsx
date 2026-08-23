@@ -82,10 +82,16 @@ function StockRow({
   stock,
   quantityKinds,
   solubilityStatuses,
+  onChanged,
 }: {
   stock: StockSolution;
   quantityKinds: QuantityKind[];
   solubilityStatuses: string[];
+  // A stock row renders from its parent's locally-fetched list, not from the
+  // server tree, so router.refresh() alone cannot show a change to it. Without
+  // this, "Mark verified" wrote verified_at and then looked like it had done
+  // nothing -- the button stayed, inviting a second click.
+  onChanged: () => void;
 }) {
   const { run, load, pending, pendingKey } = useRunAction();
   const [attempts, setAttempts] = useState<StockSolubilityAttempt[] | null>(null);
@@ -133,7 +139,7 @@ function StockRow({
             style={{ marginLeft: "auto" }}
             disabled={pending}
             aria-busy={pending && pendingKey === "verify"}
-            onClick={() => run(() => verifyStockAction(stock.id), "verify")}
+            onClick={() => run(() => verifyStockAction(stock.id), "verify", onChanged)}
           >
             {pending && pendingKey === "verify" && <Spinner />}
             Mark verified
@@ -246,6 +252,10 @@ function LotRow({
     );
   }
 
+  function refreshStocks() {
+    load(() => getLotStocksAction(lot.id), (data) => setStocks(data as StockSolution[]), "stocks");
+  }
+
   return (
     <div className="act-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -281,7 +291,13 @@ function LotRow({
       {open && (
         <div style={{ marginTop: 8, paddingLeft: 20 }}>
           {(stocks ?? []).map((s) => (
-            <StockRow key={s.id} stock={s} quantityKinds={quantityKinds} solubilityStatuses={solubilityStatuses} />
+            <StockRow
+              key={s.id}
+              stock={s}
+              quantityKinds={quantityKinds}
+              solubilityStatuses={solubilityStatuses}
+              onChanged={refreshStocks}
+            />
           ))}
           {!showNewStock ? (
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowNewStock(true)}>
