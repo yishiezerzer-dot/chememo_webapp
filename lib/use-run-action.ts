@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, unstable_rethrow } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import type { ActionResult } from "@/lib/types";
 
@@ -48,7 +48,17 @@ export function useRunAction() {
       }
       router.refresh();
       after?.();
-    } catch {
+    } catch (e) {
+      // A server action that redirects on success (createExperiment,
+      // createDraftExperimentFromPlan, deleteExperiment, createWorkspace)
+      // signals it by REJECTING with a framework control-flow error. Before
+      // these panels adopted the hook they had no catch at all, so that
+      // rejection reached Next untouched; catching it turned every successful
+      // create into a "Something went wrong" toast on the page it had just
+      // navigated to. Found by click-through on 2026-08-23, on the very first
+      // record created. unstable_rethrow re-throws exactly those and nothing
+      // else, so real failures still toast.
+      unstable_rethrow(e);
       showToast("Something went wrong. Please try again.", "error");
     } finally {
       setPending(false);
@@ -73,7 +83,10 @@ export function useRunAction() {
     setPending(true);
     try {
       onLoaded(await action());
-    } catch {
+    } catch (e) {
+      // Same reason as run()'s catch: plan-client's commit and the experiment
+      // form both go through here, and both redirect on success.
+      unstable_rethrow(e);
       showToast("Something went wrong. Please try again.", "error");
     } finally {
       setPending(false);
