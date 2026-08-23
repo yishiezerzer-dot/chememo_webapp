@@ -34,7 +34,23 @@ Rules:
 - If everything checks out, return empty arrays for both.
 - Be specific and concise.`;
 
-  const user = `Complete draft:\n${JSON.stringify({
+  // Measured 2026-08-23: the rule above cut the duplicates from four pairs to
+  // one on identical notes (EXP-1397's 14 items became EXP-2234's 10), but
+  // `hypothesis` still came back twice -- "No explicit hypothesis is stated in
+  // the notes." next to "No explicit hypothesis is provided.", about as
+  // blatant a restatement as the model could produce. So the constraint is
+  // repeated here, in the user message, immediately above the draft, where it
+  // cannot be skimmed past the way a mid-list rule evidently was.
+  //
+  // Deliberately NOT a hard ban on those fields: a second item on `controls`
+  // can be a genuinely different missing control, and the run this was
+  // measured against lost exactly such an item (a no-cycle/initial-mixture
+  // control) between runs. The constraint is on re-wording, not on the field.
+  const alreadyFlagged = [...new Set(draft.unresolved.map((u) => u.field))];
+  const user = `Fields already on the unresolved list: ${alreadyFlagged.join(", ") || "(none)"}.
+Add an item on one of these ONLY if it names a gap genuinely different from what is already there, never a re-wording of it.
+
+Complete draft:\n${JSON.stringify({
     structured: draft.structured,
     unresolved: draft.unresolved,
     normalization: draft.normalization,
