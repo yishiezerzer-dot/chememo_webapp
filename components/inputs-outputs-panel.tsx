@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { totalVolumeLiters } from "@/lib/stoichiometry/calculate";
 import type {
   ActionResult,
@@ -60,10 +59,7 @@ export function InputsOutputsPanel({
   removeOutput: (outputId: string) => Promise<ActionResult>;
   recalculate: () => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending, pendingKey } = useRunAction();
 
   const massKind = quantityKinds.find((k) => k.key === "input_amount_mass");
   const volumeKind = quantityKinds.find((k) => k.key === "input_amount_volume");
@@ -80,15 +76,6 @@ export function InputsOutputsPanel({
   const [outputRole, setOutputRole] = useState(outputRoles[0] ?? "product");
   const [outputAmountValue, setOutputAmountValue] = useState("");
   const [outputAmountUnit, setOutputAmountUnit] = useState(massKind?.canonical_unit_code ?? "g");
-
-  function run(action: () => Promise<ActionResult>, key: string) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
-  }
 
   const amountUnitOptions = [...(massKind?.compatible_units ?? []), ...(volumeKind?.compatible_units ?? [])];
 

@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult } from "@/lib/types";
 import type { TimelineEntry } from "@/lib/experiments/timeline";
 import type { DiffField } from "@/lib/diff";
@@ -56,9 +55,7 @@ function RestoreControl({
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
 
   if (!open) {
     return (
@@ -82,20 +79,7 @@ function RestoreControl({
           className="btn btn-sm"
           disabled={pending || !reason.trim()}
           aria-busy={pending}
-          onClick={() =>
-            start(async () => {
-              try {
-                const res = await restoreRevision(revisionId, reason);
-                if (!res.ok) showToast(res.error, "error");
-                else router.refresh();
-              } catch {
-                // requireUser() runs before the action's own try block, so an
-                // expired session rejects here instead of returning an error
-                // result — without this, that takes down the whole page.
-                showToast("Could not restore that version. Please try again.", "error");
-              }
-            })
-          }
+          onClick={() => run(() => restoreRevision(revisionId, reason))}
         >
           {pending && <Spinner />}
           Confirm restore

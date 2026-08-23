@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult } from "@/lib/types";
 
 // §18.5 — reopening a locked record requires a documented reason. The dialog
@@ -16,9 +15,7 @@ export function ReopenExperimentButton({
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
 
   if (!open) {
     return (
@@ -45,13 +42,7 @@ export function ReopenExperimentButton({
           className="btn btn-primary btn-sm"
           disabled={pending || !reason.trim()}
           aria-busy={pending}
-          onClick={() =>
-            start(async () => {
-              const res = await action(reason);
-              if (!res.ok) showToast(res.error, "error");
-              else router.refresh();
-            })
-          }
+          onClick={() => run(() => action(reason))}
         >
           {pending && <Spinner />}
           Confirm reopen

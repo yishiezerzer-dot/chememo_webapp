@@ -1,36 +1,40 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { METHOD_TYPES } from "@/lib/types";
-import type { ActionResult, Instrument, InstrumentMethod, MethodType } from "@/lib/types";
+import type { Instrument, InstrumentMethod, MethodType } from "@/lib/types";
 import { createInstrumentAction, createMethodAction, getInstrumentMethodsAction } from "@/app/(app)/instruments/actions";
 
 function InstrumentRow({ instrument }: { instrument: Instrument }) {
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, load, pending } = useRunAction();
   const [open, setOpen] = useState(false);
   const [methods, setMethods] = useState<InstrumentMethod[] | null>(null);
   const [methodName, setMethodName] = useState("");
   const [methodType, setMethodType] = useState<MethodType>("lc_ms");
 
-  async function load() {
-    if (!open) setMethods(await getInstrumentMethodsAction(instrument.id));
-    setOpen((o) => !o);
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    load(() => getInstrumentMethodsAction(instrument.id), (m) => {
+      setMethods(m);
+      setOpen(true);
+    });
   }
 
-  function run(action: () => Promise<ActionResult>) {
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else {
-        router.refresh();
+  function addMethod() {
+    // The re-fetch sits inside the action so one pending state covers both
+    // awaits and the hook's catch guards them together.
+    run(async () => {
+      const res = await createMethodAction(instrument.id, methodName, methodType);
+      if (res.ok) {
         setMethods(await getInstrumentMethodsAction(instrument.id));
         setMethodName("");
       }
+      return res;
     });
   }
 
@@ -41,7 +45,15 @@ function InstrumentRow({ instrument }: { instrument: Instrument }) {
           <b>{instrument.name}</b>
           {instrument.model && <span className="muted"> — {instrument.model}</span>}
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          style={{ marginLeft: "auto" }}
+          disabled={pending}
+          aria-busy={pending}
+          onClick={toggle}
+        >
+          {pending && <Spinner />}
           {open ? "Collapse" : "Methods"}
         </button>
       </div>
@@ -69,7 +81,7 @@ function InstrumentRow({ instrument }: { instrument: Instrument }) {
               className="btn btn-ghost btn-sm"
               disabled={pending || !methodName.trim()}
               aria-busy={pending}
-              onClick={() => run(() => createMethodAction(instrument.id, methodName, methodType))}
+              onClick={addMethod}
             >
               {pending && <Spinner />}
               + Add method
@@ -82,9 +94,7 @@ function InstrumentRow({ instrument }: { instrument: Instrument }) {
 }
 
 export function InstrumentsClient({ instruments }: { instruments: Instrument[] }) {
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
   const [showNew, setShowNew] = useState(false);
 
   return (
@@ -100,16 +110,7 @@ export function InstrumentsClient({ instruments }: { instruments: Instrument[] }
         <form
           className="obs-box glass"
           style={{ marginBottom: 16 }}
-          action={(formData) =>
-            start(async () => {
-              const res = await createInstrumentAction(null, formData);
-              if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
-              else {
-                setShowNew(false);
-                router.refresh();
-              }
-            })
-          }
+          action={(formData) => run(() => createInstrumentAction(null, formData), undefined, () => setShowNew(false))}
         >
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <input name="name" placeholder="Instrument name" required />

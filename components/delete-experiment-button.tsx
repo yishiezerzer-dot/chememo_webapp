@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult, ExperimentStatus } from "@/lib/types";
 
 const TERMINAL: ExperimentStatus[] = ["completed", "reviewed", "failed", "cancelled"];
@@ -23,22 +23,14 @@ export function DeleteExperimentButton({
   archiveAction: (endedAs?: "completed" | "failed" | "cancelled") => Promise<ActionResult>;
 }) {
   const [mode, setMode] = useState<Mode>("idle");
-  const [pending, start] = useTransition();
+  const { run, pending } = useRunAction();
   const { showToast } = useToast();
-  const router = useRouter();
 
   // Already archived: nothing left for this control to do.
   if (status === "archived") return null;
 
   function runArchive(endedAs?: "completed" | "failed" | "cancelled") {
-    start(async () => {
-      const res = await archiveAction(endedAs);
-      if (!res.ok) showToast(res.error, "error");
-      else {
-        showToast("Archived.", "success");
-        router.refresh();
-      }
-    });
+    run(() => archiveAction(endedAs), undefined, () => showToast("Archived.", "success"));
   }
 
   // draft — the only status that may still be soft-deleted (§18.2, narrowed).
@@ -58,7 +50,14 @@ export function DeleteExperimentButton({
           disabled={pending}
           aria-busy={pending}
           style={{ borderColor: "var(--rose)", color: "var(--rose)" }}
-          onClick={() => start(async () => { await deleteAction(); })}
+          onClick={() =>
+            // deleteAction navigates away from this record rather than
+            // returning an ActionResult, so there is nothing to report.
+            run(async () => {
+              await deleteAction();
+              return { ok: true };
+            })
+          }
         >
           {pending && <Spinner />}
           Confirm delete

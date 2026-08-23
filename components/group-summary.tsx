@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { CitedAnswerView } from "@/components/cited-answer";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { CitedAnswer } from "@/lib/llm";
 
 export function GroupSummary({
@@ -14,7 +15,7 @@ export function GroupSummary({
 }) {
   const [summary, setSummary] = useState<CitedAnswer | null>(null);
   const [failed, setFailed] = useState(false);
-  const [pending, start] = useTransition();
+  const { load, pending } = useRunAction();
 
   if (summary) {
     return (
@@ -34,14 +35,16 @@ export function GroupSummary({
         className="btn btn-ghost btn-sm"
         disabled={pending}
         aria-busy={pending}
-        onClick={() =>
-          start(async () => {
-            setFailed(false);
-            const s = await action(ids);
-            if (s) setSummary(s);
-            else setFailed(true);
-          })
-        }
+        onClick={() => {
+          setFailed(false);
+          load(
+            () => action(ids),
+            (s) => {
+              if (s) setSummary(s);
+              else setFailed(true);
+            }
+          );
+        }}
       >
         {pending && <Spinner />}
         {pending ? "Summarising…" : `Summarise these ${ids.length} experiments`}

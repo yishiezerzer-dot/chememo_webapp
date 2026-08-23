@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { WORKSPACE_ROLES } from "@/lib/types";
 import type { WorkspaceRole } from "@/lib/types";
 import type { InvitationView, MemberView } from "@/lib/workspaces/service";
@@ -24,22 +24,11 @@ export function MembersClient({
   currentUserId: string;
   isAdmin: boolean;
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const { run, pending, pendingKey } = useRunAction();
   const { showToast } = useToast();
-  const router = useRouter();
   const emailRef = useRef<HTMLInputElement>(null);
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>("researcher");
   const [lastLink, setLastLink] = useState<string | null>(null);
-
-  function run(action: () => Promise<{ ok: boolean; error?: string }>, key: string) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
-      else router.refresh();
-    });
-  }
 
   return (
     <div>
@@ -107,16 +96,13 @@ export function MembersClient({
               onClick={() => {
                 const email = emailRef.current?.value.trim();
                 if (!email) return;
-                setPendingKey("invite");
-                start(async () => {
-                  const res = await inviteMemberAction(email, inviteRole);
-                  if (!res.ok) {
-                    showToast(res.error, "error");
-                    return;
+                run(
+                  () => inviteMemberAction(email, inviteRole),
+                  "invite",
+                  () => {
+                    if (emailRef.current) emailRef.current.value = "";
                   }
-                  if (emailRef.current) emailRef.current.value = "";
-                  router.refresh();
-                });
+                );
               }}
             >
               {pending && pendingKey === "invite" && <Spinner />}

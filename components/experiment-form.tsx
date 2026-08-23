@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import {
   METHOD_OPTIONS,
   type ActionResult,
@@ -272,7 +273,11 @@ function ExperimentFormBody({
 }: Props) {
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [state, setState] = useState<ActionResult | null>(null);
-  const [pending, startTransition] = useTransition();
+  // The loader form of the hook: this form renders its own failure result
+  // (field errors, the conflict banner) rather than toasting it, so what it
+  // wants from the hook is the guarded await and the pending flag, not
+  // run()'s toast-and-refresh.
+  const { load, pending } = useRunAction();
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
   const criteriaLocked = !!initial?.acceptance_criteria_locked_at;
   const formRef = useRef<HTMLFormElement>(null);
@@ -298,12 +303,14 @@ function ExperimentFormBody({
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    startTransition(async () => {
-      const result = await action(state, formData);
-      setState(result);
-      if (result.ok) markSaved();
-      else if (result.conflict) markConflict();
-    });
+    load(
+      () => action(state, formData),
+      (result) => {
+        setState(result);
+        if (result.ok) markSaved();
+        else if (result.conflict) markConflict();
+      }
+    );
   }
 
   return (

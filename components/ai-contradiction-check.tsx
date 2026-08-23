@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import type { Experiment } from "@/lib/types";
 import type { CitedAnswer } from "@/lib/llm";
 import { CitedAnswerView } from "@/components/cited-answer";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 
 // T3.6 D3 — two parts: (a) missing controls, deterministic and free — any
 // experiment in the set with zero recorded controls, straight from the
@@ -29,7 +30,7 @@ export function AiContradictionCheck({
   const [result, setResult] = useState<CitedAnswer | null>(null);
   const [checked, setChecked] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [pending, start] = useTransition();
+  const { load, pending } = useRunAction();
 
   const missingControls = experiments.filter((e) => (controlsCounts[e.id] ?? 0) === 0);
 
@@ -73,15 +74,17 @@ export function AiContradictionCheck({
           className="btn btn-ghost btn-sm"
           disabled={pending || experiments.length < 2}
           aria-busy={pending}
-          onClick={() =>
-            start(async () => {
-              setFailed(false);
-              const r = await action(experiments.map((e) => e.id));
-              setChecked(true);
-              if (r) setResult(r);
-              else setFailed(true);
-            })
-          }
+          onClick={() => {
+            setFailed(false);
+            load(
+              () => action(experiments.map((e) => e.id)),
+              (r) => {
+                setChecked(true);
+                if (r) setResult(r);
+                else setFailed(true);
+              }
+            );
+          }}
         >
           {pending && <Spinner />}
           Check for contradictions & missing controls

@@ -1,17 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { WorkspaceMembership } from "@/lib/types";
 import { switchWorkspaceAction } from "@/app/(app)/workspaces-actions";
 
 export function WorkspaceSwitcher({ memberships, activeId }: { memberships: WorkspaceMembership[]; activeId: string }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const router = useRouter();
+  const { run, pending, pendingKey: pendingId } = useRunAction();
   const active = memberships.find((m) => m.id === activeId);
 
   function switchTo(id: string) {
@@ -19,12 +17,16 @@ export function WorkspaceSwitcher({ memberships, activeId }: { memberships: Work
       setOpen(false);
       return;
     }
-    setPendingId(id);
-    start(async () => {
-      await switchWorkspaceAction(id);
-      setOpen(false);
-      router.refresh();
-    });
+    // switchWorkspaceAction resolves to void, so there is no ActionResult to
+    // report -- it either sets the cookie or throws.
+    run(
+      async () => {
+        await switchWorkspaceAction(id);
+        return { ok: true };
+      },
+      id,
+      () => setOpen(false)
+    );
   }
 
   return (

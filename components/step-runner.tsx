@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useRef, useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult, Quantity, QuantityKind } from "@/lib/types";
 import type { StepDetail, DeviationInput } from "@/lib/experiment-steps/service";
 
@@ -146,23 +145,13 @@ function StepCard({
   recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
 }) {
   const { step, protocolStep, observations, deviations } = detail;
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
   const [ph, setPh] = useState<number | null>(step.actual_ph);
   const [quantities, setQuantities] = useState<Record<string, Quantity>>(step.actual_quantities);
   const [atmosphere, setAtmosphere] = useState(step.actual_atmosphere ?? "");
   const noteRef = useRef<HTMLInputElement>(null);
   const temperatureKind = quantityKinds.find((k) => k.key === "temperature");
   const durationKind = quantityKinds.find((k) => k.key === "duration");
-
-  function run(action: () => Promise<ActionResult>) {
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
-  }
 
   return (
     <div className="obs-box glass" style={{ marginBottom: 12 }}>
@@ -310,9 +299,7 @@ export function StepRunner({
   recordObservation: (stepId: string, note: string) => Promise<ActionResult>;
   recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
 
   if (steps.length === 0) {
     if (!instantiate) return null;
@@ -322,13 +309,7 @@ export function StepRunner({
         className="btn btn-sm"
         disabled={pending}
         aria-busy={pending}
-        onClick={() =>
-          start(async () => {
-            const res = await instantiate();
-            if (!res.ok) showToast(res.error, "error");
-            else router.refresh();
-          })
-        }
+        onClick={() => run(instantiate)}
       >
         {pending && <Spinner />}
         Instantiate steps

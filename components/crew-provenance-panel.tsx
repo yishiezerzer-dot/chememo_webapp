@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult } from "@/lib/types";
 import type { CrewProvenance } from "@/lib/ai/crew/provenance";
 import type { AiSuggestion } from "@/lib/ai/suggestions";
@@ -52,41 +51,23 @@ export function CrewProvenancePanel({
   resolveAiSuggestionAction?: (experimentId: string, suggestionId: string, accept: boolean) => Promise<ActionResult>;
 }) {
   const [rawOpen, setRawOpen] = useState(false);
-  const [pending, start] = useTransition();
-  // Which specific button triggered the in-flight transition -- pending
-  // alone is shared by every button in this list (one useTransition for the
-  // whole panel), so without this every button would show a spinner
-  // whenever ANY of them was clicked (bug found 2026-08-17: Yishi wanted
-  // only the pressed button to spin).
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  // pendingKey says which specific button is in flight -- `pending` alone is
+  // shared by every button in this list (one hook for the whole panel), so
+  // without it every button would show a spinner whenever ANY of them was
+  // clicked (bug found 2026-08-17: Yishi wanted only the pressed button to
+  // spin).
+  const { run, pending, pendingKey } = useRunAction();
 
   function resolve(index: number) {
-    setPendingKey(`resolve-${index}`);
-    start(async () => {
-      const res = await resolveAction(experimentId, index);
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
+    run(() => resolveAction(experimentId, index), `resolve-${index}`);
   }
 
   function generateAiResolution(itemId: string) {
-    setPendingKey(`ai-${itemId}`);
-    start(async () => {
-      const res = await generateAiResolutionAction!(experimentId, itemId);
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
+    run(() => generateAiResolutionAction!(experimentId, itemId), `ai-${itemId}`);
   }
 
   function resolveAiSuggestion(suggestionId: string, accept: boolean) {
-    setPendingKey(`${suggestionId}-${accept ? "agree" : "dismiss"}`);
-    start(async () => {
-      const res = await resolveAiSuggestionAction!(experimentId, suggestionId, accept);
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
+    run(() => resolveAiSuggestionAction!(experimentId, suggestionId, accept), `${suggestionId}-${accept ? "agree" : "dismiss"}`);
   }
 
   return (

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import type { ComparisonTableSuggestion } from "@/lib/llm";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 
 // T3.6 D2 — condition/result table generation. Same opt-in button pattern as
 // GroupSummary: nothing generates until the human clicks, and the output is
@@ -17,7 +18,7 @@ export function AiComparisonTable({
 }) {
   const [table, setTable] = useState<ComparisonTableSuggestion | null>(null);
   const [failed, setFailed] = useState(false);
-  const [pending, start] = useTransition();
+  const { load, pending } = useRunAction();
 
   if (table) {
     return (
@@ -62,14 +63,16 @@ export function AiComparisonTable({
         className="btn btn-ghost btn-sm"
         disabled={pending}
         aria-busy={pending}
-        onClick={() =>
-          start(async () => {
-            setFailed(false);
-            const t = await action(ids);
-            if (t) setTable(t);
-            else setFailed(true);
-          })
-        }
+        onClick={() => {
+          setFailed(false);
+          load(
+            () => action(ids),
+            (t) => {
+              if (t) setTable(t);
+              else setFailed(true);
+            }
+          );
+        }}
       >
         {pending && <Spinner />}
         Generate comparison table

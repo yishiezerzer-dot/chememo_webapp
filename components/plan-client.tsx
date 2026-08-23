@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExperimentTemplate, Project } from "@/lib/types";
 import type { CrewDraft, PlanFields } from "@/lib/ai/crew/types";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { createDraftExperimentFromPlan } from "@/app/(app)/plan/commit-actions";
 
 function deriveDefaultName(draft: CrewDraft): string {
@@ -64,7 +65,9 @@ export function PlanClient({ projects, templates }: { projects: Project[]; templ
   const [alsoCreateProject, setAlsoCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [commitError, setCommitError] = useState<string | null>(null);
-  const [committing, startCommit] = useTransition();
+  // The commit result is rendered inline (commitError), not toasted, so this
+  // goes through the hook's loader form rather than run().
+  const { load, pending: committing } = useRunAction();
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -80,21 +83,25 @@ export function PlanClient({ projects, templates }: { projects: Project[]; templ
 
   function commit() {
     if (!draft || !commitName.trim()) return;
-    startCommit(async () => {
-      const res = await createDraftExperimentFromPlan(draft, {
-        name: commitName.trim(),
-        templateId: templateId || null,
-        newProjectName: alsoCreateProject ? newProjectName.trim() || null : null,
-      });
-      // A successful commit redirects server-side and never returns here —
-      // only a failure result reaches this line.
-      if (!res.ok) {
-        setCommitError(res.error);
-      } else {
-        showToast("Draft experiment created", "success");
-        router.refresh();
+    const pending = draft;
+    load(
+      () =>
+        createDraftExperimentFromPlan(pending, {
+          name: commitName.trim(),
+          templateId: templateId || null,
+          newProjectName: alsoCreateProject ? newProjectName.trim() || null : null,
+        }),
+      (res) => {
+        // A successful commit redirects server-side and never returns here —
+        // only a failure result reaches this line.
+        if (!res.ok) {
+          setCommitError(res.error);
+        } else {
+          showToast("Draft experiment created", "success");
+          router.refresh();
+        }
       }
-    });
+    );
   }
 
   async function run() {

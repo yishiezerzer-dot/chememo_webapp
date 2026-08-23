@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { FILE_ROLES } from "@/lib/types";
 import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from "@/lib/files/limits";
 import type { ActionResult, ExperimentFile, FileRole, FileVersion } from "@/lib/types";
@@ -30,7 +30,7 @@ type Item = ExperimentFile & { href: string | null };
 
 function RemoveButton({ action }: { action: () => Promise<ActionResult> }) {
   const [armed, setArmed] = useState(false);
-  const [pending, start] = useTransition();
+  const { run, pending } = useRunAction();
   const { showToast } = useToast();
   if (!armed) {
     return (
@@ -52,13 +52,7 @@ function RemoveButton({ action }: { action: () => Promise<ActionResult> }) {
       disabled={pending}
       aria-busy={pending}
       style={{ borderColor: "var(--rose)", color: "var(--rose)", padding: "4px 9px" }}
-      onClick={() =>
-        start(async () => {
-          const res = await action();
-          if (!res.ok) showToast(res.error, "error");
-          else showToast("File removed", "success");
-        })
-      }
+      onClick={() => run(action, undefined, () => showToast("File removed", "success"))}
     >
       {pending && <Spinner />}
       Remove
@@ -72,9 +66,10 @@ function RemoveButton({ action }: { action: () => Promise<ActionResult> }) {
 // live behind one "Details" toggle per uploaded file to keep the base list
 // unchanged for link-only rows and for viewers who never expand it.
 function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwner: boolean; experimentId: string }) {
-  const [pending, start] = useTransition();
+  // Renamed on the way in so the local run() below -- which adds this
+  // section's own version re-fetch -- can keep the name every call site uses.
+  const { run: runAction, load, pending, pendingKey } = useRunAction();
   const { showToast } = useToast();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [versions, setVersions] = useState<FileVersion[] | null>(null);
   const [runOptions, setRunOptions] = useState<{ id: string; label: string }[] | null>(null);
@@ -92,39 +87,47 @@ function FileDetailsSection({ file, isOwner, experimentId }: { file: Item; isOwn
   const [metaValue, setMetaValue] = useState("");
   const [runId, setRunId] = useState("");
 
-  async function load() {
-    if (!open) {
-      const [v, r] = await Promise.all([listVersionsAction(file.id), listRunsForFileLinkAction(experimentId)]);
-      setVersions(v);
-      setRunOptions(r);
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
     }
-    setOpen((o) => !o);
+    load(
+      () => Promise.all([listVersionsAction(file.id), listRunsForFileLinkAction(experimentId)]),
+      ([v, r]) => {
+        setVersions(v);
+        setRunOptions(r);
+        setOpen(true);
+      },
+      "details"
+    );
   }
 
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-
   function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
-    setPendingKey(key);
-    start(async () => {
-      try {
+    // The version list is this section's own state rather than part of the
+    // server tree, so it is re-fetched inside the action: one pending state
+    // covers both awaits and the hook's catch guards them together.
+    runAction(
+      async () => {
         const res = await action();
-        if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
-        else {
-          router.refresh();
-          setVersions(await listVersionsAction(file.id));
-          after?.();
-        }
-      } catch {
-        // Without this, a rejected action (e.g. a body Next refuses outright)
-        // escapes to the error boundary and takes the experiment page down.
-        showToast("Something went wrong. Please try again.", "error");
-      }
-    });
+        if (res.ok) setVersions(await listVersionsAction(file.id));
+        return res;
+      },
+      key,
+      after
+    );
   }
 
   return (
     <div style={{ marginLeft: 32, marginBottom: 4 }}>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={load}>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        disabled={pending}
+        aria-busy={pending && pendingKey === "details"}
+        onClick={toggle}
+      >
+        {pending && pendingKey === "details" && <Spinner />}
         {open ? "Hide details" : "Details"}
       </button>
       {open && (

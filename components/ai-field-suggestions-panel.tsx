@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult } from "@/lib/types";
 import type { AiSuggestion } from "@/lib/ai/suggestions";
 
@@ -41,29 +39,16 @@ export function AiFieldSuggestionsPanel({
   generateAction: (experimentId: string) => Promise<ActionResult>;
   resolveAction: (experimentId: string, suggestionId: string, accept: boolean) => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending, pendingKey } = useRunAction();
 
   if (!isOwner) return null;
 
   function generate() {
-    setPendingKey("generate");
-    start(async () => {
-      const res = await generateAction(experimentId);
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
+    run(() => generateAction(experimentId), "generate");
   }
 
   function resolve(suggestionId: string, accept: boolean) {
-    setPendingKey(`${suggestionId}-${accept ? "agree" : "dismiss"}`);
-    start(async () => {
-      const res = await resolveAction(experimentId, suggestionId, accept);
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
+    run(() => resolveAction(experimentId, suggestionId, accept), `${suggestionId}-${accept ? "agree" : "dismiss"}`);
   }
 
   return (

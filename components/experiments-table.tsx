@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { StatusBadge, STATUS_LABEL } from "@/components/status-badge";
 import { exportExperimentsCsvAction, saveViewAction, deleteViewAction } from "@/app/(app)/experiments/actions";
 import {
@@ -39,10 +39,11 @@ export function ExperimentsTable({
   savedViews: SavedView[];
   params: ExperimentSearchParams;
 }) {
+  // router is still needed for navigate()'s push -- the hook only owns the
+  // refresh that follows a successful action.
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { showToast } = useToast();
-  const [pending, start] = useTransition();
+  const { run, load, pending, pendingKey } = useRunAction();
   const [q, setQ] = useState(params.q ?? "");
   // "No results" and "nothing here yet" are different states and deserve
   // different copy. sort/dir are excluded deliberately — they are always
@@ -59,8 +60,6 @@ export function ExperimentsTable({
       params.phMax != null
   );
   const [viewName, setViewName] = useState("");
-  const [exporting, setExporting] = useState(false);
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
 
   function navigate(patch: Partial<ExperimentSearchParams>) {
     // Read the live URL, not the `params` prop -- that prop is a snapshot
@@ -92,45 +91,32 @@ export function ExperimentsTable({
 
   const projectLabel = Object.fromEntries(projects.map((p) => [p.id, p.label]));
 
-  async function exportCsv() {
-    setExporting(true);
-    try {
-      const csv = await exportExperimentsCsvAction(params);
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `chememo-experiments-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting(false);
-    }
+  function exportCsv() {
+    load(
+      () => exportExperimentsCsvAction(params),
+      (csv) => {
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `chememo-experiments-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      },
+      "export"
+    );
   }
 
   function saveView() {
     const name = viewName.trim();
     if (!name) return;
-    setPendingKey("save-view");
-    start(async () => {
-      const res = await saveViewAction(name, params);
-      if (!res.ok) showToast(res.error, "error");
-      else {
-        setViewName("");
-        router.refresh();
-      }
-    });
+    run(() => saveViewAction(name, params), "save-view", () => setViewName(""));
   }
 
   function deleteView(id: string) {
-    setPendingKey(`delete-view-${id}`);
-    start(async () => {
-      const res = await deleteViewAction(id);
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
+    run(() => deleteViewAction(id), `delete-view-${id}`);
   }
 
   return (
@@ -222,12 +208,12 @@ export function ExperimentsTable({
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          disabled={exporting}
-          aria-busy={exporting}
+          disabled={pending}
+          aria-busy={pending && pendingKey === "export"}
           onClick={exportCsv}
           title="Download every matching row (not just this page) as CSV"
         >
-          {exporting && <Spinner />}
+          {pending && pendingKey === "export" && <Spinner />}
           Export CSV
         </button>
       </div>

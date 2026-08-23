@@ -1,15 +1,13 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult } from "@/lib/types";
 
 export function ReindexEmbeddingsButton({ action }: { action: () => Promise<ActionResult> }) {
-  const [pending, start] = useTransition();
+  const { run, pending } = useRunAction();
   const { showToast } = useToast();
-  const router = useRouter();
 
   return (
     <button
@@ -18,14 +16,9 @@ export function ReindexEmbeddingsButton({ action }: { action: () => Promise<Acti
       disabled={pending}
       aria-busy={pending}
       onClick={() =>
-        start(async () => {
-          const res = await action();
-          if (!res.ok) showToast(res.error, "error");
-          else {
-            showToast("Re-indexing queued — the poller works through it in the background.", "success");
-            router.refresh();
-          }
-        })
+        run(action, undefined, () =>
+          showToast("Re-indexing queued — the poller works through it in the background.", "success")
+        )
       }
     >
       {pending && <Spinner />}

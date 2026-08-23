@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useRef } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { ComparisonTable } from "@/components/comparison-table";
 import { GroupSummary } from "@/components/group-summary";
 import { AiComparisonTable } from "@/components/ai-comparison-table";
@@ -23,18 +22,8 @@ export function SeriesDetailClient({
   addMember: (experimentId: string) => Promise<ActionResult>;
   removeMember: (experimentId: string) => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
   const inputRef = useRef<HTMLInputElement>(null);
-
-  function run(action: () => Promise<ActionResult>) {
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
-  }
 
   // T2.9 D2 — "timeline" ordering: experiment_series_members has no real
   // sequence field (only an insertion-time added_at), so the comparison

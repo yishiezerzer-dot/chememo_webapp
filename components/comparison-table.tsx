@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { StatusBadge } from "@/components/status-badge";
 import type { ActionResult, Experiment } from "@/lib/types";
 
@@ -22,19 +20,11 @@ export function ComparisonTable({
   controlsCounts: Record<string, number>;
   onRemove?: (experimentId: string) => Promise<ActionResult>;
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending, pendingKey } = useRunAction();
 
   function remove(experimentId: string) {
     if (!onRemove) return;
-    setPendingKey(experimentId);
-    start(async () => {
-      const res = await onRemove(experimentId);
-      if (!res.ok) showToast(res.error, "error");
-      else router.refresh();
-    });
+    run(() => onRemove(experimentId), experimentId);
   }
 
   if (experiments.length === 0) {

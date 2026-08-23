@@ -55,5 +55,30 @@ export function useRunAction() {
     }
   }
 
-  return { run, pending, pendingKey };
+  // Loader-shaped counterpart. Several surfaces await an action for its *data*
+  // rather than for an ActionResult -- a disclosure that fetches its rows on
+  // first open (materials, samples), or an AI panel that renders what came
+  // back. Those awaits were bare too, and sat inside the same sealed
+  // transition, so they carry both defects: a rejection killed the route
+  // segment, and the control could stay disabled for good. Sharing
+  // `pending`/`pendingKey` with `run` is deliberate -- a row's load and its
+  // buttons are one busy state as far as the person clicking is concerned.
+  //
+  // `onLoaded` receives whatever the action resolved to, `null` included: the
+  // AI panels treat null as "couldn't generate that" and say so inline, which
+  // is a different thing from the action failing outright.
+  async function load<T>(action: () => Promise<T>, onLoaded: (value: T) => void, key?: string) {
+    setPendingKey(key ?? null);
+    setPending(true);
+    try {
+      onLoaded(await action());
+    } catch {
+      showToast("Something went wrong. Please try again.", "error");
+    } finally {
+      setPending(false);
+      setPendingKey(null);
+    }
+  }
+
+  return { run, load, pending, pendingKey };
 }

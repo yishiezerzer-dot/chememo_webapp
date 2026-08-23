@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import type { ConditionProgramTemplate, QuantityKind, Quantity } from "@/lib/types";
 import { createConditionProgramTemplateAction } from "@/app/(app)/condition-programs/actions";
 
@@ -52,9 +51,7 @@ export function ConditionProgramsClient({
   templates: ConditionProgramTemplate[];
   quantityKinds: QuantityKind[];
 }) {
-  const [pending, start] = useTransition();
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending } = useRunAction();
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
   const [cycleCount, setCycleCount] = useState("");
@@ -91,33 +88,33 @@ export function ConditionProgramsClient({
   }
 
   function save() {
-    start(async () => {
-      const quantities: Record<string, Quantity> = {};
-      if (wetTemp) quantities.wet_temperature = wetTemp;
-      if (dryTemp) quantities.dry_temperature = dryTemp;
-      if (wetDuration) quantities.wet_duration = wetDuration;
-      if (dryDuration) quantities.dry_duration = dryDuration;
-      if (startingVolume) quantities.starting_volume = startingVolume;
-      if (rehydrationVolume) quantities.rehydration_volume = rehydrationVolume;
+    const quantities: Record<string, Quantity> = {};
+    if (wetTemp) quantities.wet_temperature = wetTemp;
+    if (dryTemp) quantities.dry_temperature = dryTemp;
+    if (wetDuration) quantities.wet_duration = wetDuration;
+    if (dryDuration) quantities.dry_duration = dryDuration;
+    if (startingVolume) quantities.starting_volume = startingVolume;
+    if (rehydrationVolume) quantities.rehydration_volume = rehydrationVolume;
 
-      const res = await createConditionProgramTemplateAction(
-        name,
-        cycleCount ? Number(cycleCount) : 0,
-        atmosphere,
-        humidity,
-        vessel,
-        agitation,
-        samplingPoints,
-        quantities,
-        notes
-      );
-      if (!res.ok) showToast(res.error ?? "Something went wrong.", "error");
-      else {
+    run(
+      () =>
+        createConditionProgramTemplateAction(
+          name,
+          cycleCount ? Number(cycleCount) : 0,
+          atmosphere,
+          humidity,
+          vessel,
+          agitation,
+          samplingPoints,
+          quantities,
+          notes
+        ),
+      undefined,
+      () => {
         reset();
         setShowNew(false);
-        router.refresh();
       }
-    });
+    );
   }
 
   return (
