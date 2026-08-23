@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import type { ActionResult } from "@/lib/types";
 
-// Five panels had hand-rolled this exact helper, and every copy awaited the
+// Roughly thirty panels had hand-rolled this exact helper (five adopted the
+// hook first, the rest followed on 2026-08-23), and every copy awaited the
 // action bare. A server action can *reject* rather than return { ok: false }
 // -- requireUser() runs before an action's own try block, so an expired
 // session is the everyday case -- and an unguarded rejection escapes to
@@ -34,8 +35,8 @@ export function useRunAction() {
   const { showToast } = useToast();
   const router = useRouter();
 
-  // Positional (action, key, after) deliberately matches the signature all
-  // five copies already had, so adopting the hook changes no call site.
+  // Positional (action, key, after) deliberately matches the signature the
+  // hand-rolled copies already had, so adopting the hook changes no call site.
   async function run(action: () => Promise<ActionResult>, key?: string, after?: () => void) {
     setPendingKey(key ?? null);
     setPending(true);

@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useRunAction } from "@/lib/use-run-action";
 import { SAMPLE_RELATIONSHIP_TYPES, SAMPLE_EVENT_TYPES } from "@/lib/types";
 import type {
   ActionResult,
@@ -55,10 +54,9 @@ function ConditionProgramSection({
   templates: ConditionProgramTemplate[];
   quantityKinds: QuantityKind[];
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  // Renamed on the way in so the local run() below -- which adds this
+  // panel's own re-fetch -- can keep the name every call site uses.
+  const { run: runAction, load, pending, pendingKey } = useRunAction();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<Awaited<ReturnType<typeof getBatchConditionsAction>> | null>(null);
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
@@ -77,22 +75,34 @@ function ConditionProgramSection({
   const [finalPh, setFinalPh] = useState("");
   const [anaerobic, setAnaerobic] = useState(false);
 
-  async function load() {
-    if (!open) setData(await getBatchConditionsAction(batchId));
-    setOpen((o) => !o);
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    load(
+      () => getBatchConditionsAction(batchId),
+      (d) => {
+        setData(d);
+        setOpen(true);
+      },
+      "conditions"
+    );
   }
 
   function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else {
-        router.refresh();
-        setData(await getBatchConditionsAction(batchId));
-        after?.();
-      }
-    });
+    // The conditions block is this panel's own state rather than part of the
+    // server tree, so it is re-fetched inside the action: one pending state
+    // covers both awaits and the hook's catch guards them together.
+    runAction(
+      async () => {
+        const res = await action();
+        if (res.ok) setData(await getBatchConditionsAction(batchId));
+        return res;
+      },
+      key,
+      after
+    );
   }
 
   const wetVolumeKind = quantityKinds.find((k) => k.key === "cycle_wet_volume");
@@ -103,7 +113,15 @@ function ConditionProgramSection({
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span className="act-dot"></span>
         <span style={{ fontSize: 13 }}>Condition program &amp; environment</span>
-        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          style={{ marginLeft: "auto" }}
+          disabled={pending}
+          aria-busy={pending && pendingKey === "conditions"}
+          onClick={toggle}
+        >
+          {pending && pendingKey === "conditions" && <Spinner />}
           {open ? "Hide" : "Show"}
         </button>
       </div>
@@ -380,10 +398,7 @@ function AnalysisRunsSection({
   resultConfidences: string[];
   assignmentConfidences: string[];
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, load, pending, pendingKey } = useRunAction();
   const [runs, setRuns] = useState<AnalysisRun[] | null>(null);
   const [open, setOpen] = useState(false);
   const [methodId, setMethodId] = useState("");
@@ -397,42 +412,64 @@ function AnalysisRunsSection({
   const [peakMz, setPeakMz] = useState("");
   const [peakConfidence, setPeakConfidence] = useState(assignmentConfidences[0] ?? "");
 
-  async function load() {
-    if (!open) setRuns(await getSampleRunsAction(sampleId));
-    setOpen((o) => !o);
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    load(
+      () => getSampleRunsAction(sampleId),
+      (r) => {
+        setRuns(r);
+        setOpen(true);
+      },
+      "runs"
+    );
   }
 
-  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else {
-        router.refresh();
-        after?.();
-      }
-    });
-  }
-
-  async function loadRunDetail(runId: string) {
+  function loadRunDetail(runId: string) {
     if (expandedRun === runId) {
       setExpandedRun(null);
       return;
     }
-    setRunDetail(await getRunDetailAction(runId));
-    setExpandedRun(runId);
+    load(
+      () => getRunDetailAction(runId),
+      (d) => {
+        setRunDetail(d);
+        setExpandedRun(runId);
+      },
+      `run-${runId}`
+    );
   }
 
-  async function loadPeaks(resultId: string) {
+  // The un-guarded twin of loadPeaks, for the one call site that runs inside
+  // an action already covered by run()'s pending state and catch.
+  async function fetchPeaks(resultId: string) {
     const peaks = await getResultPeaksAction(resultId);
     setPeaksByResult((cur) => ({ ...cur, [resultId]: peaks }));
+  }
+
+  function loadPeaks(resultId: string) {
+    load(
+      () => getResultPeaksAction(resultId),
+      (peaks) => setPeaksByResult((cur) => ({ ...cur, [resultId]: peaks })),
+      `peaks-${resultId}`
+    );
   }
 
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line, #2a2a2a)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0 }}>Analysis runs</h4>
-        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          style={{ marginLeft: "auto" }}
+          disabled={pending}
+          aria-busy={pending && pendingKey === "runs"}
+          onClick={toggle}
+        >
+          {pending && pendingKey === "runs" && <Spinner />}
           {open ? "Hide" : "Show"}
         </button>
       </div>
@@ -448,7 +485,15 @@ function AnalysisRunsSection({
                   <span style={{ fontSize: 13 }}>
                     {method?.label ?? "Method"} <span className="chip">{r.status}</span>
                   </span>
-                  <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={() => loadRunDetail(r.id)}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ marginLeft: "auto" }}
+                    disabled={pending}
+                    aria-busy={pending && pendingKey === `run-${r.id}`}
+                    onClick={() => loadRunDetail(r.id)}
+                  >
+                    {pending && pendingKey === `run-${r.id}` && <Spinner />}
                     {expandedRun === r.id ? "Hide" : "Details"}
                   </button>
                 </div>
@@ -458,7 +503,15 @@ function AnalysisRunsSection({
                       <div key={res.id} style={{ marginBottom: 6 }}>
                         <div style={{ fontSize: 12.5 }}>
                           {res.summary || "(no summary)"} {res.result_confidence && <span className="chip">{res.result_confidence}</span>}
-                          <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => loadPeaks(res.id)}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            style={{ marginLeft: 8 }}
+                            disabled={pending}
+                            aria-busy={pending && pendingKey === `peaks-${res.id}`}
+                            onClick={() => loadPeaks(res.id)}
+                          >
+                            {pending && pendingKey === `peaks-${res.id}` && <Spinner />}
                             Peaks
                           </button>
                         </div>
@@ -500,7 +553,7 @@ function AnalysisRunsSection({
                                 });
                                 if (res2.ok) {
                                   setPeakMz("");
-                                  await loadPeaks(res.id);
+                                  await fetchPeaks(res.id);
                                 }
                                 return res2;
                               }, `peak-${res.id}`)
@@ -628,10 +681,9 @@ function SampleRow({
   resultConfidences: string[];
   assignmentConfidences: string[];
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  // Renamed on the way in so the local run() below -- which adds this row's
+  // own re-fetch -- can keep the name every call site uses.
+  const { run: runAction, load, pending, pendingKey } = useRunAction();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getDetail>> | null>(null);
 
@@ -643,21 +695,30 @@ function SampleRow({
   const [weight, setWeight] = useState("");
   const [weightUnit, setWeightUnit] = useState(weightKind?.canonical_unit_code ?? "g");
 
-  async function load() {
-    if (!open) setDetail(await getDetail(sample.id));
-    setOpen((o) => !o);
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    load(
+      () => getDetail(sample.id),
+      (d) => {
+        setDetail(d);
+        setOpen(true);
+      },
+      "detail"
+    );
   }
 
   function run(action: () => Promise<ActionResult>, key: string) {
-    setPendingKey(key);
-    start(async () => {
+    // The detail block is this row's own state rather than part of the server
+    // tree, so it is re-fetched inside the action: one pending state covers
+    // both awaits and the hook's catch guards them together.
+    runAction(async () => {
       const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else {
-        router.refresh();
-        setDetail(await getDetail(sample.id));
-      }
-    });
+      if (res.ok) setDetail(await getDetail(sample.id));
+      return res;
+    }, key);
   }
 
   const otherSamples = allSamples.filter((s) => s.id !== sample.id);
@@ -671,7 +732,15 @@ function SampleRow({
           {sample.sample_type && <span className="chip" style={{ marginLeft: 6 }}>{sample.sample_type}</span>}
           <span className="chip" style={{ marginLeft: 6 }}>{sample.status}</span>
         </span>
-        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={load}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          style={{ marginLeft: "auto" }}
+          disabled={pending}
+          aria-busy={pending && pendingKey === "detail"}
+          onClick={toggle}
+        >
+          {pending && pendingKey === "detail" && <Spinner />}
           {open ? "Hide" : "Details"}
         </button>
       </div>
@@ -876,10 +945,7 @@ export function SamplesPanel({
   assignmentConfidences: string[];
   conditionProgramTemplates: ConditionProgramTemplate[];
 }) {
-  const [pending, start] = useTransition();
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { run, pending, pendingKey } = useRunAction();
   const [showNewBatch, setShowNewBatch] = useState(false);
   const [batchLabel, setBatchLabel] = useState("");
   const [addingToBatch, setAddingToBatch] = useState<string | null>(null);
@@ -891,18 +957,6 @@ export function SamplesPanel({
 
   const allSamples = Object.values(samplesByBatch).flat();
   void SAMPLE_EVENT_TYPES;
-
-  function run(action: () => Promise<ActionResult>, key: string, after?: () => void) {
-    setPendingKey(key);
-    start(async () => {
-      const res = await action();
-      if (!res.ok) showToast(res.error, "error");
-      else {
-        router.refresh();
-        after?.();
-      }
-    });
-  }
 
   return (
     <div className="obs-box glass">
