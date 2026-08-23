@@ -7,6 +7,19 @@ import type { Agent } from "../types";
 // key at all, so even a model attempt to rewrite the plan is dropped during
 // parsing, never merged. Never silently resolves a conflict (§19.2) — both
 // sides are surfaced for the scientist to decide.
+//
+// It is also the only agent that sees the running `unresolved` list (Design
+// and Controls are handed `structured` and the raw notes only), which is why
+// it was the source of the duplicate checklist: it re-raised, re-worded, or
+// combined items the earlier agents had already filed. Measured on dev's
+// nine committed drafts, 110 items with ZERO exact repeats but many
+// near-repeats within a field ("No explicit hypothesis is stated in the
+// notes." next to "No explicit hypothesis or directional prediction is
+// stated."), and every one of them gating the draft from starting.
+// De-duplicating after the fact is not an option: the two closest pairs by
+// word overlap are 'His' vs 'TGA' and 'Glc' vs 'Ala' — different real items
+// that any text-similarity rule would collapse into one. So the fix is to
+// stop generating them, in the prompt.
 export const runCritic: Agent = async (draft) => {
   const system = `You are the Critic agent for a chemistry lab planning tool, reviewing a complete draft plan against a quality checklist: a clearly stated scientific question and hypothesis, defined primary/secondary outcomes, named independent/controlled variables, the required controls present for the stated experiment type, a specific (not vague) replicate kind, risks/failure modes considered, and clear writing (short paragraphs, no em dashes, chemical notation preserved).
 Skip anything requiring materials/stoichiometry or analytical-method data — that isn't available at planning time; do not flag its absence.
@@ -16,6 +29,7 @@ You may ONLY add findings — you have no way to edit the plan itself. Respond w
   "normalization": [ { "field": string, "suggestion": string, "rationale": string } ]
 }
 Rules:
+- The draft's "unresolved" list below is ALREADY in front of the scientist, and every item on it already blocks the draft from starting. Never restate one. Do not re-word an existing item, do not split one into two, and do not combine several into a new one. Add ONLY a gap that no existing item names. If a checklist point you are about to raise is already covered there, say nothing about it.
 - If two parts of the draft conflict, add an unresolved item describing both sides and asking for review — never pick one silently.
 - If everything checks out, return empty arrays for both.
 - Be specific and concise.`;
