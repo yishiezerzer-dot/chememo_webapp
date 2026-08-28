@@ -61,8 +61,8 @@ export async function createSeries(
   return data.id as string;
 }
 
-export async function addMember(supabase: Supabase, seriesId: string, experimentId: string): Promise<void> {
-  const { data: experiment } = await supabase.from("experiments").select("id").eq("id", experimentId).is("deleted_at", null).maybeSingle();
+export async function addMember(supabase: Supabase, seriesId: string, experimentId: string): Promise<Experiment> {
+  const { data: experiment } = await supabase.from("experiments").select("*").eq("id", experimentId).is("deleted_at", null).maybeSingle();
   if (!experiment) throw new AppError("validation", `${experimentId} is not a real experiment.`);
 
   const { error } = await supabase.from("experiment_series_members").insert({ series_id: seriesId, experiment_id: experimentId });
@@ -70,6 +70,7 @@ export async function addMember(supabase: Supabase, seriesId: string, experiment
     if (error.code === "23505") throw new AppError("conflict", "That experiment is already in this series.");
     throw new AppError("conflict", "Could not add the experiment to this series.", { cause: error });
   }
+  return experiment as Experiment;
 }
 
 // Which series a given experiment already belongs to — for the "add to

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser, requireWorkspace } from "@/lib/authorization/policies";
 import * as seriesService from "@/lib/series/service";
 import { toActionResult } from "@/lib/errors";
-import type { ActionResult } from "@/lib/types";
+import type { ActionResult, Experiment } from "@/lib/types";
 
 export async function createNewSeries(
   _prevState: ActionResult | null,
@@ -29,18 +29,19 @@ export async function createNewSeries(
   redirect(`/series/${id}`);
 }
 
-export async function addMemberAction(seriesId: string, experimentId: string): Promise<ActionResult> {
+export async function addMemberAction(seriesId: string, experimentId: string): Promise<ActionResult<Experiment>> {
   const { supabase } = await requireUser();
   const trimmed = experimentId.trim();
   if (!trimmed) return { ok: false, error: "Enter an experiment ID." };
+  let experiment: Experiment;
   try {
-    await seriesService.addMember(supabase, seriesId, trimmed);
+    experiment = await seriesService.addMember(supabase, seriesId, trimmed);
   } catch (e) {
     return toActionResult("addMemberAction", e);
   }
   revalidatePath(`/series/${seriesId}`);
   revalidatePath(`/experiments/${trimmed}`);
-  return { ok: true };
+  return { ok: true, data: experiment };
 }
 
 export async function removeMemberAction(seriesId: string, experimentId: string): Promise<ActionResult> {
@@ -59,7 +60,7 @@ export async function removeMemberAction(seriesId: string, experimentId: string)
 // bind its own id via .bind(null, experimentId) and leave seriesId as the
 // remaining call-time argument (the "add to series" control on that page
 // picks the series, not the experiment).
-export async function addExperimentToSeriesAction(experimentId: string, seriesId: string): Promise<ActionResult> {
+export async function addExperimentToSeriesAction(experimentId: string, seriesId: string): Promise<ActionResult<Experiment>> {
   return addMemberAction(seriesId, experimentId);
 }
 

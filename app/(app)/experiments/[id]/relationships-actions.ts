@@ -10,19 +10,20 @@ export async function createRelationshipAction(
   experimentId: string,
   targetExperimentId: string,
   relationshipType: RelationshipType
-): Promise<ActionResult> {
+): Promise<ActionResult<relationshipsService.RelationshipView>> {
   const { supabase, user } = await requireUser();
   const target = targetExperimentId.trim();
   if (!target) return { ok: false, error: "Enter the other experiment's ID." };
 
+  let view: relationshipsService.RelationshipView;
   try {
-    await relationshipsService.createRelationship(supabase, user.id, experimentId, target, relationshipType);
+    view = await relationshipsService.createRelationship(supabase, user.id, experimentId, target, relationshipType);
   } catch (e) {
     return toActionResult("createRelationshipAction", e);
   }
   revalidatePath(`/experiments/${experimentId}`);
   revalidatePath(`/experiments/${target}`);
-  return { ok: true };
+  return { ok: true, data: view };
 }
 
 export async function deleteRelationshipAction(experimentId: string, relationshipId: string): Promise<ActionResult> {

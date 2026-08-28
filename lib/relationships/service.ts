@@ -105,13 +105,13 @@ export async function createRelationship(
   sourceExperimentId: string,
   targetExperimentId: string,
   relationshipType: RelationshipType
-): Promise<void> {
+): Promise<RelationshipView> {
   if (sourceExperimentId === targetExperimentId) {
     throw new AppError("validation", "An experiment cannot be related to itself.");
   }
   const { data: target } = await supabase
     .from("experiments")
-    .select("id")
+    .select("id, name, status")
     .eq("id", targetExperimentId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -119,18 +119,34 @@ export async function createRelationship(
     throw new AppError("validation", `${targetExperimentId} is not a real experiment.`);
   }
 
-  const { error } = await supabase.from("experiment_relationships").insert({
-    source_experiment_id: sourceExperimentId,
-    target_experiment_id: targetExperimentId,
-    relationship_type: relationshipType,
-    created_by: userId,
-  });
+  const { data: row, error } = await supabase
+    .from("experiment_relationships")
+    .insert({
+      source_experiment_id: sourceExperimentId,
+      target_experiment_id: targetExperimentId,
+      relationship_type: relationshipType,
+      created_by: userId,
+    })
+    .select("*")
+    .single();
   if (error) {
     if (error.code === "23505") {
       throw new AppError("conflict", "That relationship already exists.");
     }
     throw new AppError("conflict", "Could not create the relationship.", { cause: error });
   }
+
+  const relationship = row as ExperimentRelationship;
+  return {
+    relationship,
+    direction: "outgoing",
+    label: RELATIONSHIP_LABEL[relationship.relationship_type],
+    otherExperiment: {
+      id: target.id,
+      name: target.name ?? target.id,
+      status: (target.status as ExperimentStatus | null) ?? null,
+    },
+  };
 }
 
 export async function deleteRelationship(supabase: Supabase, id: string): Promise<void> {
