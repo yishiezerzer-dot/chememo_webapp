@@ -55,7 +55,7 @@ test("experiment lifecycle: start, complete, and reopen", async ({ page }) => {
     .getByPlaceholder("Why does this record need to change after completion?")
     .fill("Need to correct a typo in the conclusion.");
   await page.getByRole("button", { name: "Confirm reopen" }).click();
-  await expect(page.locator('textarea[name="conclusion"]')).toHaveCount(1);
+  await expect(page.locator('textarea[name="conclusion"]')).toHaveCount(1, { timeout: 15000 });
 
   // Cleanup — close the record out (in_progress -> failed -> archived is a
   // legal transition pair) so the test leaves no open record behind.

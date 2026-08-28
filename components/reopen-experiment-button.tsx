@@ -42,7 +42,16 @@ export function ReopenExperimentButton({
           className="btn btn-primary btn-sm"
           disabled={pending || !reason.trim()}
           aria-busy={pending}
-          onClick={() => run(() => action(reason))}
+          onClick={() =>
+            run(() => action(reason), undefined, () => {
+              // The edit page is a server fork (locked view vs the form). A
+              // dropped router.refresh() leaves this locked branch on screen
+              // even though reopen succeeded — same Next.js 16 stampede as
+              // the experiment detail panels. A real load always takes the
+              // unlocked branch.
+              window.location.reload();
+            })
+          }
         >
           {pending && <Spinner />}
           Confirm reopen
