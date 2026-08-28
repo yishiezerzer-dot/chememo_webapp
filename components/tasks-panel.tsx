@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
+import { useStickyState } from "@/lib/use-sticky-state";
 import { TASK_STATUSES } from "@/lib/types";
 import type { ActionResult, TaskStatus, TaskType } from "@/lib/types";
 import type { TaskView } from "@/lib/tasks/service";
@@ -23,7 +24,7 @@ export function TasksPanel({
   createTask: (input: {
     taskType: TaskType; title: string; status: TaskStatus; blockerNote: string | null;
     assigneeId: string | null; dueAt: string | null; checklist: string[] | null;
-  }) => Promise<ActionResult>;
+  }) => Promise<ActionResult<TaskView>>;
   updateStatus: (taskId: string, status: TaskStatus, blockerNote: string | null) => Promise<ActionResult>;
 }) {
   const { run, pending } = useRunAction();
@@ -38,6 +39,7 @@ export function TasksPanel({
   // doing nothing.
   const [title, setTitle] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("task");
+  const [items, setItems] = useStickyState(tasks);
 
   function changeStatus(task: TaskView, status: TaskStatus) {
     let blockerNote = task.blocker_note;
@@ -45,19 +47,27 @@ export function TasksPanel({
       blockerNote = window.prompt("What is this task blocked on / waiting for? (required)", task.blocker_note ?? "");
       if (!blockerNote?.trim()) return;
     }
-    run(() => updateStatus(task.id, status, blockerNote));
+    run(async () => {
+      const res = await updateStatus(task.id, status, blockerNote);
+      if (res.ok) {
+        setItems((cur) =>
+          cur.map((t) => (t.id === task.id ? { ...t, status, blocker_note: blockerNote } : t))
+        );
+      }
+      return res;
+    });
   }
 
   return (
     <div className="obs-box glass">
       <h4>Tasks</h4>
-      {tasks.length === 0 ? (
+      {items.length === 0 ? (
         <p className="muted" style={{ margin: "0 0 12px" }}>
           No tasks yet.
         </p>
       ) : (
         <div style={{ marginBottom: 12 }}>
-          {tasks.map((t) => (
+          {items.map((t) => (
             <div key={t.id} className="act-row">
               <span className="act-dot"></span>
               <span style={{ fontSize: 13 }}>
@@ -107,7 +117,10 @@ export function TasksPanel({
                 taskType, title: trimmed, status: "not_started", blockerNote: null,
                 assigneeId: null, dueAt: null, checklist: null,
               });
-              if (res.ok) setTitle("");
+              if (res.ok) {
+                setTitle("");
+                if (res.data) setItems((cur) => [...cur, res.data as TaskView]);
+              }
               return res;
             });
           }}

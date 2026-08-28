@@ -40,8 +40,8 @@ export type Project = Database["public"]["Tables"]["projects"]["Row"];
 // `conflict` (T1.3 D4/D5) distinguishes "someone else saved a change since
 // you started editing" from an ordinary validation/server error, so the UI
 // can show "reload" instead of a generic field error.
-export type ActionResult =
-  | { ok: true }
+export type ActionResult<T = unknown> =
+  | { ok: true; data?: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string>; conflict?: boolean };
 
 // T1.2, §8.2: the 19 required sample-matrix columns, one row per sample.

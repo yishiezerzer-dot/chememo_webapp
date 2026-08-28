@@ -59,8 +59,9 @@ test("revision diff and restore", async ({ page }) => {
   await page.getByRole("button", { name: "Confirm restore" }).click();
   await expect(page.getByText(/locked/i)).toBeVisible({ timeout: 15000 });
 
-  // Cleanup — close the record out so this test leaves no open record behind.
-  await page.getByRole("button", { name: "Close out…" }).click();
-  await page.getByRole("button", { name: "Failed", exact: true }).click();
+  // Cleanup — the record is completed (terminal), so archive is the
+  // close-out, not the in-progress "Close out…" picker.
+  await page.getByRole("button", { name: "Archive" }).click();
+  await page.getByRole("button", { name: "Confirm archive" }).click();
   await expect(page.getByText("Archived", { exact: true })).toBeVisible();
 });

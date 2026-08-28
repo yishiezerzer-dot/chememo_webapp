@@ -43,7 +43,7 @@ export class AppError extends Error {
 // logging the real cause server-side under a trace ID first. Validation
 // errors skip the trace suffix — fieldErrors already pinpoint the problem,
 // so a support reference number would only add noise.
-export function toActionResult(context: string, error: unknown): ActionResult {
+export function toActionResult(context: string, error: unknown): Extract<ActionResult, { ok: false }> {
   if (error instanceof AppError) {
     logError(context, error.code, { traceId: error.traceId, error: error.cause ?? error });
     const suffix = error.code === "validation" ? "" : ` (ref ${error.traceId})`;

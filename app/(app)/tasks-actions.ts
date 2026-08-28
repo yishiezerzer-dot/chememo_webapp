@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/authorization/policies";
 import * as tasksService from "@/lib/tasks/service";
 import { toActionResult } from "@/lib/errors";
 import type { ActionResult, CommentTargetType, TaskStatus, TaskType } from "@/lib/types";
+import type { TaskView } from "@/lib/tasks/service";
 
 export async function createTaskAction(
   experimentId: string,
@@ -19,18 +20,18 @@ export async function createTaskAction(
     dueAt: string | null;
     checklist: string[] | null;
   }
-): Promise<ActionResult> {
+): Promise<ActionResult<TaskView>> {
   const { supabase, user } = await requireUser();
   const title = input.title.trim();
   if (!title) return { ok: false, error: "A task needs a title." };
 
   try {
-    await tasksService.createTask(supabase, user.id, { ...input, title, targetType, targetId });
+    const created = await tasksService.createTask(supabase, user.id, { ...input, title, targetType, targetId });
+    revalidatePath(`/experiments/${experimentId}`);
+    return { ok: true, data: created };
   } catch (e) {
     return toActionResult("createTaskAction", e);
   }
-  revalidatePath(`/experiments/${experimentId}`);
-  return { ok: true };
 }
 
 export async function updateTaskStatusAction(

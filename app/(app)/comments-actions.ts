@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/authorization/policies";
 import * as commentsService from "@/lib/comments/service";
 import { toActionResult } from "@/lib/errors";
 import type { ActionResult, CommentTargetType } from "@/lib/types";
+import type { CommentView } from "@/lib/comments/service";
 
 // Comments on an experiment_step/experiment_file target still render inline
 // on their parent experiment's own detail page (D1), so every action here
@@ -14,15 +15,15 @@ export async function createCommentAction(
   targetType: CommentTargetType,
   targetId: string,
   body: string
-): Promise<ActionResult> {
+): Promise<ActionResult<CommentView>> {
   const { supabase, user } = await requireUser();
   try {
-    await commentsService.createComment(supabase, user.id, targetType, targetId, body);
+    const created = await commentsService.createComment(supabase, user.id, targetType, targetId, body);
+    revalidatePath(`/experiments/${experimentId}`);
+    return { ok: true, data: created };
   } catch (e) {
     return toActionResult("createCommentAction", e);
   }
-  revalidatePath(`/experiments/${experimentId}`);
-  return { ok: true };
 }
 
 export async function resolveCommentAction(experimentId: string, commentId: string): Promise<ActionResult> {

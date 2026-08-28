@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
+import { useOptionalExperimentView } from "@/components/experiment-view";
 import type { ActionResult, ExperimentStatus } from "@/lib/types";
 
 const TERMINAL: ExperimentStatus[] = ["completed", "reviewed", "failed", "cancelled"];
@@ -25,16 +26,21 @@ export function DeleteExperimentButton({
   const [mode, setMode] = useState<Mode>("idle");
   const { run, pending } = useRunAction();
   const { showToast } = useToast();
+  const view = useOptionalExperimentView();
+  const currentStatus = view?.status ?? status;
 
   // Already archived: nothing left for this control to do.
-  if (status === "archived") return null;
+  if (currentStatus === "archived") return null;
 
   function runArchive(endedAs?: "completed" | "failed" | "cancelled") {
-    run(() => archiveAction(endedAs), undefined, () => showToast("Archived.", "success"));
+    run(() => archiveAction(endedAs), undefined, () => {
+      view?.patch({ status: "archived" });
+      showToast("Archived.", "success");
+    });
   }
 
   // draft — the only status that may still be soft-deleted (§18.2, narrowed).
-  if (status === "draft") {
+  if (currentStatus === "draft") {
     if (mode !== "confirm-delete") {
       return (
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMode("confirm-delete")}>
@@ -70,7 +76,7 @@ export function DeleteExperimentButton({
   }
 
   // Already terminal (completed/reviewed/failed/cancelled) — one move to archived.
-  if (status !== null && TERMINAL.includes(status)) {
+  if (currentStatus !== null && TERMINAL.includes(currentStatus)) {
     if (mode !== "confirm-archive") {
       return (
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMode("confirm-archive")}>

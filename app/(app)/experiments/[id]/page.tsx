@@ -67,7 +67,6 @@ import { InputsOutputsPanel } from "@/components/inputs-outputs-panel";
 import { SamplesPanel } from "@/components/samples-panel";
 import { ControlsPanel } from "@/components/controls-panel";
 import { HistoryPanel } from "@/components/history-panel";
-import { StatusBadge } from "@/components/status-badge";
 import { CrewProvenancePanel } from "@/components/crew-provenance-panel";
 import { AiFieldSuggestionsPanel } from "@/components/ai-field-suggestions-panel";
 import { AiNextExperimentSuggestion } from "@/components/ai-next-experiment-suggestion";
@@ -76,6 +75,7 @@ import { StepRunner } from "@/components/step-runner";
 import { CommentThread } from "@/components/comment-thread";
 import { TasksPanel } from "@/components/tasks-panel";
 import { ExportMarkdownButton } from "@/components/export-markdown-button";
+import { ExperimentViewProvider, ExperimentHeading, ExperimentStatusBadge } from "@/components/experiment-view";
 
 const fmtDateTime = (iso: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "—");
 
@@ -215,17 +215,18 @@ export default async function ExperimentDetailPage({
   ];
 
   return (
+    <ExperimentViewProvider name={e.name} status={e.status}>
     <div>
-      <Link href="/experiments" className="muted" style={{ fontSize: 13 }}>
+      <Link href="/experiments" prefetch={false} className="muted" style={{ fontSize: 13 }}>
         ← All experiments
       </Link>
 
       <div className="detail-head" style={{ marginTop: 12 }}>
         <div>
           <div className="id">{e.id}</div>
-          <h2>{e.name}</h2>
+          <ExperimentHeading />
           <div className="detail-meta" style={{ marginBottom: 8 }}>
-            <StatusBadge status={e.status} />
+            <ExperimentStatusBadge />
           </div>
           <div className="detail-meta">
             {projectLabel && <span className="chip">{projectLabel}</span>}
@@ -241,7 +242,7 @@ export default async function ExperimentDetailPage({
           <ExportMarkdownButton experimentId={e.id} exportMarkdown={exportExperimentMarkdownAction.bind(null, e.id)} />
           {isOwner && (
             <>
-              <Link href={`/experiments/${e.id}/edit`} className="btn btn-ghost btn-sm">
+              <Link href={`/experiments/${e.id}/edit`} prefetch={false} className="btn btn-ghost btn-sm">
                 Edit
               </Link>
               <DeleteExperimentButton
@@ -257,7 +258,6 @@ export default async function ExperimentDetailPage({
 
       {isOwner && (
         <LifecycleControls
-          status={e.status}
           hasConclusion={!!e.conclusion?.trim()}
           hasAcceptanceCriteria={!!e.acceptance_criteria?.trim()}
           unresolvedOpenCount={crewProvenance?.unresolvedOpenCount ?? 0}
@@ -553,6 +553,7 @@ export default async function ExperimentDetailPage({
         </aside>
       </div>
     </div>
+    </ExperimentViewProvider>
   );
 }
 

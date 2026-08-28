@@ -64,7 +64,7 @@ export type CreateTaskInput = {
 // T1.9 D6 — §10.3: "a task marked blocked or waiting must include the
 // blocker or dependency." Checked here (app layer), same pattern T1.1
 // established for acceptance-criteria-before-start.
-export async function createTask(supabase: Supabase, userId: string, input: CreateTaskInput): Promise<ExperimentTask> {
+export async function createTask(supabase: Supabase, userId: string, input: CreateTaskInput): Promise<TaskView> {
   if ((input.status === "blocked" || input.status === "waiting") && !input.blockerNote?.trim()) {
     throw new AppError("validation", "A blocked or waiting task must name the blocker or dependency.");
   }
@@ -95,7 +95,9 @@ export async function createTask(supabase: Supabase, userId: string, input: Crea
     });
   }
 
-  return task as ExperimentTask;
+  const [view] = await withNames(supabase, [task as ExperimentTask]);
+  if (!view) throw new AppError("conflict", "Could not create the task.");
+  return view;
 }
 
 export async function updateTaskStatus(

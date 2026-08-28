@@ -18,7 +18,7 @@ export async function restoreRevisionAction(
   experimentId: string,
   revisionId: string,
   reason: string
-): Promise<ActionResult> {
+): Promise<ActionResult<{ name: string }>> {
   const { supabase, user } = await requireUser();
   const trimmedReason = reason.trim();
   if (!trimmedReason) {
@@ -46,5 +46,5 @@ export async function restoreRevisionAction(
   }
 
   revalidatePath(`/experiments/${experimentId}`);
-  return { ok: true };
+  return { ok: true, data: { name: input.name } };
 }

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { useExperimentView } from "@/components/experiment-view";
 import { useRunAction } from "@/lib/use-run-action";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { ActionResult } from "@/lib/types";
 import type { TimelineEntry } from "@/lib/experiments/timeline";
 import type { DiffField } from "@/lib/diff";
@@ -49,13 +51,16 @@ function DiffLine({ field }: { field: DiffField }) {
 function RestoreControl({
   revisionId,
   restoreRevision,
+  onRestored,
 }: {
   revisionId: string;
-  restoreRevision: (revisionId: string, reason: string) => Promise<ActionResult>;
+  restoreRevision: (revisionId: string, reason: string) => Promise<ActionResult<{ name: string }>>;
+  onRestored: (reason: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const { run, pending } = useRunAction();
+  const { patch } = useExperimentView();
 
   if (!open) {
     return (
@@ -84,10 +89,21 @@ function RestoreControl({
           // open parks a filled-in reason and an armed "Confirm restore"
           // against a DIFFERENT revision than the one just restored.
           onClick={() =>
-            run(() => restoreRevision(revisionId, reason), undefined, () => {
-              setReason("");
-              setOpen(false);
-            })
+            run(
+              async () => {
+                const res = await restoreRevision(revisionId, reason);
+                if (res.ok) {
+                  if (res.data?.name) patch({ name: res.data.name });
+                  onRestored(reason.trim());
+                }
+                return res;
+              },
+              undefined,
+              () => {
+                setReason("");
+                setOpen(false);
+              }
+            )
           }
         >
           {pending && <Spinner />}
@@ -112,16 +128,17 @@ export function HistoryPanel({
 }: {
   entries: TimelineEntry[];
   isOwner: boolean;
-  restoreRevision: (revisionId: string, reason: string) => Promise<ActionResult>;
+  restoreRevision: (revisionId: string, reason: string) => Promise<ActionResult<{ name: string }>>;
 }) {
-  if (entries.length === 0) return null;
+  const [items, setItems] = useStickyState(entries);
+  if (items.length === 0) return null;
   return (
     <div className="panel glass" style={{ marginTop: 16 }}>
       <h4 style={{ fontFamily: "var(--display)", margin: "0 0 12px" }}>
-        History · {entries.length} event{entries.length === 1 ? "" : "s"}
+        History · {items.length} event{items.length === 1 ? "" : "s"}
       </h4>
       <div className="activity">
-        {entries.map((entry) => (
+        {items.map((entry) => (
           <div key={`${entry.kind}-${entry.id}`} className="act-row" style={{ flexWrap: "wrap" }}>
             <span className="act-dot"></span>
             <div style={{ flex: 1, minWidth: 200 }}>
@@ -135,7 +152,23 @@ export function HistoryPanel({
                   ))}
                   {isOwner && (
                     <div style={{ marginTop: 6 }}>
-                      <RestoreControl revisionId={entry.id} restoreRevision={restoreRevision} />
+                      <RestoreControl
+                        revisionId={entry.id}
+                        restoreRevision={restoreRevision}
+                        onRestored={(restoreReason) =>
+                          setItems((cur) => [
+                            {
+                              kind: "lock_event",
+                              id: `local-restore-${Date.now()}`,
+                              created_at: new Date().toISOString(),
+                              actorName: "You",
+                              event: "restore",
+                              reason: restoreReason,
+                            },
+                            ...cur,
+                          ])
+                        }
+                      />
                     </div>
                   )}
                 </>
