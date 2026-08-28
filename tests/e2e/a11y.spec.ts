@@ -46,16 +46,16 @@ test("experiment detail page has no serious accessibility violations", async ({ 
   await page.waitForURL(/\/experiments$/);
 });
 
-// T1.10 D1 — sort headers are keyboard-operable now that they're real buttons.
+// T1.10 D1 — sort headers are keyboard-operable (real links to the sorted URL).
 test("table sort header is keyboard-operable", async ({ page }) => {
   await signIn(page);
   await page.goto("/experiments");
-  const idHeader = page.locator("th.col-id button");
+  const idHeader = page.locator("th.col-id .th-sort-btn");
   await idHeader.focus();
   await expect(page.locator("th.col-id")).toHaveAttribute("aria-sort", "none");
   await idHeader.press("Enter");
-  // Sorting re-fetches server-rendered data (T1.6) — a real round trip
-  // against chememo-dev, same latency class as REFRESH_TIMEOUT elsewhere.
+  // Sorting is a document request (T1.6 URL-backed list state), not a client
+  // router.push — Next.js 16 can drop those the same way it drops refresh.
   await expect(page).toHaveURL(/sort=id/, { timeout: 15000 });
   await expect(page.locator("th.col-id")).toHaveAttribute("aria-sort", /ascending|descending/, { timeout: 15000 });
 });

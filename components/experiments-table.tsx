@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/spinner";
@@ -64,23 +64,37 @@ export function ExperimentsTable({
   function navigate(patch: Partial<ExperimentSearchParams>) {
     // Read the live URL, not the `params` prop -- that prop is a snapshot
     // from the last server render, so two filter edits fired back-to-back
-    // (before the first router.push's RSC round-trip lands and refreshes
-    // `params`) would each build off the same stale snapshot and clobber
-    // each other. useSearchParams() reflects the URL immediately after
-    // router.push updates it client-side, so this stays correct even when
-    // called again before the previous navigation has fully resolved.
+    // (before the first navigation lands and refreshes `params`) would each
+    // build off the same stale snapshot and clobber each other.
     const current = parseExperimentSearchParams(Object.fromEntries(searchParams.entries()));
     // Any filter change restarts pagination (a stale cursor from a different
     // filter set could skip or duplicate rows).
     router.push(`/experiments?${buildQueryString({ ...current, ...patch })}`);
   }
 
-  function toggleSort(key: ExperimentSortKey) {
-    if (params.sort === key || (!params.sort && key === "date")) {
-      navigate({ sort: key, dir: params.dir === "asc" ? "desc" : "asc" });
-    } else {
-      navigate({ sort: key, dir: key === "name" || key === "id" ? "asc" : "desc" });
-    }
+  // Sort is URL-backed list state (T1.6), same as a saved view: a real
+  // hyperlink, not router.push. Next.js 16 client navigations can sit behind
+  // an in-viewport prefetch queue (vercel/next.js#93210) and never commit the
+  // address bar; a document request always does. The <th> still owns aria-sort.
+  function sortHref(key: ExperimentSortKey): string {
+    const current = parseExperimentSearchParams(Object.fromEntries(searchParams.entries()));
+    const isActive = params.sort === key || (!params.sort && key === "date");
+    const dir: "asc" | "desc" = isActive
+      ? params.dir === "asc"
+        ? "desc"
+        : "asc"
+      : key === "name" || key === "id"
+        ? "asc"
+        : "desc";
+    return `/experiments?${buildQueryString({ ...current, sort: key, dir })}`;
+  }
+
+  // Primary activation must not go through the Next client router. Modifier
+  // clicks (new tab, etc.) keep the native href.
+  function followAsDocument(e: MouseEvent<HTMLAnchorElement>) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    window.location.assign(e.currentTarget.href);
   }
 
   const sortKey = params.sort ?? "date";
@@ -252,31 +266,31 @@ export function ExperimentsTable({
             <thead>
               <tr>
                 <th className="col-id" aria-sort={ariaSort("id")}>
-                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("id")}>
+                  <a href={sortHref("id")} className="th-sort-btn" onClick={followAsDocument}>
                     ID {arrow("id")}
-                  </button>
+                  </a>
                 </th>
                 <th className="col-name" aria-sort={ariaSort("name")}>
-                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("name")}>
+                  <a href={sortHref("name")} className="th-sort-btn" onClick={followAsDocument}>
                     Name {arrow("name")}
-                  </button>
+                  </a>
                 </th>
                 <th className="col-date" aria-sort={ariaSort("date")}>
-                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("date")}>
+                  <a href={sortHref("date")} className="th-sort-btn" onClick={followAsDocument}>
                     Date {arrow("date")}
-                  </button>
+                  </a>
                 </th>
                 <th className="col-status">Status</th>
                 <th className="col-proj">Project</th>
                 <th className="col-ph" aria-sort={ariaSort("ph")}>
-                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("ph")}>
+                  <a href={sortHref("ph")} className="th-sort-btn" onClick={followAsDocument}>
                     pH {arrow("ph")}
-                  </button>
+                  </a>
                 </th>
                 <th className="col-cyc" aria-sort={ariaSort("cycles")}>
-                  <button type="button" className="th-sort-btn" onClick={() => toggleSort("cycles")}>
+                  <a href={sortHref("cycles")} className="th-sort-btn" onClick={followAsDocument}>
                     Cyc {arrow("cycles")}
-                  </button>
+                  </a>
                 </th>
                 <th className="col-comp">Compounds</th>
                 <th className="col-meth">Methods</th>
@@ -327,7 +341,7 @@ export function ExperimentsTable({
                   <p style={{ margin: "6px 0 12px" }}>
                     Every record you log shows up here, searchable by compound, pH, method or m/z.
                   </p>
-                  <Link href="/new" className="btn btn-sm">
+                  <Link href="/new" prefetch={false} className="btn btn-sm">
                     Log your first experiment
                   </Link>
                 </>
