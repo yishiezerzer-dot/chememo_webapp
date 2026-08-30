@@ -36,6 +36,33 @@ describe("useStickyState", () => {
     expect(result.current[0]).toBe("in_progress");
   });
 
+  it("holds a patched LIST when the server re-sends the same rows in a new array", () => {
+    // The regression this exists to prevent (CI run 33297353128): every server
+    // re-render produces a fresh array, so comparing by reference discarded the
+    // patch on any refresh at all and the appended row vanished again.
+    const rowA = { id: "a" };
+    const { result, rerender } = renderHook(({ server }: { server: { id: string }[] }) => useStickyState(server), {
+      initialProps: { server: [rowA] },
+    });
+
+    act(() => result.current[1]((cur) => [...cur, { id: "b" }]));
+    expect(result.current[0].map((r) => r.id)).toEqual(["a", "b"]);
+
+    // Same rows, different array identity — must NOT be treated as a change.
+    rerender({ server: [{ id: "a" }] });
+    expect(result.current[0].map((r) => r.id)).toEqual(["a", "b"]);
+  });
+
+  it("adopts a LIST the server has genuinely changed", () => {
+    const { result, rerender } = renderHook(({ server }: { server: { id: string }[] }) => useStickyState(server), {
+      initialProps: { server: [{ id: "a" }] },
+    });
+
+    act(() => result.current[1]((cur) => [...cur, { id: "b" }]));
+    rerender({ server: [{ id: "a" }, { id: "b" }, { id: "c" }] });
+    expect(result.current[0].map((r) => r.id)).toEqual(["a", "b", "c"]);
+  });
+
   it("gives way the moment the server sends something genuinely new", () => {
     // The reconciliation rule, and the reason this differs from the version it
     // was adapted from: the server is the record, so once it moves it wins.

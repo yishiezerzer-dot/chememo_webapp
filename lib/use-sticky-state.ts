@@ -32,13 +32,34 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 // Patch from the action's OWN returned row, never from a value assembled on
 // the client. That keeps this a display of the outcome rather than a guess at
 // it, which is the line that makes the pattern acceptable here at all.
+// "Has the server actually moved?" cannot be answered by reference identity.
+// A server re-render hands back a brand-new array or object every time, even
+// when every row in it is identical, so `!==` reports a change on any refresh
+// whatsoever. That threw the local patch away the instant anything re-rendered
+// and broke the relationships panel on CI run 33297353128 -- the row was
+// appended and then immediately dropped again.
+//
+// Structural comparison is the honest test, and these payloads are plain
+// serialisable rows a few dozen long, so the cost is nil next to a round trip.
+function sameServerValue<T>(a: T, b: T): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    // A cycle or a BigInt: fall back to "treat as changed", which is the safe
+    // direction -- the server wins and nothing can be shown contradicting it.
+    return false;
+  }
+}
+
 export function useStickyState<T>(serverValue: T): [T, Dispatch<SetStateAction<T>>] {
   // The last value the server sent, so "the server moved" can be told apart
-  // from "React re-rendered us with the same props".
+  // from "React re-rendered us with the same data".
   const [lastServerValue, setLastServerValue] = useState(serverValue);
   const [value, setValue] = useState(serverValue);
 
-  if (serverValue !== lastServerValue) {
+  if (!sameServerValue(serverValue, lastServerValue)) {
     setLastServerValue(serverValue);
     setValue(serverValue);
   }
