@@ -200,7 +200,6 @@ export function ExperimentForm(props: Props) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBanner({ fields: local.fields as Partial<ExperimentInput>, rawNote: local.rawNote, savedAt: new Date(localTime).toISOString() });
     } else if (recoveredDraft && Object.keys(recoveredDraft.fields).length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBanner({ fields: recoveredDraft.fields, rawNote: recoveredDraft.raw_note, savedAt: recoveredDraft.updated_at });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

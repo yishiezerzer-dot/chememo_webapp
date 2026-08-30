@@ -16,6 +16,29 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "12mb",
     },
   },
+
+  // Defence-in-depth headers — the one genuinely actionable finding in the
+  // 2026-08-26 QA audit (DEF-SEC-01). None of these change behaviour for a
+  // signed-in user; they close off MIME sniffing, clickjacking and referrer
+  // leakage to third parties.
+  //
+  // HSTS is deliberately NOT set here. Railway terminates TLS in front of the
+  // app, so that header belongs at the edge; emitting it from Next would also
+  // apply it to any non-HTTPS origin (a local `next start`), where it is wrong
+  // and, once a browser has cached it, awkward to take back.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

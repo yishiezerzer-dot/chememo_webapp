@@ -20,7 +20,6 @@ const ready = !!URL && !!ANON_KEY && !!SERVICE_ROLE_KEY;
 describe.skipIf(!ready)("analytical run model (local Supabase)", () => {
   let admin: SupabaseClient;
   let memberClient: SupabaseClient;
-  let outsiderClient: SupabaseClient;
   let memberId: string;
   let outsiderId: string;
   let workspaceId: string;
@@ -47,7 +46,6 @@ describe.skipIf(!ready)("analytical run model (local Supabase)", () => {
     memberClient = member.client;
     const outsider = await newUser("ana-outsider");
     outsiderId = outsider.id;
-    outsiderClient = outsider.client;
 
     workspaceId = await createTestWorkspace(admin, [{ id: memberId }]);
     otherWorkspaceId = await createTestWorkspace(admin, [{ id: outsiderId }]);
@@ -110,7 +108,11 @@ describe.skipIf(!ready)("analytical run model (local Supabase)", () => {
     expect(peak!.workspace_id).toBe(workspaceId);
   });
 
-  it("a non-member cannot read another workspace's instruments or runs", async () => {
+  // Scoped to instruments deliberately: asserting the same for runs needs a
+// full experiment -> batch -> sample chain in the other workspace, which is
+// not built here. Named for what it actually asserts -- an over-promising
+// test name is how the purity bug survived 162 green tests (2026-08-19).
+  it("a non-member cannot read another workspace's instruments", async () => {
     const { data: instrument } = await admin
       .from("instruments")
       .insert({ name: "Outsider-only instrument", workspace_id: otherWorkspaceId })

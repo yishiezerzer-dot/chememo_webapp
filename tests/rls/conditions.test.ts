@@ -18,7 +18,6 @@ const ready = !!URL && !!ANON_KEY && !!SERVICE_ROLE_KEY;
 describe.skipIf(!ready)("condition programs & controls (local Supabase)", () => {
   let admin: SupabaseClient;
   let memberClient: SupabaseClient;
-  let outsiderClient: SupabaseClient;
   let memberId: string;
   let outsiderId: string;
   let workspaceId: string;
@@ -45,7 +44,6 @@ describe.skipIf(!ready)("condition programs & controls (local Supabase)", () => 
     memberClient = member.client;
     const outsider = await newUser("cond-outsider");
     outsiderId = outsider.id;
-    outsiderClient = outsider.client;
 
     workspaceId = await createTestWorkspace(admin, [{ id: memberId }]);
     otherWorkspaceId = await createTestWorkspace(admin, [{ id: outsiderId }]);
