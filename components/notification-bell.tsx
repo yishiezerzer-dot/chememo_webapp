@@ -4,7 +4,7 @@ import Link from "next/link";
 // real-time push, just reflects the count at the last page load/navigation.
 export function NotificationBell({ count }: { count: number }) {
   return (
-    <Link href="/notifications" className="btn btn-ghost btn-sm" style={{ position: "relative" }} aria-label="Notifications">
+    <Link href="/notifications" prefetch={false} className="btn btn-ghost btn-sm" style={{ position: "relative" }} aria-label="Notifications">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
         <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
         <path d="M13.73 21a2 2 0 0 1-3.46 0" />

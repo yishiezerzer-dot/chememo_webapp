@@ -62,10 +62,10 @@ export function WorkspaceSwitcher({ memberships, activeId }: { memberships: Work
               {m.name} <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>{m.role}</span>
             </button>
           ))}
-          <Link href="/workspaces/new" className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "flex-start", marginTop: 4 }}>
+          <Link href="/workspaces/new" prefetch={false} className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "flex-start", marginTop: 4 }}>
             + New workspace
           </Link>
-          <Link href="/workspaces/members" className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "flex-start" }}>
+          <Link href="/workspaces/members" prefetch={false} className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "flex-start" }}>
             Manage members
           </Link>
         </div>
