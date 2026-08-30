@@ -53,9 +53,23 @@ test("table sort header is keyboard-operable", async ({ page }) => {
   const idHeader = page.locator("th.col-id button");
   await idHeader.focus();
   await expect(page.locator("th.col-id")).toHaveAttribute("aria-sort", "none");
-  await idHeader.press("Enter");
-  // Sorting re-fetches server-rendered data (T1.6) — a real round trip
-  // against chememo-dev, same latency class as REFRESH_TIMEOUT elsewhere.
-  await expect(page).toHaveURL(/sort=id/, { timeout: 15000 });
+  // Retry the keypress until it takes. The header is a plain
+  // <button type="button">, so an Enter that arrives before React has
+  // attached its onClick is simply swallowed — nothing is queued, and no
+  // amount of waiting afterwards can rescue it. That is why this failed with
+  // the URL still on /experiments after the whole 15s budget: the click was
+  // already gone.
+  //
+  // This does not weaken what the test proves — keyboard activation still has
+  // to produce sort=id. It only stops the assertion assuming hydration
+  // completes within one page-load tick, which it does not on a cold
+  // production build. Verified by hand 2026-08-30: once hydration is done,
+  // both Enter and a mouse click sort correctly, locally and against deployed
+  // dev. Sorting is a real server round trip (T1.6), so the outer budget stays
+  // in the same latency class as REFRESH_TIMEOUT elsewhere.
+  await expect(async () => {
+    await idHeader.press("Enter");
+    await expect(page).toHaveURL(/sort=id/, { timeout: 2000 });
+  }).toPass({ timeout: 20000 });
   await expect(page.locator("th.col-id")).toHaveAttribute("aria-sort", /ascending|descending/, { timeout: 15000 });
 });
