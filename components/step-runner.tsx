@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { ActionResult, Quantity, QuantityKind } from "@/lib/types";
 import type { StepDetail, DeviationInput } from "@/lib/experiment-steps/service";
 
@@ -132,6 +133,7 @@ function StepCard({
   updateStatus,
   recordObservation,
   recordDeviation,
+  onStepPatched,
 }: {
   detail: StepDetail;
   quantityKinds: QuantityKind[];
@@ -143,6 +145,7 @@ function StepCard({
   ) => Promise<ActionResult>;
   recordObservation: (stepId: string, note: string) => Promise<ActionResult>;
   recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
+  onStepPatched: (stepId: string, patch: (detail: StepDetail) => StepDetail) => void;
 }) {
   const { step, protocolStep, observations, deviations } = detail;
   const { run, pending } = useRunAction();
@@ -213,7 +216,15 @@ function StepCard({
           className="btn btn-ghost btn-sm"
           disabled={pending}
           aria-busy={pending}
-          onClick={() => run(() => updateStatus(step.id, "in_progress", { ph, quantities, atmosphere: atmosphere || null }))}
+          onClick={() =>
+            run(async () => {
+              const res = await updateStatus(step.id, "in_progress", { ph, quantities, atmosphere: atmosphere || null });
+              if (res.ok) {
+                onStepPatched(step.id, (d) => ({ ...d, step: { ...d.step, status: "in_progress" } }));
+              }
+              return res;
+            })
+          }
         >
           {pending && <Spinner />}
           Start
@@ -223,7 +234,15 @@ function StepCard({
           className="btn btn-sm"
           disabled={pending}
           aria-busy={pending}
-          onClick={() => run(() => updateStatus(step.id, "completed", { ph, quantities, atmosphere: atmosphere || null }))}
+          onClick={() =>
+            run(async () => {
+              const res = await updateStatus(step.id, "completed", { ph, quantities, atmosphere: atmosphere || null });
+              if (res.ok) {
+                onStepPatched(step.id, (d) => ({ ...d, step: { ...d.step, status: "completed" } }));
+              }
+              return res;
+            })
+          }
         >
           {pending && <Spinner />}
           Complete
@@ -251,7 +270,23 @@ function StepCard({
             if (!note) return;
             run(async () => {
               const res = await recordObservation(step.id, note);
-              if (res.ok && noteRef.current) noteRef.current.value = "";
+              if (res.ok) {
+                if (noteRef.current) noteRef.current.value = "";
+                onStepPatched(step.id, (d) => ({
+                  ...d,
+                  observations: [
+                    ...d.observations,
+                    {
+                      id: `local-obs-${Date.now()}`,
+                      experiment_step_id: step.id,
+                      note,
+                      observed_at: new Date().toISOString(),
+                      observed_by: null,
+                      workspace_id: null,
+                    },
+                  ],
+                }));
+              }
               return res;
             });
           }}
@@ -272,7 +307,37 @@ function StepCard({
       )}
       <DeviationForm
         deviationCategories={deviationCategories}
-        onSubmit={(input) => run(() => recordDeviation(step.id, input))}
+        onSubmit={(input) =>
+          run(async () => {
+            const res = await recordDeviation(step.id, input);
+            if (res.ok) {
+              onStepPatched(step.id, (d) => ({
+                ...d,
+                deviations: [
+                  ...d.deviations,
+                  {
+                    id: `local-dev-${Date.now()}`,
+                    experiment_step_id: step.id,
+                    category: input.category,
+                    what_happened: input.what_happened,
+                    how_discovered: input.how_discovered,
+                    likely_impact: input.likely_impact,
+                    sample_still_usable: input.sample_still_usable,
+                    corrective_action: input.corrective_action,
+                    preventive_action: input.preventive_action,
+                    affected_samples: input.affected_samples,
+                    decision_owner: null,
+                    linked_replacement_sample: null,
+                    reported_at: new Date().toISOString(),
+                    reported_by: null,
+                    workspace_id: null,
+                  },
+                ],
+              }));
+            }
+            return res;
+          })
+        }
       />
     </div>
   );
@@ -290,7 +355,7 @@ export function StepRunner({
   steps: StepDetail[];
   quantityKinds: QuantityKind[];
   deviationCategories: string[];
-  instantiate?: () => Promise<ActionResult>;
+  instantiate?: () => Promise<ActionResult<StepDetail[]>>;
   updateStatus: (
     stepId: string,
     status: string,
@@ -300,8 +365,13 @@ export function StepRunner({
   recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
 }) {
   const { run, pending } = useRunAction();
+  const [localSteps, setLocalSteps] = useStickyState(steps);
 
-  if (steps.length === 0) {
+  function patchStep(stepId: string, patch: (detail: StepDetail) => StepDetail) {
+    setLocalSteps((cur) => cur.map((d) => (d.step.id === stepId ? patch(d) : d)));
+  }
+
+  if (localSteps.length === 0) {
     if (!instantiate) return null;
     return (
       <button
@@ -309,7 +379,13 @@ export function StepRunner({
         className="btn btn-sm"
         disabled={pending}
         aria-busy={pending}
-        onClick={() => run(instantiate)}
+        onClick={() =>
+          run(async () => {
+            const res = await instantiate();
+            if (res.ok && res.data) setLocalSteps(res.data);
+            return res;
+          })
+        }
       >
         {pending && <Spinner />}
         Instantiate steps
@@ -319,7 +395,7 @@ export function StepRunner({
 
   return (
     <div>
-      {steps.map((detail) => (
+      {localSteps.map((detail) => (
         <StepCard
           key={detail.step.id}
           detail={detail}
@@ -328,6 +404,7 @@ export function StepRunner({
           updateStatus={updateStatus}
           recordObservation={recordObservation}
           recordDeviation={recordDeviation}
+          onStepPatched={patchStep}
         />
       ))}
     </div>

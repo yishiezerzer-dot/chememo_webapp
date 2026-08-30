@@ -55,7 +55,7 @@ export async function createComment(
   targetType: CommentTargetType,
   targetId: string,
   body: string
-): Promise<Comment> {
+): Promise<CommentView> {
   const trimmed = body.trim();
   if (!trimmed) throw new AppError("validation", "A comment needs some text.");
 
@@ -66,7 +66,8 @@ export async function createComment(
     .single();
   if (error) throw new AppError("conflict", "Could not post the comment.", { cause: error });
 
-  const { data: profiles } = await supabase.from("profiles").select("id, full_name");
+  const { data: profiles } = await supabase.from("profiles").select("id, full_name, initials");
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name || p.initials || "Someone"]));
   const mentioned = (profiles ?? []).filter((p) => p.full_name && trimmed.includes(`@${p.full_name}`));
   if (mentioned.length > 0) {
     await supabase
@@ -77,7 +78,11 @@ export async function createComment(
       .insert(mentioned.map((p) => ({ user_id: p.id, kind: "mention", comment_id: comment.id })));
   }
 
-  return comment as Comment;
+  return {
+    ...(comment as Comment),
+    authorName: nameById.get(userId) ?? "Someone",
+    mentionedNames: mentioned.map((p) => p.full_name || "Someone"),
+  };
 }
 
 export async function resolveComment(supabase: Supabase, commentId: string, userId: string): Promise<void> {

@@ -15,9 +15,17 @@ import type { ActionResult } from "@/lib/types";
 //
 // The catch below turns that into a toast on the button that was clicked.
 // Behaviour is otherwise identical to the copies it replaces: pendingKey for
-// per-button spinners (2026-08-17's convention), router.refresh() on success
-// because revalidatePath only marks the route stale, then the optional
-// `after` callback.
+// per-button spinners (2026-08-17's convention), then the optional `after`
+// callback, then router.refresh(). `after` runs first so a panel can patch
+// its own state from the action result before the refresh is dispatched.
+//
+// Refresh is eventual consistency, not the display path. Next.js 16 eagerly
+// re-prefetches every in-viewport Link on refresh (vercel/next.js#93210);
+// under CI that stampede can leave the current-page RSC payload uncommitted
+// for the whole toBeVisible budget even though the write and the server
+// render both succeeded. Mutating panels therefore apply the action result
+// locally (see useStickyState) and keep showing it if the tree never catches
+// up.
 //
 // `pending` is plain state rather than useTransition deliberately. Every copy
 // of this helper ran `start(async () => { await action(); router.refresh() })`
@@ -29,6 +37,9 @@ import type { ActionResult } from "@/lib/types";
 // write succeeded. It is a race, invisible on a fast machine and near-certain
 // on a slow one -- CI has failed on it continuously since 2026-08-03, every
 // failure being "clicked, wrote to the database, UI never updated".
+//
+// Do not await router.refresh(). If the client router never commits, that
+// promise may not resolve, and the button would stay disabled for good.
 export function useRunAction() {
   const [pending, setPending] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -46,8 +57,8 @@ export function useRunAction() {
         showToast(res.error ?? "Something went wrong.", "error");
         return;
       }
-      router.refresh();
       after?.();
+      router.refresh();
     } catch (e) {
       // A server action that redirects on success (createExperiment,
       // createDraftExperimentFromPlan, deleteExperiment, createWorkspace)

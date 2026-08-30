@@ -1,0 +1,181 @@
+{
+  "summary": {
+    "total": 35,
+    "passed": 29,
+    "failed": 5,
+    "blocked": 1,
+    "notTested": 0
+  },
+  "defects": [],
+  "axeFindings": {
+    "Dashboard": {
+      "violationsCount": 0,
+      "violations": []
+    },
+    "Experiments List": {
+      "violationsCount": 0,
+      "violations": []
+    },
+    "Plan Page": {
+      "violationsCount": 0,
+      "violations": []
+    },
+    "Materials Page": {
+      "violationsCount": 0,
+      "violations": []
+    },
+    "Instruments Page": {
+      "violationsCount": 0,
+      "violations": []
+    },
+    "Health Page": {
+      "violationsCount": 0,
+      "violations": []
+    },
+    "Ask AI Page": {
+      "violationsCount": 0,
+      "violations": []
+    }
+  },
+  "viewports": {
+    "dashboard_360x800": {
+      "hasHScroll": false
+    },
+    "dashboard_390x844": {
+      "hasHScroll": false
+    },
+    "dashboard_768x1024": {
+      "hasHScroll": false
+    },
+    "dashboard_1366x768": {
+      "hasHScroll": false
+    },
+    "dashboard_1920x1080": {
+      "hasHScroll": false
+    }
+  },
+  "performance": {
+    "Experiments List": {
+      "durationMs": 945,
+      "status": 200
+    },
+    "Experiments Compare": {
+      "durationMs": 939,
+      "status": 200
+    },
+    "Experiments Map": {
+      "durationMs": 938,
+      "status": 200
+    },
+    "Experiments Matrix": {
+      "durationMs": 946,
+      "status": 200
+    },
+    "Materials": {
+      "durationMs": 943,
+      "status": 200
+    },
+    "Instruments": {
+      "durationMs": 946,
+      "status": 200
+    },
+    "Condition Programs": {
+      "durationMs": 946,
+      "status": 200
+    },
+    "Templates": {
+      "durationMs": 948,
+      "status": 200
+    },
+    "Protocols": {
+      "durationMs": 941,
+      "status": 200
+    },
+    "Series": {
+      "durationMs": 940,
+      "status": 200
+    },
+    "Health Page": {
+      "durationMs": 1015,
+      "status": 200
+    },
+    "Ask AI": {
+      "durationMs": 939,
+      "status": 200
+    },
+    "Notifications": {
+      "durationMs": 950,
+      "status": 200
+    }
+  },
+  "security": {
+    "health": {
+      "status": 200,
+      "json": {
+        "status": "degraded",
+        "timestamp": "2026-08-26T08:46:35.277Z",
+        "db": {
+          "ok": true
+        },
+        "indexJobs": {
+          "pending": 0,
+          "failed": 0
+        },
+        "evidenceChunks": {
+          "pending": 0,
+          "failed": 0
+        },
+        "ai": {
+          "recentSampleSize": 0,
+          "recentErrorRate": 0,
+          "windowHours": 24
+        },
+        "embeddings": {
+          "activeModel": "text-embedding-3-small",
+          "staleChunks": 33
+        }
+      },
+      "headers": {
+        "connection": "keep-alive",
+        "content-type": "application/json",
+        "date": "Wed, 26 Aug 2026 08:46:35 GMT",
+        "server": "railway-hikari",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-hikari-trace": "ams1.cycp",
+        "x-railway-edge": "ams1",
+        "x-railway-request-id": "ySl0kgivQkCxPKen2prcFg"
+      }
+    },
+    "loginHeaders": {
+      "cache-control": "s-maxage=31536000",
+      "content-encoding": "gzip",
+      "content-type": "text/html; charset=utf-8",
+      "date": "Wed, 26 Aug 2026 08:46:40 GMT",
+      "etag": "\"4xfsvbjd4i9bu\"",
+      "server": "railway-hikari",
+      "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+      "x-hikari-trace": "ams1.9qww",
+      "x-nextjs-cache": "HIT",
+      "x-nextjs-prerender": "1\n1",
+      "x-nextjs-stale-time": "300",
+      "x-powered-by": "Next.js",
+      "x-railway-edge": "ams1",
+      "x-railway-request-id": "dsvwETE_TZKjaa5U9o6EoQ"
+    }
+  },
+  "journeys": {},
+  "consoleErrors": [
+    {
+      "url": "https://chememowebapp-dev.up.railway.app/login",
+      "text": "Failed to load resource: the server responded with a status of 400 ()"
+    }
+  ],
+  "networkErrors": [
+    {
+      "url": "https://khkpqnpmhravdpbogqai.supabase.co/auth/v1/token?grant_type=password",
+      "status": 400,
+      "page": "https://chememowebapp-dev.up.railway.app/login"
+    }
+  ]
+}

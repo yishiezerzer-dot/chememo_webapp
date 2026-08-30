@@ -8,20 +8,21 @@ import { listQuantityKinds } from "@/lib/quantities/service";
 import { validateQuantityUnits, validateDeviationCategory } from "@/lib/schemas";
 import { toActionResult } from "@/lib/errors";
 import type { ActionResult, Quantity } from "@/lib/types";
-import type { DeviationInput } from "@/lib/experiment-steps/service";
+import type { DeviationInput, StepDetail } from "@/lib/experiment-steps/service";
 
 export async function instantiateStepsAction(
   experimentId: string,
   protocolVersionId: string
-): Promise<ActionResult> {
+): Promise<ActionResult<StepDetail[]>> {
   const { supabase } = await requireUser();
   try {
     await stepsService.instantiateSteps(supabase, experimentId, protocolVersionId);
   } catch (e) {
     return toActionResult("instantiateStepsAction", e);
   }
+  const details = await stepsService.listStepDetails(experimentId);
   revalidatePath(`/experiments/${experimentId}`);
-  return { ok: true };
+  return { ok: true, data: details };
 }
 
 // Called directly by StepRunner (never a raw <form action> submit — actual

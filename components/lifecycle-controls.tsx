@@ -1,6 +1,7 @@
 "use client";
 
 import { Spinner } from "@/components/spinner";
+import { useExperimentView } from "@/components/experiment-view";
 import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult, ExperimentStatus } from "@/lib/types";
 
@@ -35,7 +36,6 @@ const NEXT_MOVES: Record<ExperimentStatus, { label: string; next: ExperimentStat
 };
 
 export function LifecycleControls({
-  status,
   hasConclusion,
   hasAcceptanceCriteria = true,
   unresolvedOpenCount = 0,
@@ -43,7 +43,6 @@ export function LifecycleControls({
   completeAction,
   reviewAction,
 }: {
-  status: ExperimentStatus | null;
   hasConclusion: boolean;
   // Defaults to true so a caller that hasn't been updated keeps today's
   // behaviour (the trigger still refuses), rather than silently disabling
@@ -59,6 +58,7 @@ export function LifecycleControls({
   reviewAction: () => Promise<ActionResult>;
 }) {
   const { run, pending } = useRunAction();
+  const { status, patch } = useExperimentView();
 
   // A legacy null-status row is classified through the Edit page's first
   // save, not here (§19.4 — name the gap rather than guessing a state).
@@ -94,7 +94,7 @@ export function LifecycleControls({
                   ? "Write the acceptance criteria before starting — what result would count as success (standard section 8.6). Add them from Edit."
                   : undefined
             }
-            onClick={() => run(() => setStatusAction(m.next))}
+            onClick={() => run(() => setStatusAction(m.next), undefined, () => patch({ status: m.next }))}
           >
             {pending && <Spinner />}
             {m.label}
@@ -108,7 +108,7 @@ export function LifecycleControls({
           disabled={pending}
           aria-busy={pending}
           title={hasConclusion ? undefined : "A conclusion is required to complete (standard §15.2)."}
-          onClick={() => run(completeAction)}
+          onClick={() => run(completeAction, undefined, () => patch({ status: "completed" }))}
         >
           {pending && <Spinner />}
           Complete
@@ -120,7 +120,7 @@ export function LifecycleControls({
           className="btn btn-ghost btn-sm"
           disabled={pending}
           aria-busy={pending}
-          onClick={() => run(reviewAction)}
+          onClick={() => run(reviewAction, undefined, () => patch({ status: "reviewed" }))}
         >
           {pending && <Spinner />}
           Mark reviewed

@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type { ActionResult } from "@/lib/types";
 import type { CommentView } from "@/lib/comments/service";
 
@@ -17,16 +18,17 @@ export function CommentThread({
   reopenComment,
 }: {
   comments: CommentView[];
-  createComment: (body: string) => Promise<ActionResult>;
+  createComment: (body: string) => Promise<ActionResult<CommentView>>;
   resolveComment: (commentId: string) => Promise<ActionResult>;
   reopenComment: (commentId: string) => Promise<ActionResult>;
 }) {
   const { run, pending, pendingKey } = useRunAction();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const [items, setItems] = useStickyState(comments);
 
   return (
     <div>
-      {comments.map((c) => (
+      {items.map((c) => (
         <div key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border, #2a2a2a22)" }}>
           <div style={{ fontSize: 12.5 }}>
             <b>{c.authorName}</b>{" "}
@@ -63,7 +65,10 @@ export function CommentThread({
             if (!body) return;
             run(async () => {
               const res = await createComment(body);
-              if (res.ok && bodyRef.current) bodyRef.current.value = "";
+              if (res.ok) {
+                if (res.data) setItems((cur) => [...cur, res.data as CommentView]);
+                if (bodyRef.current) bodyRef.current.value = "";
+              }
               return res;
             }, "post");
           }}
