@@ -28,7 +28,7 @@ export default async function ExperimentsPage({
             All experiments
           </h3>
         </div>
-        <Link href="/new" prefetch={false} className="btn btn-primary btn-sm">
+        <Link href="/new" className="btn btn-primary btn-sm">
           + New experiment
         </Link>
       </div>
