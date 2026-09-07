@@ -46,3 +46,6 @@ next-env.d.ts
 # QA run artefacts (screenshots/video). The report itself lives in docs/.
 qa-evidence/
 QA_REPORT.md
+
+# local Claude Code settings (may hold API keys)
+.claude/settings.local.json

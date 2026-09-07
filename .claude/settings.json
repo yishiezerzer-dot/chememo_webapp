@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$(git status --porcelain -- app components lib supabase tests middleware.ts next.config.ts instrumentation.ts 2>/dev/null)\" ] && echo \"{\\\"systemMessage\\\":\\\"Obsidian vault sync pending — code changed this session. Log it to Plans/ChemMemo_Implementation_Plan.md and update ChemMemo.md frontmatter (skill: obsidian-vault-sync).\\\"}\" || echo \"{\\\"suppressOutput\\\":true}\"",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "grep -qiE '\"file_path\"[[:space:]]*:[[:space:]]*\"[^\"]*lib[\\/]+database\\.types\\.ts\"' && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"lib/database.types.ts is generated from the linked Supabase project. Hand-editing it causes the schema drift it exists to prevent. Run `npm run types:gen` instead.\"}}' || echo '{\"suppressOutput\":true}'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "grep -qiE '\"file_path\"[[:space:]]*:[[:space:]]*\"[^\"]*supabase[\\/]+migrations[\\/]+[^\"]*\\.sql\"' && echo '{\"systemMessage\":\"Migration touched — run `npm run types:gen` before relying on lib/database.types.ts. Skipping it turns a renamed column into silent drift instead of a type error.\"}' || echo '{\"suppressOutput\":true}'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "claude-code-setup@claude-plugins-official": true
+  }
+}
