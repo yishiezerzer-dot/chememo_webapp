@@ -27,6 +27,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@21st-dev/cli": "^1.17.0",
     "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4",
