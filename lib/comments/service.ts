@@ -66,7 +66,26 @@ export async function createComment(
     .single();
   if (error) throw new AppError("conflict", "Could not post the comment.", { cause: error });
 
-  const { data: profiles } = await supabase.from("profiles").select("id, full_name, initials");
+  // Scoped to this comment's own workspace. `profiles_read` is `using (true)`
+  // (20260702120000:142) — every profile in the instance is readable — so
+  // matching "@Full Name" against all of them meant a member of one workspace
+  // could mention someone from another lab entirely: that person got a
+  // notification row, and a comment_mentions row, for a comment `comments_read`
+  // will not let them open. The body never leaked, but their existence, the
+  // timing, and the fact that a given workspace is active did.
+  //
+  // workspace_id is set on the comment by trg_workspace_comments during the
+  // insert above, so it is available here and is the authoritative scope.
+  // A comment with no workspace cannot establish who counts as a colleague, so
+  // it mentions nobody. The trigger always sets it, so this is a guard against
+  // a state that should not arise rather than a supported path.
+  const { data: members } = comment.workspace_id
+    ? await supabase.from("workspace_members").select("user_id").eq("workspace_id", comment.workspace_id)
+    : { data: [] as { user_id: string }[] };
+  const memberIds = (members ?? []).map((m) => m.user_id);
+  const { data: profiles } = memberIds.length
+    ? await supabase.from("profiles").select("id, full_name, initials").in("id", memberIds)
+    : { data: [] as { id: string; full_name: string | null; initials: string | null }[] };
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name || p.initials || "Someone"]));
   const mentioned = (profiles ?? []).filter((p) => p.full_name && trimmed.includes(`@${p.full_name}`));
   if (mentioned.length > 0) {

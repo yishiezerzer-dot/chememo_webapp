@@ -167,6 +167,71 @@ describe.skipIf(!ready)("comments, tasks, notifications (local Supabase)", () =>
     expect(editWhileResolvedErr).toBeNull();
   });
 
+  // 20260908130000 — a soft-deleted experiment disappears for everyone but its
+  // owner (experiments_read), but its steps and files did not, and since
+  // 2026-09-07 both are comment targets whose bodies get embedded into
+  // evidence_chunks and become RAG-retrievable workspace-wide.
+  it("files and steps of a soft-deleted experiment are hidden from everyone but the owner", async () => {
+    const expId = await newExperiment();
+    const { data: file } = await admin
+      .from("experiment_files")
+      .insert({ experiment_id: expId, kind: "link", url: "https://example.org/x", label: "A file", workspace_id: workspaceId })
+      .select()
+      .single();
+
+    // Visible to both while the experiment is live.
+    const { data: beforeA } = await userAClient.from("experiment_files").select("id").eq("id", file!.id).maybeSingle();
+    const { data: beforeB } = await userBClient.from("experiment_files").select("id").eq("id", file!.id).maybeSingle();
+    expect(beforeA?.id).toBe(file!.id);
+    expect(beforeB?.id).toBe(file!.id);
+
+    // userA owns it and soft-deletes it (only drafts may be soft-deleted --
+    // lifecycle clause a2 -- and newExperiment creates drafts).
+    const { error: delErr } = await userAClient
+      .from("experiments")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", expId);
+    expect(delErr).toBeNull();
+
+    // The owner keeps seeing it, which is what makes restore work.
+    const { data: afterA } = await userAClient.from("experiment_files").select("id").eq("id", file!.id).maybeSingle();
+    expect(afterA?.id).toBe(file!.id);
+
+    // Everyone else loses it, and so loses the comment target with it.
+    const { data: afterB } = await userBClient.from("experiment_files").select("id").eq("id", file!.id).maybeSingle();
+    expect(afterB).toBeNull();
+
+    const { error: commentErr } = await userBClient
+      .from("comments")
+      .insert({ target_type: "experiment_file", target_id: file!.id, body: "on a deleted record", created_by: userBId });
+    expect(commentErr).not.toBeNull();
+  });
+
+  // 20260908130000 — set_workspace_from_comment_id only derived the workspace
+  // when the client left it null, and the insert policy then trusted whatever
+  // was supplied.
+  it("comment_mentions cannot be labelled with a workspace the client chose", async () => {
+    const expId = await newExperiment();
+    const { data: comment } = await userAClient
+      .from("comments")
+      .insert({ target_type: "experiment", target_id: expId, body: "Mention test", created_by: userAId })
+      .select()
+      .single();
+
+    const otherWorkspaceId = await createTestWorkspace(admin, [{ id: userAId }]);
+    await userAClient
+      .from("comment_mentions")
+      .insert({ comment_id: comment!.id, mentioned_user_id: userBId, workspace_id: otherWorkspaceId });
+
+    // Whatever the client asked for, the row is derived from its parent comment.
+    const { data: mention } = await admin
+      .from("comment_mentions")
+      .select("workspace_id")
+      .eq("comment_id", comment!.id)
+      .maybeSingle();
+    if (mention) expect(mention.workspace_id).toBe(workspaceId);
+  });
+
   it("tasks: lab-shared read, owner-only insert, any authenticated user can update status", async () => {
     const expId = await newExperiment();
 
