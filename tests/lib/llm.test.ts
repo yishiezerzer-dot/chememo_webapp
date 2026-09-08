@@ -238,21 +238,23 @@ describe("extractExperimentFields (zod validation regression)", () => {
     expect(fields!.methods).toEqual(["NMR"]);
   });
 
-  it("extracts scientific_question/hypothesis/rationale/conclusion when the notes state them", async () => {
+  it("keeps the conclusion, and drops planning prose the model still volunteers", async () => {
+    // The planning-narrative columns are gone. A model that has seen an older
+    // prompt (or simply free-associates) may still return them, and they must
+    // fall on the floor at the schema rather than reaching a caller that would
+    // then try to write a column that does not exist.
     mockGeminiText(
       JSON.stringify({
         name: "Test",
         scientific_question: "Does Zn2+ change oligomer yield?",
         hypothesis: "Zn2+ increases yield relative to no metal.",
-        rationale: "Zn2+ is a known Lewis-acid catalyst.",
-        conclusion: "Results are consistent with the hypothesis.",
+        conclusion: "Results are consistent with the earlier run.",
       })
     );
     const fields = await extractExperimentFields("notes with a stated hypothesis and conclusion");
-    expect(fields!.scientific_question).toBe("Does Zn2+ change oligomer yield?");
-    expect(fields!.hypothesis).toBe("Zn2+ increases yield relative to no metal.");
-    expect(fields!.rationale).toBe("Zn2+ is a known Lewis-acid catalyst.");
-    expect(fields!.conclusion).toBe("Results are consistent with the hypothesis.");
+    expect(fields!.conclusion).toBe("Results are consistent with the earlier run.");
+    expect(Object.keys(fields!)).not.toContain("scientific_question");
+    expect(Object.keys(fields!)).not.toContain("hypothesis");
   });
 });
 
@@ -351,13 +353,13 @@ describe("suggestExperimentFields (AI Field Suggestions)", () => {
   it("filters out a suggestion for a field outside the requested targetFields, even if the model proposes one anyway", async () => {
     mockGeminiText(
       JSON.stringify([
-        { field: "hypothesis", suggestedValue: "Zn2+ templates the depsipeptide.", rationale: "Stated in observations." },
+        { field: "notes", suggestedValue: "Zn2+ templates the depsipeptide.", rationale: "Stated in observations." },
         { field: "conclusion", suggestedValue: "Confirmed by m/z 297.", rationale: "Stated in observations." },
       ])
     );
-    const result = await suggestExperimentFields(record("EXP-1", "Test"), ["hypothesis"]);
+    const result = await suggestExperimentFields(record("EXP-1", "Test"), ["notes"]);
     expect(result).not.toBeNull();
-    expect(result!.map((s) => s.field)).toEqual(["hypothesis"]);
+    expect(result!.map((s) => s.field)).toEqual(["notes"]);
   });
 
   it("drops a malformed entry (invalid field name) rather than returning a partially-trusted array", async () => {

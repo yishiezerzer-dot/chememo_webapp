@@ -238,28 +238,16 @@ export type ExperimentInput = {
   mz: number[];
   observations: string | null;
   notes: string | null;
-  scientific_question: string | null;
-  rationale: string | null;
-  hypothesis: string | null;
-  primary_outcome: string | null;
-  secondary_outcomes: string | null;
-  data_analysis_plan: string | null;
-  risks_failure_modes: string | null;
   conclusion: string | null;
-  next_steps: string | null;
   acceptance_criteria: string | null;
   planned_start_at: string | null;
   planned_end_at: string | null;
-  independent_variables: string | null;
-  controlled_variables: string | null;
   sample_matrix: SampleMatrixRow[];
   controls: ControlItem[];
   // T1.5 D4 — protocol_version (free text, pre-T1.5) is absent here for the
   // same reason concentration/temperature are: it's legacy/display-only now,
   // read straight from Experiment, never written again by a form save.
   protocol_version_id: string | null;
-  planned_analyses: string | null;
-  sample_storage_plan: string | null;
   // T1.4 D1/D4 — new structured values only; the legacy temperature/
   // concentration text columns above are untouched, display-only for
   // pre-T1.4 records.
@@ -274,12 +262,10 @@ export type ExperimentInput = {
 export const EXPERIMENT_INPUT_KEYS: (keyof ExperimentInput)[] = [
   "name", "date", "researcher", "project", "reaction_type",
   "compounds", "metals", "ph", "cycles", "methods", "mz",
-  "observations", "notes", "scientific_question", "rationale", "hypothesis",
-  "primary_outcome", "secondary_outcomes", "data_analysis_plan", "risks_failure_modes",
-  "conclusion", "next_steps", "acceptance_criteria",
-  "planned_start_at", "planned_end_at", "independent_variables", "controlled_variables",
-  "sample_matrix", "controls", "protocol_version_id", "planned_analyses",
-  "sample_storage_plan", "quantities",
+  "observations", "notes",
+  "conclusion", "acceptance_criteria",
+  "planned_start_at", "planned_end_at",
+  "sample_matrix", "controls", "protocol_version_id", "quantities",
 ];
 
 // T1.8 D6 — build an ExperimentInput-shaped restore patch from a revision's

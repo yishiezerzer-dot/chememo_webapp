@@ -1835,45 +1835,33 @@ export type Database = {
           compounds: string[] | null
           concentration: string | null
           conclusion: string | null
-          controlled_variables: string | null
           controls: Json
           created_at: string | null
           cycles: number | null
-          data_analysis_plan: string | null
           date: string | null
           deleted_at: string | null
-          hypothesis: string | null
           id: string
-          independent_variables: string | null
           locked_at: string | null
           metals: string[] | null
           methods: string[] | null
           mz: number[] | null
           name: string
-          next_steps: string | null
           notes: string | null
           observations: string | null
           owner_id: string | null
           ph: number | null
-          planned_analyses: string | null
           planned_end_at: string | null
           planned_start_at: string | null
-          primary_outcome: string | null
           project: string | null
           protocol_version: string | null
           protocol_version_id: string | null
           quantities: Json
-          rationale: string | null
           reaction_type: string | null
           researcher: string | null
           reviewed_at: string | null
           reviewed_by: string | null
-          risks_failure_modes: string | null
           sample_matrix: Json
-          sample_storage_plan: string | null
-          scientific_question: string | null
           search_vector: unknown
-          secondary_outcomes: string | null
           short_code: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["experiment_status"] | null
@@ -1891,45 +1879,33 @@ export type Database = {
           compounds?: string[] | null
           concentration?: string | null
           conclusion?: string | null
-          controlled_variables?: string | null
           controls?: Json
           created_at?: string | null
           cycles?: number | null
-          data_analysis_plan?: string | null
           date?: string | null
           deleted_at?: string | null
-          hypothesis?: string | null
           id: string
-          independent_variables?: string | null
           locked_at?: string | null
           metals?: string[] | null
           methods?: string[] | null
           mz?: number[] | null
           name: string
-          next_steps?: string | null
           notes?: string | null
           observations?: string | null
           owner_id?: string | null
           ph?: number | null
-          planned_analyses?: string | null
           planned_end_at?: string | null
           planned_start_at?: string | null
-          primary_outcome?: string | null
           project?: string | null
           protocol_version?: string | null
           protocol_version_id?: string | null
           quantities?: Json
-          rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          risks_failure_modes?: string | null
           sample_matrix?: Json
-          sample_storage_plan?: string | null
-          scientific_question?: string | null
           search_vector?: unknown
-          secondary_outcomes?: string | null
           short_code?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["experiment_status"] | null
@@ -1947,45 +1923,33 @@ export type Database = {
           compounds?: string[] | null
           concentration?: string | null
           conclusion?: string | null
-          controlled_variables?: string | null
           controls?: Json
           created_at?: string | null
           cycles?: number | null
-          data_analysis_plan?: string | null
           date?: string | null
           deleted_at?: string | null
-          hypothesis?: string | null
           id?: string
-          independent_variables?: string | null
           locked_at?: string | null
           metals?: string[] | null
           methods?: string[] | null
           mz?: number[] | null
           name?: string
-          next_steps?: string | null
           notes?: string | null
           observations?: string | null
           owner_id?: string | null
           ph?: number | null
-          planned_analyses?: string | null
           planned_end_at?: string | null
           planned_start_at?: string | null
-          primary_outcome?: string | null
           project?: string | null
           protocol_version?: string | null
           protocol_version_id?: string | null
           quantities?: Json
-          rationale?: string | null
           reaction_type?: string | null
           researcher?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          risks_failure_modes?: string | null
           sample_matrix?: Json
-          sample_storage_plan?: string | null
-          scientific_question?: string | null
           search_vector?: unknown
-          secondary_outcomes?: string | null
           short_code?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["experiment_status"] | null

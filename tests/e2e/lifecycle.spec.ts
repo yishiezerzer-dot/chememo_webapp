@@ -1,18 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { signIn } from "./helpers";
 
-// T1.1 — full lifecycle journey: create -> plan -> start (criteria lock) ->
-// complete (conclusion required) -> edit blocked -> reopen -> edit succeeds.
-// The new Planning/Conclusions textareas have no associated <label> (same
-// reason as experiment.spec.ts), so they're located by `name` attribute.
+// T1.1 — full lifecycle journey: create -> start (criteria asked and locked)
+// -> complete (conclusion asked) -> edit blocked -> reopen -> edit succeeds.
+//
+// Both gates are now questions asked at the moment they matter rather than
+// fields buried in the Edit form, so this walks the prompts.
 test("experiment lifecycle: start, complete, and reopen", async ({ page }) => {
   await signIn(page);
 
   await page.goto("/new/blank");
   const name = `E2E lifecycle test ${Date.now()}`;
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(name);
-  await page.locator('textarea[name="scientific_question"]').fill("Does Zn accelerate condensation?");
-  await page.locator('textarea[name="acceptance_criteria"]').fill("Yield increases by at least 10%.");
   await page.getByRole("button", { name: "Save experiment" }).click();
 
   await page.waitForURL(/\/experiments\/EXP-\d+/);
@@ -20,25 +19,22 @@ test("experiment lifecycle: start, complete, and reopen", async ({ page }) => {
   await expect(page.getByText(name)).toBeVisible();
   await expect(page.getByText("Draft", { exact: true })).toBeVisible();
 
-  // Start — acceptance criteria are already filled, so the trigger locks them.
-  // Generous timeouts below: each step is a real round trip to the dev
-  // Supabase project (not a local/mocked DB), and router.refresh() after a
-  // lifecycle action re-fetches the current route rather than updating
-  // client state directly, both add latency beyond Playwright's default.
+  // Start asks the question rather than refusing the click. Generous timeouts
+  // below: each step is a real round trip to the dev Supabase project (not a
+  // local/mocked DB), and router.refresh() after a lifecycle action re-fetches
+  // the current route, both adding latency beyond Playwright's default.
   await page.getByRole("button", { name: "Start" }).click();
+  await page
+    .getByLabel("How will you know this worked?")
+    .fill("Yield increases by at least 10%.");
+  await page.getByRole("button", { name: "Start" }).last().click();
   await expect(page.getByText("In progress")).toBeVisible({ timeout: 15000 });
 
-  // Completing without a conclusion is rejected by the trigger (§15.2).
+  // Complete asks for the conclusion in place, instead of sending the user to
+  // the Edit form to satisfy §15.2 by trial and error.
   await page.getByRole("button", { name: "Complete" }).click();
-  await expect(page.getByText(/conclusion is required/i)).toBeVisible({ timeout: 15000 });
-
-  // Add the conclusion, then complete.
-  await page.goto(`/experiments/${id}/edit`);
-  await page.locator('textarea[name="conclusion"]').fill("Yield increased by 14%, hypothesis supported.");
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await page.waitForURL(new RegExp(`/experiments/${id}$`));
-
-  await page.getByRole("button", { name: "Complete" }).click();
+  await page.getByLabel("What did you find?").fill("Yield increased by 14%.");
+  await page.getByRole("button", { name: "Complete" }).last().click();
   await expect(page.getByText("Completed", { exact: true })).toBeVisible({ timeout: 15000 });
 
   // Edit is blocked on a locked record — the form isn't rendered at all.

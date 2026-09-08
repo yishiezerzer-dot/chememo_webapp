@@ -76,15 +76,7 @@ export const experimentInputSchema = z.object({
 
   // T1.1 §8.1 narrative sections (C2) and §8.6 acceptance criteria. Status
   // itself is never in this schema (D10) — it moves only through lifecycle-actions.ts.
-  scientific_question: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  rationale: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  hypothesis: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  primary_outcome: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  secondary_outcomes: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  data_analysis_plan: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  risks_failure_modes: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   conclusion: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  next_steps: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   acceptance_criteria: z.string().trim().max(4000, "Too long (max 4000 characters).").nullable(),
   planned_start_at: z
     .string()
@@ -97,13 +89,9 @@ export const experimentInputSchema = z.object({
 
   // T1.2 §8.1 sections deferred by T1.1's C2. Structured units aren't built
   // yet (T1.4), so every field here is free text (T1.2 D1).
-  independent_variables: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  controlled_variables: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   // T1.5 D4 — protocol_version (free text) is superseded by a real FK;
   // legacy/display-only now, same reasoning as concentration/temperature (T1.4 D4).
   protocol_version_id: z.string().trim().min(1).nullable(),
-  planned_analyses: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
-  sample_storage_plan: z.string().trim().max(20000, "Too long (max 20000 characters).").nullable(),
   // §8.2's 19-column sample matrix (T1.2 D2). sample_type/reaction_mode/status
   // are meant to hold controlled_vocabularies values, but that allow-list is
   // runtime data fetched per-request, not something a static schema object

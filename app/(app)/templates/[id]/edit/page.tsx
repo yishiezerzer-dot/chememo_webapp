@@ -51,10 +51,10 @@ export default async function EditTemplatePage({
           form={FORM_ID}
           name="required_fields"
           defaultValue={(latest?.required_fields ?? []).join(", ")}
-          placeholder="scientific_question, hypothesis, sample_matrix"
+          placeholder="researcher, sample_matrix, controls"
         />
         <p className="sec-sub" style={{ margin: "6px 0 0" }}>
-          Field names match the experiment form&apos;s own fields (e.g. <code>scientific_question</code>,{" "}
+          Field names match the experiment form&apos;s own fields (e.g. <code>researcher</code>,{" "}
           <code>sample_matrix</code>, <code>reaction_type</code>). Left blank in the created experiment,
           these block saving until filled.
         </p>

@@ -1,6 +1,6 @@
 import "server-only";
 import type { createClient } from "@/lib/supabase/server";
-import type { PersistedUnresolvedItem, Recommendation } from "./types";
+import type { PersistedUnresolvedItem, Recommendation } from "./unresolved";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 

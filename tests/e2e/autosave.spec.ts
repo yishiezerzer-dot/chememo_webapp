@@ -12,8 +12,8 @@ test("autosave persists a draft and restoring repopulates the form", async ({ pa
   await signIn(page);
   await page.goto("/new/blank");
 
-  const hypothesisText = `E2E autosave draft ${Date.now()}`;
-  await page.locator('textarea[name="hypothesis"]').fill(hypothesisText);
+  const notesText = `E2E autosave draft ${Date.now()}`;
+  await page.locator('textarea[name="notes"]').fill(notesText);
 
   // Past the debounce window so the server-side draft save has landed.
   await page.waitForTimeout(3500);
@@ -21,7 +21,7 @@ test("autosave persists a draft and restoring repopulates the form", async ({ pa
 
   await expect(page.getByText(/Recover an unsaved draft/i)).toBeVisible({ timeout: 15000 });
   await page.getByRole("button", { name: "Restore" }).click();
-  await expect(page.locator('textarea[name="hypothesis"]')).toHaveValue(hypothesisText);
+  await expect(page.locator('textarea[name="notes"]')).toHaveValue(notesText);
 
   // Restoring fires the draft-discard server call without awaiting it
   // (experiment-form.tsx) — give it a moment to actually land before

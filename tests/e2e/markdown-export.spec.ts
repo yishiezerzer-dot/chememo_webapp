@@ -10,7 +10,7 @@ test("export experiment as Markdown", async ({ page }) => {
   const name = `E2E export ${Date.now()}`;
   await page.goto("/new/blank");
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(name);
-  await page.locator("textarea[name=scientific_question]").fill("Does the export round-trip real data?");
+  await page.locator("textarea[name=observations]").fill("Does the export round-trip real data?");
   await page.getByRole("button", { name: "Save experiment" }).click();
   await page.waitForURL(/\/experiments\/EXP-\d+/);
   const id = page.url().match(/EXP-\d+/)![0];

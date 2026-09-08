@@ -53,17 +53,7 @@ export function buildExperimentMarkdown(input: ExperimentExportInput): string {
     lines.push(`## ${heading}`, "", body, "");
   };
 
-  section("Scientific question", e.scientific_question);
-  section("Rationale", e.rationale);
-  section("Hypothesis", e.hypothesis);
-  section("Primary outcome", e.primary_outcome);
-  section("Secondary outcomes", e.secondary_outcomes);
 
-  if (e.independent_variables || e.controlled_variables) {
-    lines.push("## Variables", "");
-    if (e.independent_variables) lines.push("### Independent variables", "", e.independent_variables, "");
-    if (e.controlled_variables) lines.push("### Controlled variables", "", e.controlled_variables, "");
-  }
 
   const kindByKey = new Map(input.quantityKinds.map((k) => [k.key, k]));
   const quantityEntries = Object.entries(e.quantities);
@@ -122,7 +112,6 @@ export function buildExperimentMarkdown(input: ExperimentExportInput): string {
     lines.push("## Protocol", "", `- Protocol: [[${input.protocolVersionLabel}]]`, "");
   }
 
-  section("Data-analysis plan", e.planned_analyses);
 
   if (e.acceptance_criteria) {
     lines.push("## Acceptance criteria", "", e.acceptance_criteria);
@@ -130,8 +119,6 @@ export function buildExperimentMarkdown(input: ExperimentExportInput): string {
     lines.push("");
   }
 
-  section("Risks and likely failure modes", e.risks_failure_modes);
-  section("Planned sample storage", e.sample_storage_plan);
 
   if (input.tasks.length > 0) {
     lines.push("## Task assignment", "", "| Task | Person | Due | Status | Dependency |", "|---|---|---|---|---|");
@@ -167,7 +154,6 @@ export function buildExperimentMarkdown(input: ExperimentExportInput): string {
   }
 
   section("Conclusions", e.conclusion);
-  section("Follow-up experiments", e.next_steps);
 
   if (input.relationships.length > 0) {
     lines.push("## Relationships", "");
@@ -196,6 +182,17 @@ export function buildExperimentMarkdown(input: ExperimentExportInput): string {
   lines.push(
     "> [!info] Not yet tracked in ChemMemo (Tier 2/3 work)",
     "> Batches, Materials and stocks, Calculation record, Replicate strategy, Measured variables, Interpretation, Limitations, Sample locations, Analyses.",
+    ""
+  );
+
+  // D4 again: sections that USED to be exported and no longer exist are named
+  // rather than quietly disappearing from the document. Someone comparing an
+  // old export with a new one must be able to see that the difference is a
+  // decision, not data loss.
+  lines.push(
+    "> [!warning] No longer captured by ChemMemo",
+    "> Scientific question, Rationale, Hypothesis, Primary and secondary outcomes, Data-analysis plan, Risks and likely failure modes, Independent and controlled variables, Planned analyses, Planned sample storage, Follow-up experiments.",
+    "> These planning-narrative sections (standard §8.1) were removed in favour of the execution log (§10). Acceptance criteria and the conclusion are still recorded.",
     ""
   );
 

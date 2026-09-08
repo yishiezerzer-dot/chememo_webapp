@@ -57,7 +57,7 @@ import {
   resolveAiSuggestionAction,
 } from "./ai-suggestions-actions";
 import { suggestNextExperiment } from "./suggestion-actions";
-import { getCrewProvenance } from "@/lib/ai/crew/provenance";
+import { getCrewProvenance } from "@/lib/ai/provenance";
 import { getPendingAiSuggestions } from "@/lib/ai/suggestions";
 import { isLlmEnabled } from "@/lib/llm";
 import { DeleteExperimentButton } from "@/components/delete-experiment-button";
@@ -460,31 +460,25 @@ export default async function ExperimentDetailPage({
             <CommentsSection experimentId={e.id} />
           </Suspense>
 
-          {(e.scientific_question || e.conclusion) && (
+          {/* What the experiment set out to prove, and what it found. Two
+              fields now, not four -- and both are the lifecycle gates rather
+              than free-form planning prose. */}
+          {(e.acceptance_criteria || e.conclusion) && (
             <div className="obs-box glass">
-              <h4>Planning &amp; conclusions</h4>
-              {e.scientific_question && (
+              <h4>Criteria &amp; conclusion</h4>
+              {e.acceptance_criteria && (
                 <>
-                  <h4 style={{ marginTop: 0, fontSize: 12.5, color: "var(--ink-mute)" }}>Scientific question</h4>
-                  <p>{e.scientific_question}</p>
-                </>
-              )}
-              {e.hypothesis && (
-                <>
-                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>Hypothesis</h4>
-                  <p>{e.hypothesis}</p>
+                  <h4 style={{ marginTop: 0, fontSize: 12.5, color: "var(--ink-mute)" }}>
+                    How we would know it worked
+                    {e.acceptance_criteria_locked_at ? " (locked at start)" : ""}
+                  </h4>
+                  <p>{e.acceptance_criteria}</p>
                 </>
               )}
               {e.conclusion && (
                 <>
-                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>Conclusion</h4>
+                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>What we found</h4>
                   <p>{e.conclusion}</p>
-                </>
-              )}
-              {e.next_steps && (
-                <>
-                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>Next steps</h4>
-                  <p>{e.next_steps}</p>
                 </>
               )}
             </div>

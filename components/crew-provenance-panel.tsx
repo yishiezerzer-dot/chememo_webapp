@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
 import type { ActionResult } from "@/lib/types";
-import type { CrewProvenance } from "@/lib/ai/crew/provenance";
+import type { CrewProvenance } from "@/lib/ai/provenance";
 import type { AiSuggestion } from "@/lib/ai/suggestions";
 
 // Mirrors lib/llm.ts's AI_SUGGESTIBLE_FIELDS (D8) — duplicated here, not
@@ -13,9 +13,7 @@ import type { AiSuggestion } from "@/lib/ai/suggestions";
 // Keep both lists in sync by hand, same convention as the migration's own
 // CHECK constraint copy.
 const AI_SUGGESTIBLE_FIELDS = new Set([
-  "scientific_question", "hypothesis", "rationale", "primary_outcome",
-  "secondary_outcomes", "data_analysis_plan", "risks_failure_modes",
-  "conclusion", "next_steps", "observations",
+  "acceptance_criteria", "conclusion", "observations", "notes",
 ]);
 
 // T3.8 — shown only when a provenance row exists (a hand-authored experiment

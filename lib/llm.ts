@@ -829,9 +829,6 @@ const extractedFieldsSchema = z.object({
   mz: z.array(z.number().finite()).optional().catch(undefined),
   observations: z.string().trim().min(1).optional().catch(undefined),
   notes: z.string().trim().min(1).optional().catch(undefined),
-  scientific_question: z.string().trim().min(1).optional().catch(undefined),
-  hypothesis: z.string().trim().min(1).optional().catch(undefined),
-  rationale: z.string().trim().min(1).optional().catch(undefined),
   conclusion: z.string().trim().min(1).optional().catch(undefined),
 });
 
@@ -882,27 +879,26 @@ Fields:
   if (d.mz) out.mz = d.mz;
   if (d.observations) out.observations = d.observations;
   if (d.notes) out.notes = d.notes;
-  if (d.scientific_question) out.scientific_question = d.scientific_question;
-  if (d.hypothesis) out.hypothesis = d.hypothesis;
-  if (d.rationale) out.rationale = d.rationale;
   if (d.conclusion) out.conclusion = d.conclusion;
   return out;
 }
 
 // AI Field Suggestions — see ChemMemo_Feature_AIFieldSuggestions_Spec.md.
-// D8: narrative fields only, exactly matching the CHECK constraint on
+// The allowlist was ten planning-narrative fields until those columns were
+// dropped; what survives is the record's own writing. Still exactly matching
+// the CHECK constraint on
 // experiment_ai_suggestions.field (migration 20260825120000) — keep both
 // lists in sync by hand if this ever changes.
 export const AI_SUGGESTIBLE_FIELDS = [
-  "scientific_question", "hypothesis", "rationale", "primary_outcome",
-  "secondary_outcomes", "data_analysis_plan", "risks_failure_modes",
-  "conclusion", "next_steps", "observations",
+  "acceptance_criteria", "conclusion", "observations", "notes",
 ] as const;
 export type SuggestibleField = (typeof AI_SUGGESTIBLE_FIELDS)[number];
 
 const fieldSuggestionSchema = z.object({
   field: z.enum(AI_SUGGESTIBLE_FIELDS),
   suggestedValue: z.string().trim().min(1),
+  // The suggestion's own justification, not the dropped `rationale` column
+  // that happened to share its name.
   rationale: z.string().trim().min(1),
 });
 export type FieldSuggestion = z.infer<typeof fieldSuggestionSchema>;
@@ -930,7 +926,7 @@ Rules:
 - Never invent a value the record's own content doesn't support. If you're not confident, omit that field entirely — do not guess.
 - Only propose a value for a field currently marked (empty). Never propose replacing a field that already has content.
 - Respond with ONLY a JSON array, one object per field you're proposing:
-[{"field": string, "suggestedValue": string, "rationale": string}]
+[{"field": string, "suggestedValue": string: string}]
 "rationale" must point to what in the record supports the suggestion (e.g. "the observations describe...").
 An empty array [] is a valid, expected response when nothing can be confidently proposed.`;
 

@@ -18,32 +18,16 @@ const GROUPS = [
     fields: ["compounds", "metals", "ph", "quantities", "cycles"] as const,
   },
   { key: "analysis", label: "Analysis methods", fields: ["methods", "mz"] as const },
-  {
-    key: "planning",
-    label: "Planning narrative",
-    fields: [
-      "scientific_question",
-      "rationale",
-      "hypothesis",
-      "primary_outcome",
-      "secondary_outcomes",
-      "data_analysis_plan",
-      "risks_failure_modes",
-      "acceptance_criteria",
-    ] as const,
-  },
+  // The planning-narrative group is gone with its columns; acceptance criteria
+  // are deliberately NOT clonable on their own -- §8.6 wants them written for
+  // the experiment in front of you, and copying last month's goalpost onto a
+  // new record is exactly the habit the lock exists to prevent.
   { key: "sample_matrix", label: "Sample matrix", fields: ["sample_matrix"] as const },
   { key: "controls", label: "Controls", fields: ["controls"] as const },
   {
     key: "protocol",
-    label: "Protocol & analyses",
-    fields: [
-      "protocol_version_id",
-      "planned_analyses",
-      "sample_storage_plan",
-      "independent_variables",
-      "controlled_variables",
-    ] as const,
+    label: "Protocol",
+    fields: ["protocol_version_id"] as const,
   },
 ];
 

@@ -16,7 +16,7 @@ import {
   type ComparisonTableSuggestion,
   type SuggestibleField,
 } from "@/lib/llm";
-import { getCrewProvenance } from "@/lib/ai/crew/provenance";
+import { getCrewProvenance } from "@/lib/ai/provenance";
 import { retrieveRecords } from "@/lib/rag";
 import { embeddingModel, EMBEDDING_DIM, isEmbeddingEnabled } from "@/lib/embeddings";
 import { AppError } from "@/lib/errors";
@@ -271,7 +271,10 @@ export async function suggestNextExperimentForRecord(
     // See the narrowing note in lib/types.ts for why this cast is safe.
     const anchorExperiment = anchor as Experiment;
     const topicQuery =
-      [anchorExperiment.scientific_question, anchorExperiment.observations, anchorExperiment.conclusion]
+      // Was scientific_question + observations + conclusion; the first is gone,
+      // and the log is a far better description of what an experiment is about
+      // than a planning sentence written before it ran. Falls back to the name.
+      [anchorExperiment.observations, anchorExperiment.conclusion]
         .filter(Boolean)
         .join(" ")
         .slice(0, 200) || anchorExperiment.name;

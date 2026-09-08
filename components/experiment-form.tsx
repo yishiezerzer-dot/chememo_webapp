@@ -332,43 +332,8 @@ function ExperimentFormBody({
           <p className="sec-sub">
             The §8.1 pre-registration — write this before the bench work starts.
           </p>
-          <div className="field">
-            <label>Scientific question</label>
-            <textarea name="scientific_question" rows={2} defaultValue={initial?.scientific_question ?? ""} />
-            <FieldError message={fieldErrors?.scientific_question} />
-          </div>
-          <div className="field">
-            <label>Rationale</label>
-            <textarea name="rationale" rows={2} defaultValue={initial?.rationale ?? ""} />
-            <FieldError message={fieldErrors?.rationale} />
-          </div>
-          <div className="field">
-            <label>Hypothesis</label>
-            <textarea name="hypothesis" rows={2} defaultValue={initial?.hypothesis ?? ""} />
-            <FieldError message={fieldErrors?.hypothesis} />
-          </div>
-          <div className="field">
-            <label>Primary outcome</label>
-            <textarea name="primary_outcome" rows={2} defaultValue={initial?.primary_outcome ?? ""} />
-            <FieldError message={fieldErrors?.primary_outcome} />
-          </div>
-          <div className="field">
-            <label>Secondary outcomes</label>
-            <textarea name="secondary_outcomes" rows={2} defaultValue={initial?.secondary_outcomes ?? ""} />
-            <FieldError message={fieldErrors?.secondary_outcomes} />
-          </div>
-          <div className="grid-2">
-            <div className="field">
-              <label>Independent variables</label>
-              <textarea name="independent_variables" rows={2} defaultValue={initial?.independent_variables ?? ""} />
-              <FieldError message={fieldErrors?.independent_variables} />
-            </div>
-            <div className="field">
-              <label>Controlled variables</label>
-              <textarea name="controlled_variables" rows={2} defaultValue={initial?.controlled_variables ?? ""} />
-              <FieldError message={fieldErrors?.controlled_variables} />
-            </div>
-          </div>
+                                                            <div className="grid-2">
+                                  </div>
           <div className="field">
             <label>Sample matrix</label>
             <SampleMatrixEditor
@@ -400,12 +365,7 @@ function ExperimentFormBody({
             )}
             <FieldError message={fieldErrors?.protocol_version_id} />
           </div>
-          <div className="field">
-            <label>Planned analyses</label>
-            <textarea name="planned_analyses" rows={2} defaultValue={initial?.planned_analyses ?? ""} />
-            <FieldError message={fieldErrors?.planned_analyses} />
-          </div>
-          <div className="grid-2">
+                    <div className="grid-2">
             <div className="field">
               <label>Planned start</label>
               <input
@@ -425,22 +385,7 @@ function ExperimentFormBody({
               <FieldError message={fieldErrors?.planned_end_at} />
             </div>
           </div>
-          <div className="field">
-            <label>Data-analysis plan</label>
-            <textarea name="data_analysis_plan" rows={2} defaultValue={initial?.data_analysis_plan ?? ""} />
-            <FieldError message={fieldErrors?.data_analysis_plan} />
-          </div>
-          <div className="field">
-            <label>Risks and likely failure modes</label>
-            <textarea name="risks_failure_modes" rows={2} defaultValue={initial?.risks_failure_modes ?? ""} />
-            <FieldError message={fieldErrors?.risks_failure_modes} />
-          </div>
-          <div className="field">
-            <label>Sample-storage plan</label>
-            <textarea name="sample_storage_plan" rows={2} defaultValue={initial?.sample_storage_plan ?? ""} />
-            <FieldError message={fieldErrors?.sample_storage_plan} />
-          </div>
-          <div className="field">
+                                        <div className="field">
             <label>Acceptance criteria</label>
             {criteriaLocked ? (
               <>
@@ -608,12 +553,7 @@ function ExperimentFormBody({
             <textarea name="conclusion" rows={3} defaultValue={initial?.conclusion ?? ""} />
             <FieldError message={fieldErrors?.conclusion} />
           </div>
-          <div className="field">
-            <label>Next steps</label>
-            <textarea name="next_steps" rows={2} defaultValue={initial?.next_steps ?? ""} />
-            <FieldError message={fieldErrors?.next_steps} />
-          </div>
-        </section>
+                  </section>
       </div>
 
       <aside className="form-aside">

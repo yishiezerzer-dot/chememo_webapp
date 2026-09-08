@@ -34,7 +34,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const { runAgentStep } = await import("@/lib/ai/crew/agent-runner");
+const { runAgentStep } = await import("@/lib/ai/agent-runner");
 
 const schema = z.object({ value: z.string() });
 

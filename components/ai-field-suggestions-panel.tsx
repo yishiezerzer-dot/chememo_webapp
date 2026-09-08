@@ -6,16 +6,10 @@ import type { ActionResult } from "@/lib/types";
 import type { AiSuggestion } from "@/lib/ai/suggestions";
 
 const FIELD_LABELS: Record<string, string> = {
-  scientific_question: "Scientific question",
-  hypothesis: "Hypothesis",
-  rationale: "Rationale",
-  primary_outcome: "Primary outcome",
-  secondary_outcomes: "Secondary outcomes",
-  data_analysis_plan: "Data-analysis plan",
-  risks_failure_modes: "Risks and failure modes",
-  conclusion: "Conclusion",
-  next_steps: "Next steps",
+  acceptance_criteria: "How we would know it worked",
+  conclusion: "What we found",
   observations: "Observations",
+  notes: "Notes",
 };
 
 // AI Field Suggestions (Feature 1) — see ChemMemo_Feature_AIFieldSuggestions_Spec.md.

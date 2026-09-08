@@ -13,8 +13,8 @@ test("template with a required field blocks instantiation until filled", async (
   await page.getByRole("button", { name: "Create and add defaults" }).click();
   await page.waitForURL(/\/templates\/.+\/edit/);
 
-  await page.locator('input[name="required_fields"]').fill("hypothesis");
-  await page.locator('textarea[name="hypothesis"]').fill("Zn accelerates condensation.");
+  await page.locator('input[name="required_fields"]').fill("notes");
+  await page.locator('textarea[name="notes"]').fill("Zn accelerates condensation.");
   await page.getByRole("button", { name: "Save template version" }).click();
   await page.waitForURL(/\/templates$/);
 
@@ -23,14 +23,14 @@ test("template with a required field blocks instantiation until filled", async (
   await page.waitForURL(/\/new\/template\/.+/);
 
   // The template's default is prefilled; clear it to exercise the gate.
-  await expect(page.locator('textarea[name="hypothesis"]')).toHaveValue("Zn accelerates condensation.");
-  await page.locator('textarea[name="hypothesis"]').fill("");
+  await expect(page.locator('textarea[name="notes"]')).toHaveValue("Zn accelerates condensation.");
+  await page.locator('textarea[name="notes"]').fill("");
   const expName = `E2E from template ${Date.now()}`;
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(expName);
   await page.getByRole("button", { name: "Save experiment" }).click();
   await expect(page.getByText(/required by this template/i).first()).toBeVisible({ timeout: 15000 });
 
-  await page.locator('textarea[name="hypothesis"]').fill("Zn accelerates condensation, refilled.");
+  await page.locator('textarea[name="notes"]').fill("Zn accelerates condensation, refilled.");
   await page.getByRole("button", { name: "Save experiment" }).click();
   await page.waitForURL(/\/experiments\/EXP-\d+/);
   await expect(page.getByText(expName)).toBeVisible();
@@ -47,7 +47,7 @@ test("clone copies only the sections left checked", async ({ page }) => {
   const sourceName = `E2E clone source ${Date.now()}`;
   await page.goto("/new/blank");
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(sourceName);
-  await page.locator('textarea[name="hypothesis"]').fill("Source hypothesis, should not clone.");
+  await page.locator('textarea[name="notes"]').fill("Source hypothesis, should not clone.");
   await page.getByRole("button", { name: "Save experiment" }).click();
   await page.waitForURL(/\/experiments\/EXP-\d+/);
   const sourceId = page.url().match(/EXP-\d+/)![0];
@@ -60,7 +60,7 @@ test("clone copies only the sections left checked", async ({ page }) => {
 
   const nameInput = page.getByPlaceholder("His + TGA + Zn — wet–dry cycling");
   await expect(nameInput).toHaveValue("");
-  await expect(page.locator('textarea[name="hypothesis"]')).toHaveValue("");
+  await expect(page.locator('textarea[name="notes"]')).toHaveValue("");
 
   const cloneName = `E2E clone result ${Date.now()}`;
   await nameInput.fill(cloneName);
