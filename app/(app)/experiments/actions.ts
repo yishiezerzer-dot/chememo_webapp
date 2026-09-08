@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requireUser, requireWorkspace } from "@/lib/authorization/policies";
 import { searchAllExperiments } from "@/lib/experiments/search";
 import { listProjects } from "@/lib/projects/service";
+import * as experimentsService from "@/lib/experiments/service";
 import * as savedViewsService from "@/lib/saved-views/service";
+import { mapCsvToInputs } from "@/lib/experiments/import";
 import { toActionResult } from "@/lib/errors";
 import type { ActionResult, ExperimentSearchParams, SavedView } from "@/lib/types";
+import type { RowError } from "@/lib/experiments/import";
 
 // Quote a CSV cell only when it contains a comma, quote, or newline.
 function csvCell(v: unknown): string {
@@ -39,6 +42,58 @@ export async function exportExperimentsCsvAction(params: ExperimentSearchParams)
       .join(",")
   );
   return [headers.join(","), ...lines].join("\r\n");
+}
+
+export type ImportReport = {
+  /** New EXP-### ids, in file order. Empty when nothing was written. */
+  created: string[];
+  rowErrors: RowError[];
+  /** ID-column values in the file, which imports never honour (see mapCsvToInputs). */
+  ignoredIds: string[];
+};
+
+// T4.1 — the import half of the export above.
+//
+// All-or-nothing on validation: if any row is bad, nothing is written and
+// every row's problem comes back at once. Half-importing a spreadsheet into a
+// lab notebook and leaving the scientist to work out which rows landed is the
+// worse failure by a distance, and the fix — edit the file, import again —
+// only works if the file is still the whole truth.
+//
+// Rows are written one at a time on purpose: each insert draws from the
+// atomic next_experiment_id() sequence and enqueues its own embedding job, and
+// a serial loop is what makes "N of M were created" honest if the run dies
+// partway. Every record lands as a draft (createExperiment stamps status
+// 'draft'), so a partial import is recoverable by soft-deleting the drafts.
+export async function importExperimentsCsvAction(csvText: string): Promise<ActionResult<ImportReport>> {
+  const { supabase, user, workspaceId } = await requireWorkspace();
+
+  const projects = await listProjects();
+  const projectIdByLabel = Object.fromEntries(projects.map((p) => [p.label.toLowerCase(), p.id]));
+
+  const mapped = mapCsvToInputs(csvText, projectIdByLabel);
+  if (!mapped.ok) return { ok: false, error: mapped.error };
+
+  const { inputs, rowErrors, ignoredIds } = mapped.mapped;
+  if (rowErrors.length > 0) return { ok: true, data: { created: [], rowErrors, ignoredIds } };
+  if (inputs.length === 0) return { ok: false, error: "That file has a header row but no data rows." };
+
+  const created: string[] = [];
+  try {
+    for (const input of inputs) {
+      created.push(await experimentsService.createExperiment(supabase, user.id, workspaceId, input));
+    }
+  } catch (e) {
+    const failure = toActionResult("importExperimentsCsvAction", e);
+    revalidatePath("/experiments");
+    return {
+      ...failure,
+      error: `${created.length} of ${inputs.length} rows were imported before this failed; they are drafts you can delete. ${failure.error}`,
+    };
+  }
+
+  revalidatePath("/experiments");
+  return { ok: true, data: { created, rowErrors, ignoredIds } };
 }
 
 export async function listViewsAction(): Promise<SavedView[]> {

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
 import { StatusBadge, STATUS_LABEL } from "@/components/status-badge";
-import { exportExperimentsCsvAction, saveViewAction, deleteViewAction } from "@/app/(app)/experiments/actions";
+import { exportExperimentsCsvAction, importExperimentsCsvAction, saveViewAction, deleteViewAction } from "@/app/(app)/experiments/actions";
+import type { ImportReport } from "@/app/(app)/experiments/actions";
 import {
   buildExperimentQueryString as buildQueryString,
   parseExperimentSearchParams,
@@ -60,6 +61,8 @@ export function ExperimentsTable({
       params.phMax != null
   );
   const [viewName, setViewName] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [report, setReport] = useState<ImportReport | null>(null);
 
   function navigate(patch: Partial<ExperimentSearchParams>) {
     // Read the live URL, not the `params` prop -- that prop is a snapshot
@@ -107,6 +110,17 @@ export function ExperimentsTable({
       },
       "export"
     );
+  }
+
+  // T4.1 — the file is read in the browser and its text handed to the action:
+  // an import is not an upload (nothing is stored), so it has no business
+  // going through the file-size path or Storage.
+  function importCsv(file: File) {
+    run(async () => {
+      const res = await importExperimentsCsvAction(await file.text());
+      if (res.ok && res.data) setReport(res.data);
+      return res;
+    }, "import");
   }
 
   function saveView() {
@@ -216,7 +230,66 @@ export function ExperimentsTable({
           {pending && pendingKey === "export" && <Spinner />}
           Export CSV
         </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={pending}
+          aria-busy={pending && pendingKey === "import"}
+          onClick={() => fileRef.current?.click()}
+          title="Import rows from a CSV in the same shape this page exports"
+        >
+          {pending && pendingKey === "import" && <Spinner />}
+          Import CSV
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // Clear it either way, so picking the same corrected file twice
+            // in a row still fires a change event.
+            e.target.value = "";
+            if (file) importCsv(file);
+          }}
+        />
       </div>
+
+      {report && (
+        <div className="obs-box glass" style={{ marginTop: 8 }} role="status">
+          {report.rowErrors.length > 0 ? (
+            <>
+              <b style={{ fontSize: 13 }}>
+                Nothing was imported — {report.rowErrors.length}{" "}
+                {report.rowErrors.length === 1 ? "row needs" : "rows need"} fixing first.
+              </b>
+              {report.rowErrors.map((e) => (
+                <p key={e.row} className="sec-sub" style={{ margin: "4px 0" }}>
+                  Line {e.row}: {e.message}
+                </p>
+              ))}
+            </>
+          ) : (
+            <>
+              <b style={{ fontSize: 13 }}>
+                Imported {report.created.length}{" "}
+                {report.created.length === 1 ? "experiment" : "experiments"} as drafts:{" "}
+                {report.created.join(", ")}.
+              </b>
+              {report.ignoredIds.length > 0 && (
+                <p className="sec-sub" style={{ margin: "4px 0" }}>
+                  The file&apos;s own ID column was not used — every record gets a fresh ChemMemo id.
+                  Ignored: {report.ignoredIds.join(", ")}.
+                </p>
+              )}
+            </>
+          )}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReport(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="toolbar" style={{ marginTop: 8 }}>
         <div className="filter-chips">
