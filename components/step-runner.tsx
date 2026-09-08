@@ -5,7 +5,7 @@ import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
 import { useStickyState } from "@/lib/use-sticky-state";
 import { CommentsDisclosure } from "@/components/comments-disclosure";
-import type { ActionResult, Quantity, QuantityKind } from "@/lib/types";
+import type { ActionResult, Quantity, QuantityKind, StepObservation, StepDeviation } from "@/lib/types";
 import type { StepDetail, DeviationInput } from "@/lib/experiment-steps/service";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -127,6 +127,19 @@ function DeviationForm({
   );
 }
 
+// experiment_steps has no updated_at column, so the remount key is derived
+// from the fields themselves. Only the three StepCard seeds state from are
+// included: an observation or deviation arriving must NOT remount the card
+// and throw away what someone is part-way through typing.
+const stepSeedKey = (d: StepDetail): string =>
+  [
+    d.step.id,
+    d.step.status,
+    d.step.actual_ph ?? "",
+    d.step.actual_atmosphere ?? "",
+    JSON.stringify(d.step.actual_quantities),
+  ].join("|");
+
 function StepCard({
   experimentId,
   detail,
@@ -146,8 +159,8 @@ function StepCard({
     status: string,
     actual: { ph: number | null; quantities: Record<string, Quantity>; atmosphere: string | null }
   ) => Promise<ActionResult>;
-  recordObservation: (stepId: string, note: string) => Promise<ActionResult>;
-  recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
+  recordObservation: (stepId: string, note: string) => Promise<ActionResult<StepObservation>>;
+  recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult<StepDeviation>>;
   onStepPatched: (stepId: string, patch: (detail: StepDetail) => StepDetail) => void;
 }) {
   const { step, protocolStep, observations, deviations } = detail;
@@ -273,22 +286,15 @@ function StepCard({
             if (!note) return;
             run(async () => {
               const res = await recordObservation(step.id, note);
-              if (res.ok) {
+              if (res.ok && res.data) {
+                const row = res.data;
                 if (noteRef.current) noteRef.current.value = "";
-                onStepPatched(step.id, (d) => ({
-                  ...d,
-                  observations: [
-                    ...d.observations,
-                    {
-                      id: `local-obs-${Date.now()}`,
-                      experiment_step_id: step.id,
-                      note,
-                      observed_at: new Date().toISOString(),
-                      observed_by: null,
-                      workspace_id: null,
-                    },
-                  ],
-                }));
+                // From the server's row, never a fabricated one: observed_at is
+                // the database's now() rather than this workstation's clock,
+                // observed_by is a real id rather than a guessed null, and the
+                // id is the real one rather than a timestamp two observations
+                // in the same millisecond would collide on.
+                onStepPatched(step.id, (d) => ({ ...d, observations: [...d.observations, row] }));
               }
               return res;
             });
@@ -313,30 +319,11 @@ function StepCard({
         onSubmit={(input) =>
           run(async () => {
             const res = await recordDeviation(step.id, input);
-            if (res.ok) {
-              onStepPatched(step.id, (d) => ({
-                ...d,
-                deviations: [
-                  ...d.deviations,
-                  {
-                    id: `local-dev-${Date.now()}`,
-                    experiment_step_id: step.id,
-                    category: input.category,
-                    what_happened: input.what_happened,
-                    how_discovered: input.how_discovered,
-                    likely_impact: input.likely_impact,
-                    sample_still_usable: input.sample_still_usable,
-                    corrective_action: input.corrective_action,
-                    preventive_action: input.preventive_action,
-                    affected_samples: input.affected_samples,
-                    decision_owner: null,
-                    linked_replacement_sample: null,
-                    reported_at: new Date().toISOString(),
-                    reported_by: null,
-                    workspace_id: null,
-                  },
-                ],
-              }));
+            if (res.ok && res.data) {
+              const row = res.data;
+              // Same rule as the observation above -- reported_at, reported_by
+              // and decision_owner are the server's, not this client's guess.
+              onStepPatched(step.id, (d) => ({ ...d, deviations: [...d.deviations, row] }));
             }
             return res;
           })
@@ -367,8 +354,8 @@ export function StepRunner({
     status: string,
     actual: { ph: number | null; quantities: Record<string, Quantity>; atmosphere: string | null }
   ) => Promise<ActionResult>;
-  recordObservation: (stepId: string, note: string) => Promise<ActionResult>;
-  recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult>;
+  recordObservation: (stepId: string, note: string) => Promise<ActionResult<StepObservation>>;
+  recordDeviation: (stepId: string, input: DeviationInput) => Promise<ActionResult<StepDeviation>>;
 }) {
   const { run, pending } = useRunAction();
   const [localSteps, setLocalSteps] = useStickyState(steps);
@@ -403,7 +390,15 @@ export function StepRunner({
     <div>
       {localSteps.map((detail) => (
         <StepCard
-          key={detail.step.id}
+          // The key carries the server's own values for the three fields
+          // StepCard seeds editable state from, so a genuine server move
+          // remounts it and re-seeds them. Keyed on id alone, StepCard
+          // re-rendered instead: the local pH/quantities/atmosphere kept
+          // whatever they held, and the next Start or Complete wrote them
+          // back over another user's edit. useStickyState only adopts when
+          // the server has actually moved, so this cannot discard someone's
+          // typing on an ordinary re-render.
+          key={stepSeedKey(detail)}
           experimentId={experimentId}
           detail={detail}
           quantityKinds={quantityKinds}

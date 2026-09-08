@@ -7,7 +7,7 @@ import { listControlledVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
 import { validateQuantityUnits, validateDeviationCategory } from "@/lib/schemas";
 import { toActionResult } from "@/lib/errors";
-import type { ActionResult, Quantity } from "@/lib/types";
+import type { ActionResult, Quantity, StepObservation, StepDeviation } from "@/lib/types";
 import type { DeviationInput, StepDetail } from "@/lib/experiment-steps/service";
 
 export async function instantiateStepsAction(
@@ -59,18 +59,19 @@ export async function recordObservationAction(
   experimentId: string,
   stepId: string,
   note: string
-): Promise<ActionResult> {
+): Promise<ActionResult<StepObservation>> {
   const { supabase, user } = await requireUser();
   const trimmed = note.trim();
   if (!trimmed) return { ok: false, error: "An observation needs a note." };
 
+  let created: StepObservation;
   try {
-    await stepsService.recordObservation(supabase, stepId, user.id, trimmed);
+    created = await stepsService.recordObservation(supabase, stepId, user.id, trimmed);
   } catch (e) {
     return toActionResult("recordObservationAction", e);
   }
   revalidatePath(`/experiments/${experimentId}`);
-  return { ok: true };
+  return { ok: true, data: created };
 }
 
 // Same direct-call convention — DeviationForm parses its own native <form>'s
@@ -80,7 +81,7 @@ export async function recordDeviationAction(
   experimentId: string,
   stepId: string,
   input: DeviationInput
-): Promise<ActionResult> {
+): Promise<ActionResult<StepDeviation>> {
   const { supabase, user } = await requireUser();
 
   if (!input.category) return { ok: false, error: "Pick a deviation category." };
@@ -90,11 +91,12 @@ export async function recordDeviationAction(
   const categoryError = validateDeviationCategory(input.category, allowed);
   if (categoryError) return { ok: false, error: categoryError };
 
+  let created: StepDeviation;
   try {
-    await stepsService.recordDeviation(supabase, stepId, user.id, input);
+    created = await stepsService.recordDeviation(supabase, stepId, user.id, input);
   } catch (e) {
     return toActionResult("recordDeviationAction", e);
   }
   revalidatePath(`/experiments/${experimentId}`);
-  return { ok: true };
+  return { ok: true, data: created };
 }

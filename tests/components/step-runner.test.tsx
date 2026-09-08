@@ -71,4 +71,98 @@ describe("StepRunner", () => {
     expect(instantiate).toHaveBeenCalled();
     expect(screen.getByText(/Added 250 µL ACN to the dry residue\./)).toBeTruthy();
   });
+
+  it("renders an observation from the server's row, not one assembled here", async () => {
+    // use-sticky-state's rule: patch from the action's OWN returned row. This
+    // panel used to append `id: local-obs-${Date.now()}`, `observed_by: null`
+    // and the workstation's clock — so a skewed clock displayed one time while
+    // the database held another, and two observations in the same millisecond
+    // collided on the fake id.
+    const recordObservation = vi.fn(async (_stepId: string, note: string) => ({
+      ok: true as const,
+      data: {
+        id: "obs-real-1",
+        experiment_step_id: "s1",
+        note,
+        observed_at: "2026-09-08T09:00:00Z",
+        observed_by: "u1",
+        workspace_id: "ws1",
+      },
+    }));
+
+    render(
+      <ToastProvider>
+        <StepRunner
+          experimentId="EXP-1"
+          steps={instantiated}
+          quantityKinds={[]}
+          deviationCategories={[]}
+          updateStatus={async () => ({ ok: true })}
+          recordObservation={recordObservation}
+          recordDeviation={async () => ({ ok: true })}
+        />
+      </ToastProvider>
+    );
+
+    const box = screen.getByPlaceholderText("Add an observation…") as HTMLInputElement;
+    await act(async () => {
+      box.value = "Precipitate formed";
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    box.value = "Precipitate formed";
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Add" }).click();
+      await Promise.resolve();
+    });
+
+    expect(recordObservation).toHaveBeenCalledWith("s1", "Precipitate formed");
+    // The server's timestamp is what renders, so the row on screen is the row
+    // in the database.
+    expect(screen.getByText(/Precipitate formed/)).toBeTruthy();
+    expect(screen.getByText(new RegExp(new Date("2026-09-08T09:00:00Z").toLocaleString(), "i"))).toBeTruthy();
+  });
+
+  it("re-seeds a step's actuals when the server's values move", async () => {
+    // StepCard seeds pH/quantities/atmosphere into local state once. Keyed on
+    // step.id alone it never re-seeded, so another user's edit was invisible
+    // here and the next Start or Complete wrote the stale local value back
+    // over it.
+    const { rerender } = render(
+      <ToastProvider>
+        <StepRunner
+          experimentId="EXP-1"
+          steps={instantiated}
+          quantityKinds={[]}
+          deviationCategories={[]}
+          updateStatus={async () => ({ ok: true })}
+          recordObservation={async () => ({ ok: true })}
+          recordDeviation={async () => ({ ok: true })}
+        />
+      </ToastProvider>
+    );
+
+    const inputs = () => Array.from(document.querySelectorAll('input[type="number"]')) as HTMLInputElement[];
+    expect(inputs()[0].value).toBe("");
+
+    // Somebody else set the pH; the server hands back a genuinely new value.
+    const moved: StepDetail[] = [
+      { ...instantiated[0], step: { ...instantiated[0].step, actual_ph: 8.2 } },
+    ];
+    rerender(
+      <ToastProvider>
+        <StepRunner
+          experimentId="EXP-1"
+          steps={moved}
+          quantityKinds={[]}
+          deviationCategories={[]}
+          updateStatus={async () => ({ ok: true })}
+          recordObservation={async () => ({ ok: true })}
+          recordDeviation={async () => ({ ok: true })}
+        />
+      </ToastProvider>
+    );
+
+    expect(inputs()[0].value).toBe("8.2");
+  });
 });

@@ -98,16 +98,23 @@ export async function updateStepStatus(
   if (error) throw new AppError("conflict", "Could not update the step.", { cause: error });
 }
 
+// Returns the row it wrote. StepRunner renders the observation immediately
+// (see useStickyState), and its rule is that the patch comes from the server's
+// own row — observed_at in particular is the database's now(), not the
+// workstation's clock, and observed_by is a real id rather than a guessed null.
 export async function recordObservation(
   supabase: Supabase,
   stepId: string,
   userId: string,
   note: string
-): Promise<void> {
-  const { error } = await supabase
+): Promise<StepObservation> {
+  const { data, error } = await supabase
     .from("step_observations")
-    .insert({ experiment_step_id: stepId, observed_by: userId, note });
+    .insert({ experiment_step_id: stepId, observed_by: userId, note })
+    .select("*")
+    .single();
   if (error) throw new AppError("conflict", "Could not save the observation.", { cause: error });
+  return data as StepObservation;
 }
 
 export type DeviationInput = {
@@ -121,14 +128,19 @@ export type DeviationInput = {
   affected_samples: string | null;
 };
 
+// Same reason as recordObservation: the row comes back so the panel renders
+// what was actually written, reported_at and reported_by included.
 export async function recordDeviation(
   supabase: Supabase,
   stepId: string,
   userId: string,
   input: DeviationInput
-): Promise<void> {
-  const { error } = await supabase
+): Promise<StepDeviation> {
+  const { data, error } = await supabase
     .from("step_deviations")
-    .insert({ experiment_step_id: stepId, reported_by: userId, decision_owner: userId, ...input });
+    .insert({ experiment_step_id: stepId, reported_by: userId, decision_owner: userId, ...input })
+    .select("*")
+    .single();
   if (error) throw new AppError("conflict", "Could not save the deviation.", { cause: error });
+  return data as StepDeviation;
 }
