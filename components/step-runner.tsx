@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
 import { useStickyState } from "@/lib/use-sticky-state";
+import { CommentsDisclosure } from "@/components/comments-disclosure";
 import type { ActionResult, Quantity, QuantityKind } from "@/lib/types";
 import type { StepDetail, DeviationInput } from "@/lib/experiment-steps/service";
 
@@ -127,6 +128,7 @@ function DeviationForm({
 }
 
 function StepCard({
+  experimentId,
   detail,
   quantityKinds,
   deviationCategories,
@@ -135,6 +137,7 @@ function StepCard({
   recordDeviation,
   onStepPatched,
 }: {
+  experimentId: string;
   detail: StepDetail;
   quantityKinds: QuantityKind[];
   deviationCategories: string[];
@@ -339,11 +342,13 @@ function StepCard({
           })
         }
       />
+      <CommentsDisclosure experimentId={experimentId} targetType="experiment_step" targetId={step.id} />
     </div>
   );
 }
 
 export function StepRunner({
+  experimentId,
   steps,
   quantityKinds,
   deviationCategories,
@@ -352,6 +357,7 @@ export function StepRunner({
   recordObservation,
   recordDeviation,
 }: {
+  experimentId: string;
   steps: StepDetail[];
   quantityKinds: QuantityKind[];
   deviationCategories: string[];
@@ -398,6 +404,7 @@ export function StepRunner({
       {localSteps.map((detail) => (
         <StepCard
           key={detail.step.id}
+          experimentId={experimentId}
           detail={detail}
           quantityKinds={quantityKinds}
           deviationCategories={deviationCategories}

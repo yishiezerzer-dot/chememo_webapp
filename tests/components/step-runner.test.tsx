@@ -51,6 +51,7 @@ describe("StepRunner", () => {
     render(
       <ToastProvider>
         <StepRunner
+          experimentId="EXP-1"
           steps={[]}
           quantityKinds={[]}
           deviationCategories={[]}

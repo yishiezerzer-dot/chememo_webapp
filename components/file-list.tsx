@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
+import { CommentsDisclosure } from "@/components/comments-disclosure";
 import { FILE_ROLES } from "@/lib/types";
 import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from "@/lib/files/limits";
 import type { ActionResult, ExperimentFile, FileRole, FileVersion } from "@/lib/types";
@@ -347,6 +348,10 @@ export function FileList({
               )}
             </div>
             {f.kind === "upload" && <FileDetailsSection file={f} isOwner={isOwner} experimentId={experimentId} />}
+            {/* Both kinds: an external link row is as commentable as an
+                uploaded one, and the target is the experiment_file row either
+                way. */}
+            <CommentsDisclosure experimentId={experimentId} targetType="experiment_file" targetId={f.id} />
           </div>
         );
       })}

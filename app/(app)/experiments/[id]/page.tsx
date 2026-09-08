@@ -355,6 +355,7 @@ export default async function ExperimentDetailPage({
               )}
               {isOwner ? (
                 <StepRunner
+                  experimentId={e.id}
                   steps={stepDetails}
                   quantityKinds={quantityKinds}
                   deviationCategories={deviationCategories}
