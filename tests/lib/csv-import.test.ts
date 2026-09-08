@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseCsv, mapCsvToInputs, MAX_IMPORT_ROWS } from "@/lib/experiments/import";
+import {
+  parseCsv,
+  mapCsvToInputs,
+  CsvTooLargeError,
+  MAX_IMPORT_ROWS,
+  MAX_IMPORT_BYTES,
+  MAX_IMPORT_CELLS,
+} from "@/lib/experiments/import";
 
 const PROJECTS = { "origins of life": "proj-1" };
 
@@ -26,6 +33,55 @@ describe("parseCsv", () => {
       ["ID", "Name"],
       ["EXP-001", "First"],
     ]);
+  });
+});
+
+// A server action is an HTTP endpoint any signed-in user can POST to
+// directly, so these bounds are the only thing between a crafted body and the
+// Node process. Each one was measured as a real denial of service before it
+// was added: 12 MB of bare newlines cost 2.4 GB of heap and 13 s of blocked
+// event loop, and a 1 MB header row of commas cost 9 s on its own.
+describe("import limits (denial of service)", () => {
+  it("refuses an oversized file before parsing it", () => {
+    const huge = "Name\n" + "x\n".repeat(MAX_IMPORT_BYTES);
+    const res = mapCsvToInputs(huge, PROJECTS);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toMatch(/limit is 2 MB/);
+  });
+
+  it("stops mid-parse on too many rows instead of materialising them", () => {
+    // The bail is inside the parser loop, so this must throw rather than
+    // return a giant array.
+    const many = Array.from({ length: MAX_IMPORT_ROWS + 5 }, (_, i) => `Row ${i}`).join("\n");
+    expect(() => parseCsv(many, { maxRows: MAX_IMPORT_ROWS, maxCells: MAX_IMPORT_CELLS })).toThrow(
+      CsvTooLargeError
+    );
+  });
+
+  it("stops mid-parse on too many cells, even in a file with few rows", () => {
+    // The wide-but-short shape: small payload, enormous cell count. This is
+    // the one that slipped past a row-count-only limit.
+    const wide = "Name" + ",".repeat(MAX_IMPORT_CELLS + 10);
+    expect(() => parseCsv(wide, { maxRows: MAX_IMPORT_ROWS, maxCells: MAX_IMPORT_CELLS })).toThrow(
+      CsvTooLargeError
+    );
+    const res = mapCsvToInputs(wide, PROJECTS);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toMatch(/cells/);
+  });
+
+  it("stays fast on a wide header, which used to be quadratic", () => {
+    // 20k columns x 200 rows. With headers.indexOf re-scanned per column per
+    // row this took seconds; with the hoisted Map it is milliseconds. The
+    // threshold is loose on purpose -- it is a regression guard, not a
+    // benchmark.
+    const columns = 20_000;
+    const header = ["Name", ...Array.from({ length: columns }, (_, i) => `c${i}`)].join(",");
+    const body = Array.from({ length: 200 }, (_, i) => `Row ${i}`).join("\n");
+    const started = Date.now();
+    const res = mapCsvToInputs(`${header}\n${body}`, PROJECTS);
+    expect(res.ok).toBe(true);
+    expect(Date.now() - started).toBeLessThan(3000);
   });
 });
 

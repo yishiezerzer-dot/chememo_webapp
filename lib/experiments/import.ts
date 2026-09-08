@@ -21,16 +21,51 @@ export const IMPORT_COLUMNS = [
 // job, and the action has a request timeout to live inside.
 export const MAX_IMPORT_ROWS = 500;
 
+// MAX_IMPORT_ROWS protects the database. These protect the process, and they
+// are a different problem: a server action is an HTTP endpoint any signed-in
+// user can POST to directly, so the bound has to hold before a row count
+// exists to check. Measured on the parser below, a 12 MB body of bare
+// newlines (the exact serverActions.bodySizeLimit, which this path shares
+// with file upload and so cannot be lowered) parses to 12.5M rows, 2.4 GB of
+// heap and 13 seconds of blocked event loop -- and Next is single-threaded
+// per worker, so that is the whole app stopped, for everyone, from one
+// request.
+//
+// 500 rows x 14 columns at the schema's own maxima (two 20,000-char text
+// fields plus the rest) is ~45 KB/row worst case, so 2 MB is already generous
+// for any real spreadsheet.
+export const MAX_IMPORT_BYTES = 2_000_000;
+export const MAX_IMPORT_CELLS = 100_000;
+
 export type RowError = { row: number; message: string };
+
+// Thrown by parseCsv when a limit trips mid-parse. Caught by mapCsvToInputs
+// and turned into an ordinary refusal -- callers never see it.
+export class CsvTooLargeError extends Error {
+  constructor(readonly kind: "rows" | "cells") {
+    super(kind);
+  }
+}
 
 // RFC 4180: quoted cells may contain commas, newlines, and doubled quotes.
 // Hand-rolled rather than adding a dependency — the export's own writer
 // (csvCell in experiments/actions.ts) is four lines, and this is its mirror.
-export function parseCsv(text: string): string[][] {
+// The limits are checked *inside* the loop. Checking a finished array would
+// be no protection at all: by then the memory has already been spent, which
+// is the entire failure mode.
+export function parseCsv(
+  text: string,
+  limits: { maxRows: number; maxCells: number } = { maxRows: Infinity, maxCells: Infinity }
+): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
   let quoted = false;
+  let cells = 0;
+
+  const countCell = () => {
+    if (++cells > limits.maxCells) throw new CsvTooLargeError("cells");
+  };
   // A BOM survives a round-trip through Excel and would otherwise become part
   // of the first header's name, so the "ID" column would silently not match.
   let i = text.charCodeAt(0) === 0xfeff ? 1 : 0;
@@ -53,23 +88,31 @@ export function parseCsv(text: string): string[][] {
     if (c === '"') {
       quoted = true;
     } else if (c === ",") {
+      countCell();
       row.push(cell);
       cell = "";
     } else if (c === "\n" || c === "\r") {
       // Swallow the \n of a \r\n pair; a bare \r is a line break too.
       if (c === "\r" && text[i + 1] === "\n") i++;
+      countCell();
       row.push(cell);
       rows.push(row);
+      if (rows.length > limits.maxRows) throw new CsvTooLargeError("rows");
       row = [];
       cell = "";
     } else {
       cell += c;
     }
   }
-  // A file not ending in a newline still has one last cell in hand.
+  // A file not ending in a newline still has one last cell in hand. The row
+  // limit is re-checked here and not only in the loop: this push happens
+  // after it, so without this a file could always exceed the cap by exactly
+  // one row by omitting its trailing newline.
   if (cell !== "" || row.length > 0) {
+    countCell();
     row.push(cell);
     rows.push(row);
+    if (rows.length > limits.maxRows) throw new CsvTooLargeError("rows");
   }
   return rows;
 }
@@ -148,18 +191,50 @@ export function mapCsvToInputs(
   text: string,
   projectIdByLabel: Record<string, string>
 ): { ok: true; mapped: MappedImport } | { ok: false; error: string } {
+  // Before anything is parsed: the string is already in memory, but nothing
+  // has been expanded into arrays yet, and that expansion is what costs
+  // 50-200x the input.
+  if (text.length > MAX_IMPORT_BYTES) {
+    return {
+      ok: false,
+      error: `That file is ${(text.length / 1_000_000).toFixed(1)} MB; the limit is ${MAX_IMPORT_BYTES / 1_000_000} MB.`,
+    };
+  }
+
   // Blank lines are NOT filtered out here: row numbers below are reported to
   // the user as spreadsheet line numbers, and dropping a blank line in the
   // middle of a file would silently shift every number after it.
-  const rows = parseCsv(text);
+  let rows: string[][];
+  try {
+    // +1 on rows so an oversized file is still distinguishable from an
+    // exactly-at-the-limit one, and reports the friendlier message below.
+    rows = parseCsv(text, { maxRows: MAX_IMPORT_ROWS + 1, maxCells: MAX_IMPORT_CELLS });
+  } catch (e) {
+    if (e instanceof CsvTooLargeError) {
+      return {
+        ok: false,
+        error:
+          e.kind === "rows"
+            ? `That file has more than ${MAX_IMPORT_ROWS} rows; the limit is ${MAX_IMPORT_ROWS} per import.`
+            : `That file has more than ${MAX_IMPORT_CELLS} cells; the limit is ${MAX_IMPORT_CELLS} per import.`,
+      };
+    }
+    throw e;
+  }
   if (rows.length === 0 || rows.every((r) => r.every((c) => c.trim() === ""))) {
     return { ok: false, error: "That file is empty." };
   }
 
   const headers = rows[0].map((h) => h.trim().toLowerCase());
+  // Hoisted deliberately. Called per column per row, `headers.indexOf` is a
+  // full scan on every miss, and nothing bounds the column count -- a
+  // one-megabyte header row of nothing but commas measured at nine seconds of
+  // blocked event loop, from a file small enough to slip under every other
+  // limit here.
+  const indexByHeader = new Map(headers.map((h, i) => [h, i]));
   const at = (row: string[], column: string): string => {
-    const idx = headers.indexOf(column.toLowerCase());
-    return idx === -1 ? "" : row[idx] ?? "";
+    const idx = indexByHeader.get(column.toLowerCase());
+    return idx === undefined ? "" : row[idx] ?? "";
   };
   if (!headers.includes("name")) {
     return {
@@ -168,10 +243,9 @@ export function mapCsvToInputs(
     };
   }
 
+  // No row-count check here: parseCsv already refused above, before the
+  // memory was spent, which is the only place the check is worth anything.
   const body = rows.slice(1);
-  if (body.length > MAX_IMPORT_ROWS) {
-    return { ok: false, error: `That file has ${body.length} rows; the limit is ${MAX_IMPORT_ROWS} per import.` };
-  }
 
   const inputs: ExperimentInput[] = [];
   const rowErrors: RowError[] = [];
