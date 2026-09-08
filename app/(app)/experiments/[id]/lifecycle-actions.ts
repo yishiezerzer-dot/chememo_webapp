@@ -28,9 +28,44 @@ export async function setStatus(id: string, next: ExperimentStatus): Promise<Act
   return { ok: true };
 }
 
-export async function completeExperiment(id: string): Promise<ActionResult> {
+// §8.6's gate, asked at the moment it means something. The criteria used to
+// live in the Edit form among thirty-odd other fields, so the only way to
+// discover the rule was to have Start refuse and read the tooltip.
+//
+// ONE update statement, deliberately. Two would let the criteria write land
+// and the transition fail, leaving an unstarted experiment carrying
+// set-but-unlocked criteria -- which is precisely the state §8.6 exists to
+// make impossible. Branch (d) of enforce_experiment_lifecycle reads
+// new.acceptance_criteria, so a single statement satisfies the gate and stamps
+// acceptance_criteria_locked_at in the same breath.
+//
+// criteria is omitted when the record already has them: they are immutable
+// once locked, and sending an identical value is fine but sending anything on
+// a locked record is not.
+export async function startExperimentAction(id: string, criteria?: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const trimmed = (criteria ?? "").trim();
+  const patch: { status: ExperimentStatus; acceptance_criteria?: string } = { status: "in_progress" };
+  if (trimmed) patch.acceptance_criteria = trimmed;
+
+  const { error } = await supabase.from("experiments").update(patch).eq("id", id);
+  if (error) return lifecycleError("startExperimentAction", error);
+
+  revalidatePath(`/experiments/${id}`);
+  revalidatePath(`/experiments/${id}/edit`);
+  revalidatePath("/experiments");
+  return { ok: true };
+}
+
+// §15.2's gate, same treatment. The conclusion is not immutable the way the
+// criteria are, so it is always safe to send.
+export async function completeExperiment(id: string, conclusion?: string): Promise<ActionResult> {
   const { supabase, user } = await requireUser();
-  const { error } = await supabase.from("experiments").update({ status: "completed" }).eq("id", id);
+  const trimmed = (conclusion ?? "").trim();
+  const patch: { status: ExperimentStatus; conclusion?: string } = { status: "completed" };
+  if (trimmed) patch.conclusion = trimmed;
+
+  const { error } = await supabase.from("experiments").update(patch).eq("id", id);
   if (error) return lifecycleError("completeExperiment", error);
 
   // Best-effort audit entry — the status change above is the source of

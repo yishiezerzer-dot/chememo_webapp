@@ -34,7 +34,7 @@ import {
 import { softDeleteExperiment } from "@/app/(app)/new/actions";
 import { uploadFile, addFileLink, removeFile } from "./file-actions";
 import { generateSummary } from "./summary-actions";
-import { setStatus, completeExperiment, reviewExperiment, archiveExperiment } from "./lifecycle-actions";
+import { setStatus, startExperimentAction, completeExperiment, reviewExperiment, archiveExperiment } from "./lifecycle-actions";
 import {
   instantiateStepsAction,
   updateStepStatusAction,
@@ -266,6 +266,7 @@ export default async function ExperimentDetailPage({
           hasAcceptanceCriteria={!!e.acceptance_criteria?.trim()}
           unresolvedOpenCount={crewProvenance?.unresolvedOpenCount ?? 0}
           setStatusAction={setStatus.bind(null, e.id)}
+          startAction={startExperimentAction.bind(null, e.id)}
           completeAction={completeExperiment.bind(null, e.id)}
           reviewAction={reviewExperiment.bind(null, e.id)}
         />

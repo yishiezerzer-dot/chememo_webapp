@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { useExperimentView } from "@/components/experiment-view";
 import { useRunAction } from "@/lib/use-run-action";
@@ -35,11 +36,71 @@ const NEXT_MOVES: Record<ExperimentStatus, { label: string; next: ExperimentStat
   cancelled: [],
 };
 
+// §8.6 permits committing to *not* pre-committing, so long as you do it before
+// seeing the data and it is then locked like any other answer. The old form's
+// placeholder already said "None — exploratory", but the trigger demands
+// non-blank, so an honest exploratory experiment had to write prose to satisfy
+// a gate. One button, same guarantee.
+const EXPLORATORY = "Exploratory — no pre-specified acceptance criteria.";
+
+// The one-question prompt that replaces a disabled button and a tooltip
+// telling you to go and find a field on another page.
+function GatePrompt({
+  question,
+  hint,
+  cta,
+  pending,
+  onSubmit,
+  onCancel,
+  extraAction,
+}: {
+  question: string;
+  hint: string;
+  cta: string;
+  pending: boolean;
+  onSubmit: (text: string) => void;
+  onCancel: () => void;
+  extraAction?: { label: string; onClick: () => void };
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  return (
+    // No aria-label on the wrapper: the textarea below carries it, and
+    // duplicating it here made the accessible name ambiguous (two elements
+    // answering to the same label).
+    <div className="obs-box glass" style={{ marginTop: 8, maxWidth: 560 }}>
+      <b style={{ fontSize: 13.5 }}>{question}</b>
+      <p className="sec-sub" style={{ margin: "2px 0 6px" }}>{hint}</p>
+      <textarea ref={ref} rows={2} aria-label={question} style={{ width: "100%" }} autoFocus />
+      <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={pending}
+          aria-busy={pending}
+          onClick={() => onSubmit(ref.current?.value ?? "")}
+        >
+          {pending && <Spinner />}
+          {cta}
+        </button>
+        {extraAction && (
+          <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={extraAction.onClick}>
+            {extraAction.label}
+          </button>
+        )}
+        <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function LifecycleControls({
   hasConclusion,
   hasAcceptanceCriteria = true,
   unresolvedOpenCount = 0,
   setStatusAction,
+  startAction,
   completeAction,
   reviewAction,
 }: {
@@ -54,11 +115,13 @@ export function LifecycleControls({
   // exactly what an open item should never block.
   unresolvedOpenCount?: number;
   setStatusAction: (next: ExperimentStatus) => Promise<ActionResult>;
-  completeAction: () => Promise<ActionResult>;
+  startAction: (criteria?: string) => Promise<ActionResult>;
+  completeAction: (conclusion?: string) => Promise<ActionResult>;
   reviewAction: () => Promise<ActionResult>;
 }) {
   const { run, pending } = useRunAction();
   const { status, patch } = useExperimentView();
+  const [asking, setAsking] = useState<null | "start" | "complete">(null);
 
   // A legacy null-status row is classified through the Edit page's first
   // save, not here (§19.4 — name the gap rather than guessing a state).
@@ -78,23 +141,34 @@ export function LifecycleControls({
         // perfectly available, so the rule was discoverable solely by failing
         // at it. Surfaced up front the same way the unresolved-items gate
         // already is; the trigger remains the real backstop either way.
-        const needsCriteria = m.next === "in_progress" && !hasAcceptanceCriteria;
-        const blocked = gated || needsCriteria;
+        const isStart = m.next === "in_progress";
         return (
           <button
             key={m.next}
             type="button"
             className="btn btn-ghost btn-sm"
-            disabled={pending || blocked}
+            disabled={pending || gated}
             aria-busy={pending}
             title={
               gated
                 ? `This experiment has ${unresolvedOpenCount} unresolved item${unresolvedOpenCount === 1 ? "" : "s"} from its AI-generated plan. Resolve them before starting.`
-                : needsCriteria
-                  ? "Write the acceptance criteria before starting — what result would count as success (standard section 8.6). Add them from Edit."
-                  : undefined
+                : undefined
             }
-            onClick={() => run(() => setStatusAction(m.next), undefined, () => patch({ status: m.next }))}
+            onClick={() => {
+              // Starting used to be disabled with a tooltip telling you to go
+              // to Edit and find the acceptance-criteria field among thirty
+              // others, so the rule was discoverable only by failing at it.
+              // Now the button asks the question.
+              if (isStart && !hasAcceptanceCriteria) {
+                setAsking("start");
+                return;
+              }
+              if (isStart) {
+                run(() => startAction(), undefined, () => patch({ status: "in_progress" }));
+                return;
+              }
+              run(() => setStatusAction(m.next), undefined, () => patch({ status: m.next }));
+            }}
           >
             {pending && <Spinner />}
             {m.label}
@@ -107,8 +181,13 @@ export function LifecycleControls({
           className="btn btn-sm"
           disabled={pending}
           aria-busy={pending}
-          title={hasConclusion ? undefined : "A conclusion is required to complete (standard §15.2)."}
-          onClick={() => run(completeAction, undefined, () => patch({ status: "completed" }))}
+          onClick={() => {
+            if (!hasConclusion) {
+              setAsking("complete");
+              return;
+            }
+            run(() => completeAction(), undefined, () => patch({ status: "completed" }));
+          }}
         >
           {pending && <Spinner />}
           Complete
@@ -125,6 +204,46 @@ export function LifecycleControls({
           {pending && <Spinner />}
           Mark reviewed
         </button>
+      )}
+
+      {asking === "start" && (
+        <GatePrompt
+          question="How will you know this worked?"
+          hint="Locked once you start — this is the goalpost, and it cannot be moved after you see the result (§8.6)."
+          cta="Start"
+          pending={pending}
+          onCancel={() => setAsking(null)}
+          extraAction={{
+            label: "No pre-set criteria — exploratory",
+            onClick: () =>
+              run(() => startAction(EXPLORATORY), undefined, () => {
+                setAsking(null);
+                patch({ status: "in_progress" });
+              }),
+          }}
+          onSubmit={(text) =>
+            run(() => startAction(text), undefined, () => {
+              setAsking(null);
+              patch({ status: "in_progress" });
+            })
+          }
+        />
+      )}
+
+      {asking === "complete" && (
+        <GatePrompt
+          question="What did you find?"
+          hint="Required to complete (§15.2). One or two sentences is plenty — the detail is in the log."
+          cta="Complete"
+          pending={pending}
+          onCancel={() => setAsking(null)}
+          onSubmit={(text) =>
+            run(() => completeAction(text), undefined, () => {
+              setAsking(null);
+              patch({ status: "completed" });
+            })
+          }
+        />
       )}
     </div>
   );
