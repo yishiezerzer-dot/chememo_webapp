@@ -57,10 +57,21 @@ test("revision diff and restore", async ({ page }) => {
   await page.getByRole("button", { name: "Restore this version" }).first().click();
   await page.getByPlaceholder(/always required/).fill("Trying to restore a locked record.");
   await page.getByRole("button", { name: "Confirm restore" }).click();
-  // Matched on a phrase unique to the trigger's own sentence. A bare /locked/i
-  // now hits two elements, because the criteria panel carries its own §8.6
-  // lock badge.
-  await expect(page.getByText(/Reopen it with a documented reason/i)).toBeVisible({ timeout: 15000 });
+  // Asserted on the OUTCOME, not on the toast. The old assertion matched
+  // /locked/i, which turns out to have been satisfied by a static lock notice
+  // on the page rather than by the error at all -- it would have passed even
+  // if the restore had silently succeeded. (The criteria panel's own §8.6
+  // badge made that ambiguity visible by matching twice.)
+  //
+  // Three things are true only if the restore was refused: the confirm box is
+  // still open (the handler closes it on success alone), the record is still
+  // completed, and no second restore was recorded in the history.
+  await expect(page.getByRole("button", { name: "Confirm restore" })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Restored a prior version/)).toHaveCount(1);
+
+  // Dismiss the still-open confirm box before the cleanup below.
+  await page.getByRole("button", { name: "Cancel" }).first().click();
 
   // Cleanup — the record is completed (terminal), so archive is the
   // close-out, not the in-progress "Close out…" picker.
