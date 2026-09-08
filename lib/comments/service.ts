@@ -85,18 +85,27 @@ export async function createComment(
   };
 }
 
-export async function resolveComment(supabase: Supabase, commentId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+// Both return the updated row: CommentThread patches its sticky state from
+// it, and useStickyState's rule is that the patch comes from the server's own
+// row rather than a resolved_at the client made up.
+export async function resolveComment(supabase: Supabase, commentId: string, userId: string): Promise<Comment> {
+  const { data, error } = await supabase
     .from("comments")
     .update({ resolved_at: new Date().toISOString(), resolved_by: userId })
-    .eq("id", commentId);
+    .eq("id", commentId)
+    .select("*")
+    .single();
   if (error) throw new AppError("conflict", "Could not resolve the comment.", { cause: error });
+  return data as Comment;
 }
 
-export async function reopenComment(supabase: Supabase, commentId: string): Promise<void> {
-  const { error } = await supabase
+export async function reopenComment(supabase: Supabase, commentId: string): Promise<Comment> {
+  const { data, error } = await supabase
     .from("comments")
     .update({ resolved_at: null, resolved_by: null })
-    .eq("id", commentId);
+    .eq("id", commentId)
+    .select("*")
+    .single();
   if (error) throw new AppError("conflict", "Could not reopen the comment.", { cause: error });
+  return data as Comment;
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
+import { useStickyState } from "@/lib/use-sticky-state";
 import type {
   Material,
   MaterialIdentifier,
@@ -374,11 +375,13 @@ function MaterialRow({
   storageLocations,
   quantityKinds,
   solubilityStatuses,
+  onDeleted,
 }: {
   material: Material;
   storageLocations: StorageLocation[];
   quantityKinds: QuantityKind[];
   solubilityStatuses: string[];
+  onDeleted: () => void;
 }) {
   const { run, load, pending, pendingKey } = useRunAction();
   const [open, setOpen] = useState(false);
@@ -437,7 +440,7 @@ function MaterialRow({
           className="btn btn-ghost btn-sm"
           disabled={pending}
           aria-busy={pending && pendingKey === "delete-material"}
-          onClick={() => run(() => deleteMaterialAction(material.id), "delete-material")}
+          onClick={() => run(() => deleteMaterialAction(material.id), "delete-material", onDeleted)}
         >
           {pending && pendingKey === "delete-material" && <Spinner />}
           Delete
@@ -569,7 +572,7 @@ function MaterialRow({
 }
 
 export function MaterialsClient({
-  materials,
+  materials: serverMaterials,
   storageLocations,
   solubilityStatuses,
   quantityKinds,
@@ -581,6 +584,7 @@ export function MaterialsClient({
   quantityKinds: QuantityKind[];
 }) {
   const { run, pending, pendingKey } = useRunAction();
+  const [materials, setMaterials] = useStickyState(serverMaterials);
   const [showNewMaterial, setShowNewMaterial] = useState(false);
   const [showNewStorage, setShowNewStorage] = useState(false);
   const [storageName, setStorageName] = useState("");
@@ -673,6 +677,7 @@ export function MaterialsClient({
             storageLocations={storageLocations}
             quantityKinds={quantityKinds}
             solubilityStatuses={solubilityStatuses}
+            onDeleted={() => setMaterials((cur) => cur.filter((x) => x.id !== m.id))}
           />
         ))
       )}

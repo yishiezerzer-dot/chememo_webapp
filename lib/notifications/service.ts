@@ -27,12 +27,17 @@ export async function unreadCount(userId: string): Promise<number> {
   return count ?? 0;
 }
 
-export async function markRead(supabase: Supabase, notificationId: string): Promise<void> {
-  const { error } = await supabase
+// Returns the updated row so the list can patch its sticky state from the
+// server's own read_at rather than one assembled on the client.
+export async function markRead(supabase: Supabase, notificationId: string): Promise<Notification> {
+  const { data, error } = await supabase
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
-    .eq("id", notificationId);
+    .eq("id", notificationId)
+    .select("*")
+    .single();
   if (error) throw new AppError("conflict", "Could not mark this notification read.", { cause: error });
+  return data as Notification;
 }
 
 export async function markAllRead(supabase: Supabase, userId: string): Promise<void> {

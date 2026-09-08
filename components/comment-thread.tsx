@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
 import { useStickyState } from "@/lib/use-sticky-state";
-import type { ActionResult } from "@/lib/types";
+import type { ActionResult, Comment } from "@/lib/types";
 import type { CommentView } from "@/lib/comments/service";
 
 const fmt = (iso: string) => iso.slice(0, 16).replace("T", " ");
@@ -19,8 +19,8 @@ export function CommentThread({
 }: {
   comments: CommentView[];
   createComment: (body: string) => Promise<ActionResult<CommentView>>;
-  resolveComment: (commentId: string) => Promise<ActionResult>;
-  reopenComment: (commentId: string) => Promise<ActionResult>;
+  resolveComment: (commentId: string) => Promise<ActionResult<Comment>>;
+  reopenComment: (commentId: string) => Promise<ActionResult<Comment>>;
 }) {
   const { run, pending, pendingKey } = useRunAction();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -46,7 +46,20 @@ export function CommentThread({
             className="btn btn-ghost btn-sm"
             disabled={pending}
             aria-busy={pending && pendingKey === c.id}
-            onClick={() => run(() => (c.resolved_at ? reopenComment(c.id) : resolveComment(c.id)), c.id)}
+            onClick={() =>
+              run(async () => {
+                const res = await (c.resolved_at ? reopenComment(c.id) : resolveComment(c.id));
+                if (res.ok && res.data) {
+                  const row = res.data;
+                  setItems((cur) =>
+                    cur.map((x) =>
+                      x.id === row.id ? { ...x, resolved_at: row.resolved_at, resolved_by: row.resolved_by } : x
+                    )
+                  );
+                }
+                return res;
+              }, c.id)
+            }
           >
             {pending && pendingKey === c.id && <Spinner />}
             {c.resolved_at ? "Reopen" : "Resolve"}

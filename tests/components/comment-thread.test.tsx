@@ -61,4 +61,32 @@ describe("CommentThread", () => {
     expect(screen.getByText("First comment")).toBeTruthy();
     expect(screen.getByText("Ada")).toBeTruthy();
   });
+
+  it("marks a comment resolved from the action result without waiting for a refresh", async () => {
+    const existing = postedComment("Needs a second pair of eyes");
+    const resolveComment = vi.fn(async () => ({
+      ok: true as const,
+      data: { ...existing, resolved_at: "2026-08-29T00:00:00Z", resolved_by: "u1" },
+    }));
+
+    render(
+      <ToastProvider>
+        <CommentThread
+          comments={[existing]}
+          createComment={async () => ({ ok: true })}
+          resolveComment={resolveComment}
+          reopenComment={async () => ({ ok: true })}
+        />
+      </ToastProvider>
+    );
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Resolve" }).click();
+      await Promise.resolve();
+    });
+
+    expect(resolveComment).toHaveBeenCalledWith("c1");
+    expect(screen.getByText("Resolved")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reopen" })).toBeTruthy();
+  });
 });

@@ -15,14 +15,18 @@ export async function instantiateStepsAction(
   protocolVersionId: string
 ): Promise<ActionResult<StepDetail[]>> {
   const { supabase } = await requireUser();
+  // The read belongs inside the try with the write: it is what StepRunner
+  // renders from, so a failure here after a committed write would escape the
+  // action and leave the panel empty under a generic error while the steps
+  // are in the database.
   try {
     await stepsService.instantiateSteps(supabase, experimentId, protocolVersionId);
+    const details = await stepsService.listStepDetails(experimentId);
+    revalidatePath(`/experiments/${experimentId}`);
+    return { ok: true, data: details };
   } catch (e) {
     return toActionResult("instantiateStepsAction", e);
   }
-  const details = await stepsService.listStepDetails(experimentId);
-  revalidatePath(`/experiments/${experimentId}`);
-  return { ok: true, data: details };
 }
 
 // Called directly by StepRunner (never a raw <form action> submit — actual
