@@ -57,9 +57,10 @@ test("revision diff and restore", async ({ page }) => {
   await page.getByRole("button", { name: "Restore this version" }).first().click();
   await page.getByPlaceholder(/always required/).fill("Trying to restore a locked record.");
   await page.getByRole("button", { name: "Confirm restore" }).click();
-  // Scoped to the toast: the criteria panel now also carries the word
-  // "locked" (its §8.6 badge), so a bare /locked/i matches two elements.
-  await expect(page.getByText(/is locked \(status/i)).toBeVisible({ timeout: 15000 });
+  // Matched on a phrase unique to the trigger's own sentence. A bare /locked/i
+  // now hits two elements, because the criteria panel carries its own §8.6
+  // lock badge.
+  await expect(page.getByText(/Reopen it with a documented reason/i)).toBeVisible({ timeout: 15000 });
 
   // Cleanup — the record is completed (terminal), so archive is the
   // close-out, not the in-progress "Close out…" picker.
