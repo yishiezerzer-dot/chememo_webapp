@@ -85,6 +85,29 @@ describe("import limits (denial of service)", () => {
   });
 });
 
+// The export prefixes an apostrophe onto anything a spreadsheet would treat as
+// a formula. These prove the import undoes exactly that and no more, so the
+// round trip does not accumulate apostrophes or eat legitimate ones.
+describe("formula-guard round trip", () => {
+  it("strips the export's guard back off", () => {
+    // The name cell is written the way the export would write it: the inner
+    // quotes doubled and the whole cell quoted.
+    const { inputs } = mapped(
+      `${HEADER}\n,"'=HYPERLINK(""http://x"")",,,,,,,,,,,'=cmd,'@SUM(A1)`
+    );
+    expect(inputs[0].name).toBe('=HYPERLINK("http://x")');
+    expect(inputs[0].observations).toBe("=cmd");
+    expect(inputs[0].notes).toBe("@SUM(A1)");
+  });
+
+  it("leaves an apostrophe that is part of the value alone", () => {
+    // No risky character follows, so this is someone's actual text.
+    const { inputs } = mapped(`${HEADER}\n,'tis a name,,,,,,,,,,,'twas observed,`);
+    expect(inputs[0].name).toBe("'tis a name");
+    expect(inputs[0].observations).toBe("'twas observed");
+  });
+});
+
 describe("mapCsvToInputs", () => {
   it("round-trips a row in the shape the CSV export writes", () => {
     const { inputs, rowErrors } = mapped(

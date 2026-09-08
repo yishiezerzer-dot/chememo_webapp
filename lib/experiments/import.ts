@@ -153,12 +153,20 @@ const blankInput = (): ExperimentInput => ({
   quantities: {},
 });
 
+// The export prefixes an apostrophe onto any value a spreadsheet would
+// evaluate as a formula (csvCell in experiments/actions.ts). Strip exactly
+// that guard back off here, so an export/import round trip returns the
+// original text rather than quietly accumulating apostrophes. The pattern
+// requires the risky character to follow, so a value that legitimately begins
+// with an apostrophe survives untouched.
+const unguard = (v: string): string => (/^'[=+\-@\t\r]/.test(v) ? v.slice(1) : v);
+
 // The export joins list columns with "; ". Split on ";" alone so a file typed
 // by hand without the space still works.
 const splitList = (v: string): string[] =>
-  v.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
+  v.split(";").map((s) => unguard(s.trim())).filter((s) => s.length > 0);
 
-const orNull = (v: string): string | null => (v.trim() === "" ? null : v.trim());
+const orNull = (v: string): string | null => (v.trim() === "" ? null : unguard(v.trim()));
 
 function numberOrNull(v: string, label: string, errors: string[]): number | null {
   if (v.trim() === "") return null;
@@ -280,7 +288,7 @@ export function mapCsvToInputs(
 
     const input: ExperimentInput = {
       ...blankInput(),
-      name: at(row, "Name").trim(),
+      name: unguard(at(row, "Name").trim()),
       date: orNull(at(row, "Date")),
       researcher: orNull(at(row, "Researcher")),
       project,

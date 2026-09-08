@@ -208,7 +208,16 @@ export async function createExperiment(
   // (D10's rule extended): the instantiate/clone actions set these
   // explicitly. template_version_id freezes that version via the
   // experiments_freeze_template_version trigger the moment this insert lands.
-  provenance?: { templateVersionId?: string | null; basedOnExperimentId?: string | null }
+  provenance?: { templateVersionId?: string | null; basedOnExperimentId?: string | null },
+  // T4.1 — bulk callers pass true. One CSV import creates up to 500 records,
+  // and the fire-and-forget embed below does NOT go through lib/ai/service.ts:
+  // no concurrency slot, no rate limit, no ai_requests row. So a single import
+  // would put up to 500 concurrent unmetered calls on the embedding provider,
+  // and the 429s that follow would burn attempts on unrelated legitimate jobs
+  // until index-jobs marks them failed. The durable index_jobs row is already
+  // written by the DB trigger, so skipping the fast path costs nothing but
+  // latency: the poller drains them 20 at a time.
+  options?: { skipIndexFastPath?: boolean }
 ): Promise<string> {
   const id = await nextExperimentId();
   // D2 — status has no DB default (a legacy row stays null); a *new* row is
@@ -233,9 +242,11 @@ export async function createExperiment(
   // row — runIndexJob is the fast-path attempt at that job; if it fails or
   // the process dies before it finishes, the poller in lib/index-jobs.ts
   // picks it up from the durable row instead of losing it silently (T0.5).
-  void runIndexJob(id).catch((e) =>
-    logError("index-jobs", `create ${id} failed`, { error: e })
-  );
+  if (!options?.skipIndexFastPath) {
+    void runIndexJob(id).catch((e) =>
+      logError("index-jobs", `create ${id} failed`, { error: e })
+    );
+  }
 
   return id;
 }
