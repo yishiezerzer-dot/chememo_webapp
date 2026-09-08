@@ -69,10 +69,30 @@ deliberately read-only under RLS and the write is machine-generated.
 requests to `/login` (public: `/login`, `/auth`, `/api/health`). Do not insert code between
 `createServerClient` and `getUser()` there — it causes random logouts.
 
-Every server action opens with `requireUser()` or `requireWorkspace()` from
-`lib/authorization/policies.ts`. That is only the "is anyone signed in" check. **Real authorization
-is Postgres RLS** (read-all, edit-own, workspace-scoped) — enforcing permissions in TypeScript
-instead of a policy is the wrong layer.
+Server actions authenticate in one of **three** ways. Pick the one that matches the caller, and do
+not "fix" code using another — all three are deliberate:
+
+1. **`requireUser()` / `requireWorkspace()`** from `lib/authorization/policies.ts` — the default, and
+   what every mutating action uses. `requireWorkspace()` redirects on write paths.
+2. **Inline `supabase.auth.getUser()` then `if (!user) return null`** — the AI actions
+   (`ask/actions.ts`, `compare-actions.ts`, `suggestion-actions.ts`). They return `null` for *every*
+   unavailable condition (disabled, rate-limited, no result), so the UI needs no separate error
+   state, and throwing would break that.
+3. **No explicit check, relying on the RLS session client** — the disclosure loaders
+   (`listVersionsAction`, `getMaterialDetailAction`, `listCommentsAction`). These read through
+   `lib/supabase/server.ts`, so an unauthenticated caller sees zero rows rather than a leak.
+
+That is only ever the "is anyone signed in" question. **Real authorization is Postgres RLS**
+(read-all, edit-own, workspace-scoped) — enforcing permissions in TypeScript instead of a policy is
+the wrong layer.
+
+**Writing a policy is not finished until you can answer "which columns, by whom".** RLS `with check`
+cannot see `OLD`, so "this column did not change" is inexpressible as a policy and needs a
+`before update` trigger (see `20260908120000_comment_update_integrity.sql`, written after T2.1's
+rewrite left `comments` UPDATE-able by any workspace writer — body, author and all — with the
+rewritten text re-embedded into RAG under the original author's name). Every policy change ships
+with a `tests/rls/` case asserting the **negative**: that someone who should not be able to do the
+thing, cannot.
 
 Workspace scoping has two entry points with intentionally different failure modes:
 `requireWorkspace()` redirects to `/workspaces/new` (write paths), while `activeWorkspaceId()`
@@ -125,6 +145,24 @@ fast-path promise so a slow embedding API never blocks a redirect.
 Timestamped SQL in `supabase/migrations/`, applied with `supabase db push`. CI's `rls` job runs
 `supabase start` against a fresh Postgres, so a SQL error in any migration fails CI — that step
 doubles as migration validation.
+
+**CI cannot validate a data migration, only a schema one.** A fresh Postgres has no `auth.users`
+rows and no data, so any backfill guarded on a real account id is a silent no-op there. Before
+writing one, check it against these — each has bitten this repo:
+
+- **Does it `UPDATE experiments`?** `experiments_enforce_lifecycle` rejects any change to a **locked**
+  row whose diff touches a column outside `{status, locked_at, updated_at, reviewed_at, reviewed_by,
+  short_code}`. One locked row and the whole `db push` aborts. Bracket the statement with
+  `alter table experiments disable trigger …` / `enable trigger …`, as
+  `20260809120000` and `20260901120000` both do.
+- **Will it fire `experiments_record_revision`?** During `db push`, `auth.uid()` is null, so every
+  touched row gets an **unattributed edit** in its history — permanent noise in a lab notebook's
+  audit trail. Disable it for backfills.
+- **Will it fire `experiments_enqueue_index_job`?** That resets rows to `pending` and re-embeds them.
+  If the column you changed is not part of the embedded content, that is paid API calls for an
+  identical vector.
+- **Is its `WHERE` clause verified against the database it will actually run on?** "Verified against
+  chememo-dev" is not verification for production.
 
 ## Gotchas
 
