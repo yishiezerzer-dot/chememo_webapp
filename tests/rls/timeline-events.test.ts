@@ -81,16 +81,17 @@ describe.skipIf(!ready)("timeline_events (local Supabase)", () => {
     const { data: entry, error } = await log(userAClient, expId, userAId, "Precipitate formed at 40 min");
     expect(error).toBeNull();
 
-    const { error: updateErr } = await userAClient
+    // With no UPDATE and no DELETE policy, neither statement raises -- RLS
+    // makes the row invisible to them, so both match zero rows and report
+    // success. Asserting on the error would pass for the wrong reason (and
+    // did, in the first version of this test). What §10.2 actually requires is
+    // that the row is still there, unchanged, afterwards.
+    await userAClient
       .from("timeline_events")
       .update({ observation: "Actually nothing happened" })
       .eq("id", entry!.id);
-    expect(updateErr).not.toBeNull();
+    await userAClient.from("timeline_events").delete().eq("id", entry!.id);
 
-    const { error: deleteErr } = await userAClient.from("timeline_events").delete().eq("id", entry!.id);
-    // No DELETE policy means the delete matches no rows rather than raising;
-    // either way the row must survive, which is what §10.2 actually requires.
-    void deleteErr;
     const { data: still } = await userAClient
       .from("timeline_events")
       .select("observation")
@@ -190,11 +191,15 @@ describe.skipIf(!ready)("timeline_events (local Supabase)", () => {
 
   it("a structured write projects into the log automatically", async () => {
     const expId = await newExperiment();
+    // Every experiment auto-creates an implicit B1 batch by trigger (decision
+    // C3), so this reads that one rather than inserting a colliding label.
     const { data: batch } = await admin
       .from("batches")
-      .insert({ experiment_id: expId, label: "B1", workspace_id: workspaceId })
-      .select()
+      .select("id")
+      .eq("experiment_id", expId)
+      .limit(1)
       .single();
+    expect(batch?.id).toBeTruthy();
     const { data: sample } = await admin
       .from("samples")
       .insert({ batch_id: batch!.id, vial_label: "V1", workspace_id: workspaceId })
