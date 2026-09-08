@@ -93,7 +93,7 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
       .from("experiment_ai_suggestions")
       .insert({
         experiment_id: experimentId,
-        field: "hypothesis",
+        field: "observations",
         suggested_value: "Zn2+ templates the depsipeptide.",
         rationale: "Stated in the observations.",
         source: "gap_scan",
@@ -125,7 +125,7 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
     const id = await makeExperiment();
     const { error: ownerInsert } = await ownerClient.from("experiment_ai_suggestions").insert({
       experiment_id: id,
-      field: "hypothesis",
+      field: "observations",
       suggested_value: "x",
       rationale: "y",
       source: "gap_scan",
@@ -139,7 +139,7 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
     } = await otherClient.auth.getUser();
     const { error: otherInsert } = await otherClient.from("experiment_ai_suggestions").insert({
       experiment_id: id,
-      field: "hypothesis",
+      field: "observations",
       suggested_value: "x",
       rationale: "y",
       source: "gap_scan",
@@ -184,13 +184,13 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
 
   it("dismissing marks the suggestion dismissed without touching the experiment", async () => {
     const id = await makeExperiment();
-    const suggestionId = await makeSuggestion(id, { field: "next_steps", suggested_value: "Repeat at pH 8." });
+    const suggestionId = await makeSuggestion(id, { field: "notes", suggested_value: "Repeat at pH 8." });
 
     const { error } = await ownerClient.rpc("apply_ai_suggestion", { p_suggestion_id: suggestionId, p_accept: false });
     expect(error).toBeNull();
 
-    const { data: exp } = await admin.from("experiments").select("next_steps").eq("id", id).single();
-    expect(exp?.next_steps).toBeNull();
+    const { data: exp } = await admin.from("experiments").select("notes").eq("id", id).single();
+    expect(exp?.notes).toBeNull();
 
     const { data: suggestion } = await admin.from("experiment_ai_suggestions").select("status").eq("id", suggestionId).single();
     expect(suggestion?.status).toBe("dismissed");
@@ -198,8 +198,8 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
 
   it("D3 — accepting a crew_resolve suggestion also decrements the linked unresolved_open_count", async () => {
     const id = await makeExperiment();
-    const hypothesisItem = item("hypothesis");
-    const unresolved = [hypothesisItem, item("conclusion")];
+    const observationsItem = item("observations");
+    const unresolved = [observationsItem, item("conclusion")];
     const { error: provErr } = await admin.from("experiment_crew_provenance").insert({
       experiment_id: id,
       raw_source: "raw notes",
@@ -214,9 +214,9 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
     if (provErr) throw provErr;
 
     const suggestionId = await makeSuggestion(id, {
-      field: "hypothesis",
+      field: "observations",
       source: "crew_resolve",
-      unresolved_item_id: hypothesisItem.id,
+      unresolved_item_id: observationsItem.id,
     });
 
     const { error } = await ownerClient.rpc("apply_ai_suggestion", { p_suggestion_id: suggestionId, p_accept: true });
@@ -234,7 +234,7 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
   it("id-based lookup — resolves a crew_resolve suggestion correctly even when its stored position has gone stale (2026-08-18 fix)", async () => {
     const id = await makeExperiment();
     const conclusionItem = item("conclusion");
-    const unresolved = [item("hypothesis"), conclusionItem];
+    const unresolved = [item("observations"), conclusionItem];
     await admin.from("experiment_crew_provenance").insert({
       experiment_id: id,
       raw_source: "raw notes",
@@ -284,9 +284,9 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
   // cleared the first and left the clicked one still open).
   it("clears the exact item a suggestion is bound to, not the first sharing its field", async () => {
     const id = await makeExperiment();
-    const first = item("hypothesis", "No explicit predicted outcome is stated.");
-    const second = item("hypothesis", "No explicit hypothesis is provided.");
-    const third = item("hypothesis", "No explicit, testable prediction is stated.");
+    const first = item("observations", "No explicit predicted outcome is stated.");
+    const second = item("observations", "No explicit hypothesis is provided.");
+    const third = item("observations", "No explicit, testable prediction is stated.");
     await admin.from("experiment_crew_provenance").insert({
       experiment_id: id,
       raw_source: "raw notes",
@@ -301,7 +301,7 @@ describe.skipIf(!ready)("AI field suggestions (local Supabase)", () => {
 
     // Bound to the THIRD item specifically.
     const suggestionId = await makeSuggestion(id, {
-      field: "hypothesis",
+      field: "observations",
       suggested_value: "Cycling yields detectable depsipeptide masses.",
       source: "crew_resolve",
       unresolved_item_id: third.id,

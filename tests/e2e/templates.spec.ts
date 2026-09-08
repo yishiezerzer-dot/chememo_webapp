@@ -47,7 +47,9 @@ test("clone copies only the sections left checked", async ({ page }) => {
   const sourceName = `E2E clone source ${Date.now()}`;
   await page.goto("/new/blank");
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(sourceName);
-  await page.locator('textarea[name="notes"]').fill("Source hypothesis, should not clone.");
+  // Chemistry is the group under test now that the planning-narrative group is
+  // gone with its columns.
+  await page.locator('input[name="ph"]').fill("8.4");
   await page.getByRole("button", { name: "Save experiment" }).click();
   await page.waitForURL(/\/experiments\/EXP-\d+/);
   const sourceId = page.url().match(/EXP-\d+/)![0];
@@ -55,12 +57,12 @@ test("clone copies only the sections left checked", async ({ page }) => {
   await page.goto("/new/clone");
   await page.getByText(sourceName).click();
   await page.waitForURL(/\/new\/clone\/.+/);
-  await page.getByText("Planning narrative").click();
+  await page.getByText("Chemistry", { exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
 
   const nameInput = page.getByPlaceholder("His + TGA + Zn — wet–dry cycling");
   await expect(nameInput).toHaveValue("");
-  await expect(page.locator('textarea[name="notes"]')).toHaveValue("");
+  await expect(page.locator('input[name="ph"]')).toHaveValue("");
 
   const cloneName = `E2E clone result ${Date.now()}`;
   await nameInput.fill(cloneName);

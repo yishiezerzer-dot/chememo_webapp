@@ -98,7 +98,7 @@ describe.skipIf(!ready)("experiment templates (local Supabase)", () => {
       .insert({
         template_id: template!.id,
         version: 1,
-        defaults: { scientific_question: "Does X affect Y?" },
+        defaults: { researcher: "Ada Lovelace" },
         required_fields: [],
         created_by: userAId,
       })
@@ -110,7 +110,7 @@ describe.skipIf(!ready)("experiment templates (local Supabase)", () => {
     // Still unfrozen: editable by any authenticated user.
     const { error: editBeforeErr } = await userBClient
       .from("experiment_template_versions")
-      .update({ required_fields: ["scientific_question"] })
+      .update({ required_fields: ["researcher"] })
       .eq("id", version!.id);
     expect(editBeforeErr).toBeNull();
 
