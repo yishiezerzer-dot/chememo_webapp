@@ -8,6 +8,7 @@ import {
   signedUrlsFor,
 } from "@/lib/experiments/service";
 import { listChangeLog } from "@/lib/experiments/change-log";
+import { listTimeline } from "@/lib/timeline/service";
 import { listProjects } from "@/lib/projects/service";
 import { listControlledVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
@@ -42,6 +43,7 @@ import {
 } from "./steps-actions";
 import { createRelationshipAction, deleteRelationshipAction } from "./relationships-actions";
 import { restoreRevisionAction } from "./restore-actions";
+import { addLogEntryAction } from "./timeline-actions";
 import { addExperimentToSeriesAction, removeExperimentFromSeriesAction } from "@/app/(app)/series/actions";
 import { listComments } from "@/lib/comments/service";
 import { listTasks } from "@/lib/tasks/service";
@@ -74,6 +76,7 @@ import { LifecycleControls } from "@/components/lifecycle-controls";
 import { StepRunner } from "@/components/step-runner";
 import { CommentThread } from "@/components/comment-thread";
 import { TasksPanel } from "@/components/tasks-panel";
+import { TimelinePanel } from "@/components/timeline-panel";
 import { ExportMarkdownButton } from "@/components/export-markdown-button";
 import { ExperimentViewProvider, ExperimentHeading, ExperimentStatusBadge } from "@/components/experiment-view";
 
@@ -145,9 +148,10 @@ export default async function ExperimentDetailPage({
   if (!result) notFound();
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
-  const [timeline, stepDetails] = await Promise.all([
+  const [timeline, stepDetails, logEvents] = await Promise.all([
     listChangeLog(id, e, files),
     e.protocol_version_id ? listStepDetails(e.id) : Promise.resolve([]),
+    listTimeline(id),
   ]);
   const protocolVersionLabel = protocolVersions.find((v) => v.id === e.protocol_version_id)?.label;
 
@@ -294,6 +298,13 @@ export default async function ExperimentDetailPage({
 
       <div className="detail-grid">
         <div>
+          {/* The log sits first in the main column deliberately: it is what a
+              scientist comes to this page to read and to add to. The structured
+              panels below all project into it. */}
+          <div style={{ marginBottom: 16 }}>
+            <TimelinePanel experimentId={e.id} events={logEvents} addEntry={addLogEntryAction} />
+          </div>
+
           <div className="spec-grid">
             {specs.map((s) => (
               <div key={s.k} className="spec">
