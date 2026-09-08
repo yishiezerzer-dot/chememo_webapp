@@ -1,0 +1,43 @@
+name: Lockfile
+
+# One-shot helper, not part of the gate. package-lock.json cannot be generated
+# correctly on the Windows dev machine: this tree has platform-specific
+# optional subtrees (@tailwindcss/oxide-wasm32-wasi needs @emnapi/core ^1.11.1
+# and @emnapi/wasi-threads ^1.2.2) that npm on Windows never resolves, so the
+# lockfile it writes is missing entries `npm ci` demands on Linux. That has
+# broken CI three times: 2026-08-11, and again on 2026-09-07 via f4dce60.
+#
+# Push a branch named chore/lockfile to regenerate it on the same platform and
+# Node version CI actually uses, prove `npm ci` accepts the result, and publish
+# it as an artifact to commit.
+on:
+  push:
+    branches: [chore/lockfile]
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Regenerate the lockfile from package.json
+        run: |
+          rm -f package-lock.json
+          npm install --no-audit --no-fund
+
+      - name: Prove npm ci accepts it
+        run: |
+          rm -rf node_modules
+          npm ci
+
+      - name: Show the entries that were missing before
+        run: npm ls @emnapi/core @emnapi/runtime @emnapi/wasi-threads --all || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-lock
+          path: package-lock.json
