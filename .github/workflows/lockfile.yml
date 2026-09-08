@@ -24,6 +24,12 @@ jobs:
         with:
           node-version: 22
 
+      # Node 22 ships npm 10, which dies on this dependency graph with
+      # "Cannot read properties of null (reading 'edgesOut')" -- an arborist
+      # bug, not a problem with the tree. npm 11 resolves it.
+      - name: Use npm 11
+        run: npm install -g npm@11
+
       - name: Regenerate the lockfile from package.json
         run: |
           rm -f package-lock.json
