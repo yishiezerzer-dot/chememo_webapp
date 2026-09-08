@@ -137,3 +137,16 @@ doubles as migration validation.
   hard-refusing to run against production. Leave both guards intact.
 - `npm audit` and the dependency scan in CI are non-blocking on purpose: the high-severity findings
   trace to `eslint-config-next`'s own dependency tree.
+- **Never commit a `package-lock.json` generated on this machine.** Adding or bumping a dependency on
+  Windows produces a lockfile `npm ci` rejects on Linux, so CI dies at the install step before a
+  single test runs. The cause is not "npm prunes `@emnapi`" — that is the symptom. This tree has
+  platform-specific optional subtrees (`@tailwindcss/oxide-wasm32-wasi` and friends) that npm on
+  win32 cannot resolve at all, so their nested dependencies never get recorded. No local incantation
+  fixes it: a clean `rm -rf node_modules package-lock.json && npm install` still omits them, and
+  `--os=linux --cpu=x64` makes it worse. It has broken the build three times (2026-08-11, and
+  2026-09-07 via `f4dce60`, which left CI red until 2026-09-08).
+  **Instead:** change `package.json`, push a branch named `chore/lockfile`, and
+  `.github/workflows/lockfile.yml` regenerates the lockfile on ubuntu with CI's own Node, proves
+  `npm ci` accepts it, and uploads it as an artifact to commit. Note that job installs npm 11 first —
+  Node 22's bundled npm 10 fails on this graph with `Cannot read properties of null (reading
+  'edgesOut')`, an arborist bug rather than anything wrong with the tree.

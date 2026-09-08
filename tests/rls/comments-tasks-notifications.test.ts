@@ -84,6 +84,89 @@ describe.skipIf(!ready)("comments, tasks, notifications (local Supabase)", () =>
     expect(resolveAsBErr).toBeNull();
   });
 
+  // 20260908120000 — comments_update checks workspace-writer and nothing else,
+  // and PostgREST is reachable from the browser with the user's own JWT, so
+  // these are the only limits that exist. The body case is the one that
+  // matters most: trg_evidence_chunk_comment fires on UPDATE too, so a
+  // rewritten body is re-embedded and served back in RAG answers still
+  // attributed to its original author.
+  it("comments: a non-author cannot rewrite the body, the author, or who resolved it", async () => {
+    const expId = await newExperiment();
+    const { data: comment } = await userAClient
+      .from("comments")
+      .insert({ target_type: "experiment", target_id: expId, body: "Original wording", created_by: userAId })
+      .select()
+      .single();
+
+    // userB is a writer in this workspace, and still cannot rewrite the text.
+    const { error: bodyErr } = await userBClient
+      .from("comments")
+      .update({ body: "Rewritten by someone else" })
+      .eq("id", comment!.id);
+    expect(bodyErr).not.toBeNull();
+
+    const { data: afterBody } = await userAClient
+      .from("comments")
+      .select("body")
+      .eq("id", comment!.id)
+      .single();
+    expect(afterBody!.body).toBe("Original wording");
+
+    // Reassigning authorship is refused for everyone, the author included.
+    const { error: authorErr } = await userAClient
+      .from("comments")
+      .update({ created_by: userBId })
+      .eq("id", comment!.id);
+    expect(authorErr).not.toBeNull();
+
+    // Forging the sign-off: resolving is allowed, resolving as someone else is not.
+    const { error: forgedErr } = await userBClient
+      .from("comments")
+      .update({ resolved_at: new Date().toISOString(), resolved_by: userAId })
+      .eq("id", comment!.id);
+    expect(forgedErr).not.toBeNull();
+
+    // The target cannot be repointed after the fact.
+    const otherExp = await newExperiment();
+    const { error: targetErr } = await userAClient
+      .from("comments")
+      .update({ target_id: otherExp })
+      .eq("id", comment!.id);
+    expect(targetErr).not.toBeNull();
+
+    // What must still work: the author edits their own text, and anyone
+    // resolves and reopens as themselves.
+    const { error: ownEditErr } = await userAClient
+      .from("comments")
+      .update({ body: "Reworded by its author" })
+      .eq("id", comment!.id);
+    expect(ownEditErr).toBeNull();
+
+    const { error: resolveErr } = await userBClient
+      .from("comments")
+      .update({ resolved_at: new Date().toISOString(), resolved_by: userBId })
+      .eq("id", comment!.id);
+    expect(resolveErr).toBeNull();
+
+    const { error: reopenErr } = await userBClient
+      .from("comments")
+      .update({ resolved_at: null, resolved_by: null })
+      .eq("id", comment!.id);
+    expect(reopenErr).toBeNull();
+
+    // And the author can still edit a comment somebody else resolved — the
+    // resolved_by rule is checked only when resolved_by itself changes.
+    await userBClient
+      .from("comments")
+      .update({ resolved_at: new Date().toISOString(), resolved_by: userBId })
+      .eq("id", comment!.id);
+    const { error: editWhileResolvedErr } = await userAClient
+      .from("comments")
+      .update({ body: "Edited after someone else resolved it" })
+      .eq("id", comment!.id);
+    expect(editWhileResolvedErr).toBeNull();
+  });
+
   it("tasks: lab-shared read, owner-only insert, any authenticated user can update status", async () => {
     const expId = await newExperiment();
 
