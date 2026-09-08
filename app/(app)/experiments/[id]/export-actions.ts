@@ -8,7 +8,7 @@ import { listVersionOptions } from "@/lib/protocols/service";
 import { listRelationships } from "@/lib/relationships/service";
 import { listTasks } from "@/lib/tasks/service";
 import { listStepDetails } from "@/lib/experiment-steps/service";
-import { listTimeline } from "@/lib/experiments/timeline";
+import { listChangeLog } from "@/lib/experiments/change-log";
 import { buildExperimentMarkdown } from "@/lib/export/markdown";
 import { AppError } from "@/lib/errors";
 
@@ -26,7 +26,7 @@ export async function exportExperimentMarkdownAction(experimentId: string): Prom
     listVersionOptions(),
     listRelationships(experimentId),
     listTasks("experiment", experimentId),
-    listTimeline(experimentId, experiment, files),
+    listChangeLog(experimentId, experiment, files),
     experiment.owner_id
       ? supabase.from("profiles").select("full_name, initials").eq("id", experiment.owner_id).maybeSingle()
       : Promise.resolve({ data: null }),

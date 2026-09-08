@@ -4,7 +4,7 @@ import { diffExperiments, type DiffField } from "@/lib/diff";
 import { listLockEvents, listRevisions } from "@/lib/experiments/service";
 import type { Experiment, ExperimentFile } from "@/lib/types";
 
-export type TimelineEntry =
+export type ChangeLogEntry =
   | { kind: "revision"; id: string; created_at: string; actorName: string; diff: DiffField[] }
   | { kind: "lock_event"; id: string; created_at: string; actorName: string; event: "lock" | "reopen" | "restore"; reason: string }
   | { kind: "file"; id: string; created_at: string; actorName: string; label: string; fileKind: "upload" | "link" };
@@ -17,11 +17,11 @@ export type TimelineEntry =
 // re-querying them — two fewer round trips per page render, which matters
 // since this runs on every router.refresh() the step-runner/protocol/
 // relationships panels on the same page trigger.
-export async function listTimeline(
+export async function listChangeLog(
   experimentId: string,
   current: Experiment,
   files: ExperimentFile[]
-): Promise<TimelineEntry[]> {
+): Promise<ChangeLogEntry[]> {
   const supabase = await createClient();
   const [revisions, lockEvents] = await Promise.all([
     listRevisions(experimentId),
@@ -42,7 +42,7 @@ export async function listTimeline(
   // Revisions are stored oldest-context-first in the array (listRevisions
   // orders newest first); each row IS the state right before the edit that
   // produced the next-newer snapshot (or the current record, for the newest).
-  const revisionEntries: TimelineEntry[] = revisions
+  const revisionEntries: ChangeLogEntry[] = revisions
     .map((r, i) => {
       const after = i === 0 ? current : revisions[i - 1].snapshot;
       return {
@@ -57,7 +57,7 @@ export async function listTimeline(
     // already sitting in the DB from before the fix shipped.
     .filter((entry) => entry.diff.length > 0);
 
-  const lockEntries: TimelineEntry[] = lockEvents.map((e) => ({
+  const lockEntries: ChangeLogEntry[] = lockEvents.map((e) => ({
     kind: "lock_event",
     id: e.id,
     created_at: e.created_at,
@@ -66,7 +66,7 @@ export async function listTimeline(
     reason: e.reason,
   }));
 
-  const fileEntries: TimelineEntry[] = files.map((f) => ({
+  const fileEntries: ChangeLogEntry[] = files.map((f) => ({
     kind: "file",
     id: f.id,
     created_at: f.created_at,

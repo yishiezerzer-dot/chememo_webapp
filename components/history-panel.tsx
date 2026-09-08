@@ -6,7 +6,7 @@ import { useExperimentView } from "@/components/experiment-view";
 import { useRunAction } from "@/lib/use-run-action";
 import { useStickyState } from "@/lib/use-sticky-state";
 import type { ActionResult } from "@/lib/types";
-import type { TimelineEntry } from "@/lib/experiments/timeline";
+import type { ChangeLogEntry } from "@/lib/experiments/change-log";
 import type { DiffField } from "@/lib/diff";
 
 const fmt = (iso: string) => iso.slice(0, 16).replace("T", " ");
@@ -126,7 +126,7 @@ export function HistoryPanel({
   isOwner,
   restoreRevision,
 }: {
-  entries: TimelineEntry[];
+  entries: ChangeLogEntry[];
   isOwner: boolean;
   restoreRevision: (revisionId: string, reason: string) => Promise<ActionResult<{ name: string }>>;
 }) {

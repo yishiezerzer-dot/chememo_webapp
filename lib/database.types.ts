@@ -3565,6 +3565,131 @@ export type Database = {
           },
         ]
       }
+      timeline_events: {
+        Row: {
+          action: string | null
+          actor_id: string | null
+          batch_id: string | null
+          corrects_event_id: string | null
+          created_at: string
+          details: Json
+          deviation_note: string | null
+          event_type: string
+          experiment_id: string
+          experiment_step_id: string | null
+          file_id: string | null
+          id: string
+          next_action: string | null
+          observation: string | null
+          occurred_at: string
+          quality_flags: string[]
+          recorded_at: string
+          sample_id: string | null
+          source_id: string | null
+          source_type: string | null
+          subject_label: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          actor_id?: string | null
+          batch_id?: string | null
+          corrects_event_id?: string | null
+          created_at?: string
+          details?: Json
+          deviation_note?: string | null
+          event_type?: string
+          experiment_id: string
+          experiment_step_id?: string | null
+          file_id?: string | null
+          id?: string
+          next_action?: string | null
+          observation?: string | null
+          occurred_at?: string
+          quality_flags?: string[]
+          recorded_at?: string
+          sample_id?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          subject_label?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          actor_id?: string | null
+          batch_id?: string | null
+          corrects_event_id?: string | null
+          created_at?: string
+          details?: Json
+          deviation_note?: string | null
+          event_type?: string
+          experiment_id?: string
+          experiment_step_id?: string | null
+          file_id?: string | null
+          id?: string
+          next_action?: string | null
+          observation?: string | null
+          occurred_at?: string
+          quality_flags?: string[]
+          recorded_at?: string
+          sample_id?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          subject_label?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_corrects_event_id_fkey"
+            columns: ["corrects_event_id"]
+            isOneToOne: false
+            referencedRelation: "timeline_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_experiment_step_id_fkey"
+            columns: ["experiment_step_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_sample_id_fkey"
+            columns: ["sample_id"]
+            isOneToOne: false
+            referencedRelation: "samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           joined_at: string
@@ -3754,12 +3879,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3783,11 +3908,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3808,11 +3933,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3833,11 +3958,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3850,11 +3975,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

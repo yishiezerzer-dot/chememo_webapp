@@ -7,7 +7,7 @@ import {
   getExperimentSummary,
   signedUrlsFor,
 } from "@/lib/experiments/service";
-import { listTimeline } from "@/lib/experiments/timeline";
+import { listChangeLog } from "@/lib/experiments/change-log";
 import { listProjects } from "@/lib/projects/service";
 import { listControlledVocab } from "@/lib/experiments/service";
 import { listQuantityKinds } from "@/lib/quantities/service";
@@ -146,7 +146,7 @@ export default async function ExperimentDetailPage({
   const aiEnabled = isLlmEnabled();
   const { experiment: e, files } = result;
   const [timeline, stepDetails] = await Promise.all([
-    listTimeline(id, e, files),
+    listChangeLog(id, e, files),
     e.protocol_version_id ? listStepDetails(e.id) : Promise.resolve([]),
   ]);
   const protocolVersionLabel = protocolVersions.find((v) => v.id === e.protocol_version_id)?.label;
@@ -562,7 +562,7 @@ export default async function ExperimentDetailPage({
 // Promise.all — every lifecycle/step-runner action calls router.refresh(),
 // which re-runs that whole load, and folding tasks in there would slow down
 // every one of those refreshes for data that isn't part of the transition
-// being confirmed (the T1.8 listTimeline duplicate-query bug was the same
+// being confirmed (the T1.8 listChangeLog duplicate-query bug was the same
 // shape of mistake).
 async function TasksSection({ experimentId }: { experimentId: string }) {
   const tasks = await listTasks("experiment", experimentId);

@@ -2,7 +2,7 @@ import type { Experiment, QuantityKind } from "@/lib/types";
 import type { RelationshipView } from "@/lib/relationships/service";
 import type { TaskView } from "@/lib/tasks/service";
 import type { StepDetail } from "@/lib/experiment-steps/service";
-import type { TimelineEntry } from "@/lib/experiments/timeline";
+import type { ChangeLogEntry } from "@/lib/experiments/change-log";
 import { toStandardFieldName } from "@/lib/quantities/convert";
 
 export type ExperimentExportInput = {
@@ -14,7 +14,7 @@ export type ExperimentExportInput = {
   relationships: RelationshipView[];
   tasks: TaskView[];
   stepDetails: StepDetail[];
-  revisions: TimelineEntry[];
+  revisions: ChangeLogEntry[];
 };
 
 const fmtDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
@@ -175,7 +175,7 @@ export function buildExperimentMarkdown(input: ExperimentExportInput): string {
     lines.push("");
   }
 
-  const revisionEntries = input.revisions.filter((r): r is Extract<TimelineEntry, { kind: "revision" }> => r.kind === "revision");
+  const revisionEntries = input.revisions.filter((r): r is Extract<ChangeLogEntry, { kind: "revision" }> => r.kind === "revision");
   if (revisionEntries.length > 0) {
     lines.push("## Change log", "", "| Date | Person | Change |", "|---|---|---|");
     for (const rev of revisionEntries) {
