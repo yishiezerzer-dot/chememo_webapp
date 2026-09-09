@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./helpers";
+import { openAdvanced, openFormPlan, signIn } from "./helpers";
 
 // T1.5 — create a protocol with one step, link it to a new experiment,
 // instantiate steps, run the step (start/complete with actuals), log an
@@ -28,11 +28,13 @@ test("versioned protocol steps: create, link, run, and freeze", async ({ page })
   const name = `E2E protocol-linked experiment ${Date.now()}`;
   await page.goto("/new/blank");
   await page.getByPlaceholder("His + TGA + Zn — wet–dry cycling").fill(name);
+  await openFormPlan(page);
   const protocolField = page.locator(".field", { has: page.locator("label", { hasText: "Protocol version" }) });
   await protocolField.locator("select").selectOption({ label: `${protocolName} v1` });
 
   await page.getByRole("button", { name: "Save experiment" }).click();
   await page.waitForURL(/\/experiments\/EXP-\d+/);
+  await openAdvanced(page);
 
   // Scoped to the Protocol & steps box — the experiment's own
   // LifecycleControls also renders a "Start" button (draft -> in_progress)
@@ -71,6 +73,7 @@ test("versioned protocol steps: create, link, run, and freeze", async ({ page })
 
   const id = page.url().match(/EXP-\d+/)![0];
   await page.goto(`/experiments/${id}`);
+  await openAdvanced(page);
   await page.getByRole("button", { name: "Delete draft", exact: true }).click();
   await page.getByRole("button", { name: "Confirm delete" }).click();
   await page.waitForURL(/\/experiments$/);

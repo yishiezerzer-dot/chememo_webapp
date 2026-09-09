@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./helpers";
+import { openAdvanced, signIn } from "./helpers";
 
 // T1.9 — post a comment, then a second comment @mentioning the same author
 // (the only "other user" identity available without T2.1's membership
@@ -17,6 +17,7 @@ test("comments, mentions, notifications, and tasks", async ({ page }) => {
   await page.getByRole("button", { name: "Save experiment" }).click();
   await page.waitForURL(/\/experiments\/EXP-\d+/);
   const id = page.url().match(/EXP-\d+/)![0];
+  await openAdvanced(page);
 
   const commentsBox = page.locator(".obs-box", { has: page.locator("h4", { hasText: "Comments" }) });
 
@@ -42,6 +43,7 @@ test("comments, mentions, notifications, and tasks", async ({ page }) => {
 
   // Tasks: a blocked status persists with its blocker note.
   await page.goto(`/experiments/${id}`);
+  await openAdvanced(page);
   const tasksBox = page.locator(".obs-box", { has: page.locator("h4", { hasText: "Tasks" }) });
   await tasksBox.getByPlaceholder("New task…").fill("A real task");
   await tasksBox.getByRole("button", { name: "+ Add" }).click();

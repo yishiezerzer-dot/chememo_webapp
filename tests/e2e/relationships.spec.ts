@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./helpers";
+import { openAdvanced, signIn } from "./helpers";
 
 // T1.7 — link two experiments (replicate_of), confirm the relationship
 // renders correctly (and inverse-labeled) on both sides, then group both
@@ -30,6 +30,7 @@ test("experiment relationships and series", async ({ page }) => {
 
   // The inverse direction shows on A's own page.
   await page.goto(`/experiments/${idA}`);
+  await openAdvanced(page);
   const relSectionA = page.locator(".obs-box", { has: page.locator("h4", { hasText: "Relationships" }) });
   await expect(relSectionA.getByText(new RegExp(`has a replicate.*${idB}`))).toBeVisible();
 

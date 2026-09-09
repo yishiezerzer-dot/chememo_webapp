@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./helpers";
+import { openFormPlan, signIn } from "./helpers";
 
 // T1.8 — edit an experiment (creating a revision), restore the prior
 // version, confirm the field actually reverts and a reason was required;
@@ -39,6 +39,7 @@ test("revision diff and restore", async ({ page }) => {
 
   // Lock the record (start requires acceptance criteria; complete requires a conclusion).
   await page.goto(`/experiments/${id}/edit`);
+  await openFormPlan(page);
   await page.locator('textarea[name="acceptance_criteria"]').fill("Some criteria.");
   await page.getByRole("button", { name: "Save changes" }).click();
   await page.waitForURL(new RegExp(`/experiments/${id}$`));
