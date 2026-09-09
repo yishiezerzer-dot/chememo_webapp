@@ -323,14 +323,62 @@ function ExperimentFormBody({
         <input type="hidden" name="draft_client_id" value={draftKey.clientDraftId} />
       )}
       <div className="form-sections">
-        <details className="fsec glass" open>
+        <section className="fsec glass">
+          <h3>
+            <span className="sec-num">01</span>Identity
+          </h3>
+          <p className="sec-sub">What the experiment is and who ran it.</p>
+          <div className="field">
+            <label>Name{nameRequired ? " *" : ""}</label>
+            <input
+              name="name"
+              required={nameRequired}
+              defaultValue={initial?.name ?? ""}
+              placeholder="His + TGA + Zn — wet–dry cycling"
+            />
+            <FieldError message={fieldErrors?.name} />
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label>Date</label>
+              <input type="date" name="date" defaultValue={initial?.date ?? ""} />
+              <FieldError message={fieldErrors?.date} />
+            </div>
+            <div className="field">
+              <label>Researcher</label>
+              <input name="researcher" defaultValue={initial?.researcher ?? ""} placeholder="Y. Ezerzer" />
+              <FieldError message={fieldErrors?.researcher} />
+            </div>
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label>Project</label>
+              <select name="project" defaultValue={initial?.project ?? ""}>
+                <option value="">— none —</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={fieldErrors?.project} />
+            </div>
+            <div className="field">
+              <label>Reaction type</label>
+              <input name="reaction_type" defaultValue={initial?.reaction_type ?? ""} placeholder="Wet–dry cycling / condensation" />
+              <FieldError message={fieldErrors?.reaction_type} />
+            </div>
+          </div>
+        </section>
+
+        <details className="fsec glass">
           <summary>
             <h3 style={{ display: "inline-flex" }}>
-              <span className="sec-num">01</span>Planning
+              <span className="sec-num">02</span>Plan
             </h3>
           </summary>
           <p className="sec-sub">
-            The §8.1 pre-registration — write this before the bench work starts.
+            Optional. Acceptance criteria can also wait until you press Start, which asks for them.
           </p>
                                                             <div className="grid-2">
                                   </div>
@@ -409,54 +457,6 @@ function ExperimentFormBody({
             <FieldError message={fieldErrors?.acceptance_criteria} />
           </div>
         </details>
-
-        <section className="fsec glass">
-          <h3>
-            <span className="sec-num">02</span>Identity
-          </h3>
-          <p className="sec-sub">What the experiment is and who ran it.</p>
-          <div className="field">
-            <label>Name{nameRequired ? " *" : ""}</label>
-            <input
-              name="name"
-              required={nameRequired}
-              defaultValue={initial?.name ?? ""}
-              placeholder="His + TGA + Zn — wet–dry cycling"
-            />
-            <FieldError message={fieldErrors?.name} />
-          </div>
-          <div className="grid-2">
-            <div className="field">
-              <label>Date</label>
-              <input type="date" name="date" defaultValue={initial?.date ?? ""} />
-              <FieldError message={fieldErrors?.date} />
-            </div>
-            <div className="field">
-              <label>Researcher</label>
-              <input name="researcher" defaultValue={initial?.researcher ?? ""} placeholder="Y. Ezerzer" />
-              <FieldError message={fieldErrors?.researcher} />
-            </div>
-          </div>
-          <div className="grid-2">
-            <div className="field">
-              <label>Project</label>
-              <select name="project" defaultValue={initial?.project ?? ""}>
-                <option value="">— none —</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <FieldError message={fieldErrors?.project} />
-            </div>
-            <div className="field">
-              <label>Reaction type</label>
-              <input name="reaction_type" defaultValue={initial?.reaction_type ?? ""} placeholder="Wet–dry cycling / condensation" />
-              <FieldError message={fieldErrors?.reaction_type} />
-            </div>
-          </div>
-        </section>
 
         <section className="fsec glass">
           <h3>
