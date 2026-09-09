@@ -189,6 +189,66 @@ describe.skipIf(!ready)("timeline_events (local Supabase)", () => {
     expect(error).not.toBeNull();
   });
 
+  // 20260912120000 — everything typed into the log has to be findable, or the
+  // app's central feature cannot see its own spine. And a projected row must
+  // NOT be indexed twice: it is already chunked under its own source type, and
+  // two hits for one fact let a single observation outvote two distinct ones
+  // in reciprocal-rank fusion.
+  it("indexes what you type into the log, and only once", async () => {
+    const expId = await newExperiment();
+    const { data: entry } = await log(userAClient, expId, userAId, "Cloudy precipitate at 40 minutes");
+
+    const { data: chunks } = await admin
+      .from("evidence_chunks")
+      .select("source_type, source_id, content, section_type")
+      .eq("source_type", "timeline_event")
+      .eq("source_id", entry!.id);
+    expect(chunks).toHaveLength(1);
+    expect(chunks![0].content).toContain("Cloudy precipitate at 40 minutes");
+    expect(chunks![0].content).toContain(expId);
+
+    // A deviation is explained back to the user differently from an
+    // observation, so it must not be filed as one.
+    const { data: dev } = await userAClient
+      .from("timeline_events")
+      .insert({ experiment_id: expId, actor_id: userAId, event_type: "deviated", deviation_note: "Wrong buffer used" })
+      .select()
+      .single();
+    const { data: devChunk } = await admin
+      .from("evidence_chunks")
+      .select("section_type")
+      .eq("source_id", dev!.id)
+      .maybeSingle();
+    expect(devChunk?.section_type).toBe("deviation");
+  });
+
+  it("does not index a projected row a second time", async () => {
+    const expId = await newExperiment();
+    const { data: batch } = await admin
+      .from("batches").select("id").eq("experiment_id", expId).limit(1).single();
+    const { data: sample } = await admin
+      .from("samples")
+      .insert({ batch_id: batch!.id, vial_label: "V-idx", workspace_id: workspaceId })
+      .select().single();
+
+    await userAClient.from("sample_events").insert({
+      sample_id: sample!.id, event_type: "transfer", performed_by: userAId, details: {},
+    });
+
+    const { data: projected } = await admin
+      .from("timeline_events").select("id").eq("experiment_id", expId).eq("source_type", "sample_events");
+    expect(projected).toHaveLength(1);
+
+    // sample_events has its own evidence-chunk trigger; the mirror must not
+    // add a second chunk for the same fact.
+    const { data: chunks } = await admin
+      .from("evidence_chunks")
+      .select("id")
+      .eq("source_type", "timeline_event")
+      .eq("source_id", projected![0].id);
+    expect(chunks ?? []).toHaveLength(0);
+  });
+
   it("a structured write projects into the log automatically", async () => {
     const expId = await newExperiment();
     // Every experiment auto-creates an implicit B1 batch by trigger (decision
