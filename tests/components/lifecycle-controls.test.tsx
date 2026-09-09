@@ -93,6 +93,45 @@ describe("LifecycleControls", () => {
     expect(startAction).toHaveBeenCalledWith("Depsipeptide dimer visible by LC-MS above 3x blank");
   });
 
+  it("drafts an answer into the box but never submits it", async () => {
+    // §18.6 — AI proposes, the scientist decides. A commitment nobody
+    // consciously made is worthless, so the draft fills the textarea and stops.
+    const startAction = vi.fn(async () => ({ ok: true as const }));
+    const draftGateAnswer = vi.fn(async () => "Dimer visible by LC-MS above 3x blank");
+
+    render(
+      <ToastProvider>
+        <ExperimentViewProvider name="Drafting" status="draft">
+          <ExperimentStatusBadge />
+          <LifecycleControls
+            hasConclusion={false}
+            hasAcceptanceCriteria={false}
+            setStatusAction={async () => ({ ok: true })}
+            startAction={startAction}
+            completeAction={async () => ({ ok: true })}
+            reviewAction={async () => ({ ok: true })}
+            draftGateAnswer={draftGateAnswer}
+          />
+        </ExperimentViewProvider>
+      </ToastProvider>
+    );
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Start" }).click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: /Draft from the log/ }).click();
+      await Promise.resolve();
+    });
+
+    expect(draftGateAnswer).toHaveBeenCalledWith("acceptance_criteria");
+    const box = screen.getByLabelText("How will you know this worked?") as HTMLTextAreaElement;
+    expect(box.value).toBe("Dimer visible by LC-MS above 3x blank");
+    // Filled, not submitted.
+    expect(startAction).not.toHaveBeenCalled();
+  });
+
   it("lets an exploratory experiment start without inventing criteria", async () => {
     // §8.6 permits committing to not pre-committing, so long as it is done
     // before seeing the data and is then locked. The old form made an honest

@@ -916,6 +916,16 @@ const fieldSuggestionsSchema = z.array(fieldSuggestionSchema);
 // already proven for the crew's own agents (agent-runner.ts) — a 500-token
 // budget asking about several fields at once is exactly the shape that
 // failure mode hits.
+// Exported so the lifecycle gates can draft their own answer from the log
+// without going through the suggestion *table*: those two questions want a
+// value in a textarea for the scientist to edit, not a pending row to accept.
+export async function suggestFieldsFromRecordText(
+  record: string,
+  fields: readonly SuggestibleField[]
+): Promise<FieldSuggestion[] | null> {
+  return suggestFieldsFromRecord(record, fields);
+}
+
 async function suggestFieldsFromRecord(
   record: string,
   fields: readonly SuggestibleField[]

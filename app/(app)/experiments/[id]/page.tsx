@@ -45,6 +45,7 @@ import { createRelationshipAction, deleteRelationshipAction } from "./relationsh
 import { restoreRevisionAction } from "./restore-actions";
 import { addLogEntryAction } from "./timeline-actions";
 import { proposeLogEntriesAction, commitLogEntriesAction } from "./filer-actions";
+import { draftGateAnswerAction } from "./gate-draft-actions";
 import { addExperimentToSeriesAction, removeExperimentFromSeriesAction } from "@/app/(app)/series/actions";
 import { listComments } from "@/lib/comments/service";
 import { listTasks } from "@/lib/tasks/service";
@@ -270,6 +271,8 @@ export default async function ExperimentDetailPage({
           startAction={startExperimentAction.bind(null, e.id)}
           completeAction={completeExperiment.bind(null, e.id)}
           reviewAction={reviewExperiment.bind(null, e.id)}
+          // Without a key there is no draft button, and the box is simply empty.
+          draftGateAnswer={aiEnabled ? draftGateAnswerAction.bind(null, e.id) : undefined}
         />
       )}
 

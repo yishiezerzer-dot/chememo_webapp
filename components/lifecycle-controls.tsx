@@ -53,6 +53,7 @@ function GatePrompt({
   onSubmit,
   onCancel,
   extraAction,
+  onDraft,
 }: {
   question: string;
   hint: string;
@@ -61,8 +62,11 @@ function GatePrompt({
   onSubmit: (text: string) => void;
   onCancel: () => void;
   extraAction?: { label: string; onClick: () => void };
+  /** Absent without an AI key — the box is then simply empty, as it always was. */
+  onDraft?: () => Promise<string | null>;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [drafting, setDrafting] = useState(false);
   return (
     // No aria-label on the wrapper: the textarea below carries it, and
     // duplicating it here made the accessible name ambiguous (two elements
@@ -82,6 +86,29 @@ function GatePrompt({
           {pending && <Spinner />}
           {cta}
         </button>
+        {onDraft && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={pending || drafting}
+            aria-busy={drafting}
+            onClick={async () => {
+              setDrafting(true);
+              try {
+                // Fills the box. Never submits: the answer to "how will you
+                // know this worked" is a commitment, and one nobody
+                // consciously made is worthless.
+                const draft = await onDraft();
+                if (draft && ref.current) ref.current.value = draft;
+              } finally {
+                setDrafting(false);
+              }
+            }}
+          >
+            {drafting && <Spinner />}
+            Draft from the log
+          </button>
+        )}
         {extraAction && (
           <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={extraAction.onClick}>
             {extraAction.label}
@@ -103,6 +130,7 @@ export function LifecycleControls({
   startAction,
   completeAction,
   reviewAction,
+  draftGateAnswer,
 }: {
   hasConclusion: boolean;
   // Defaults to true so a caller that hasn't been updated keeps today's
@@ -118,6 +146,7 @@ export function LifecycleControls({
   startAction: (criteria?: string) => Promise<ActionResult>;
   completeAction: (conclusion?: string) => Promise<ActionResult>;
   reviewAction: () => Promise<ActionResult>;
+  draftGateAnswer?: (field: "acceptance_criteria" | "conclusion") => Promise<string | null>;
 }) {
   const { run, pending } = useRunAction();
   const { status, patch } = useExperimentView();
@@ -212,6 +241,7 @@ export function LifecycleControls({
           hint="Locked once you start — this is the goalpost, and it cannot be moved after you see the result (§8.6)."
           cta="Start"
           pending={pending}
+          onDraft={draftGateAnswer ? () => draftGateAnswer("acceptance_criteria") : undefined}
           onCancel={() => setAsking(null)}
           extraAction={{
             label: "No pre-set criteria — exploratory",
@@ -236,6 +266,7 @@ export function LifecycleControls({
           hint="Required to complete (§15.2). One or two sentences is plenty — the detail is in the log."
           cta="Complete"
           pending={pending}
+          onDraft={draftGateAnswer ? () => draftGateAnswer("conclusion") : undefined}
           onCancel={() => setAsking(null)}
           onSubmit={(text) =>
             run(() => completeAction(text), undefined, () => {
