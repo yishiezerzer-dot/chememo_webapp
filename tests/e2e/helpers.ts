@@ -20,7 +20,15 @@ export async function signIn(page: Page): Promise<void> {
 // and a no-op on a page that has no disclosure.
 export async function openAdvanced(page: Page): Promise<void> {
   const panel = page.locator("details.fsec", { hasText: "Everything else" }).first();
-  if ((await panel.count()) === 0) return;
+  // Wait for it to exist rather than checking count() once: the page streams,
+  // so a bare count() right after a navigation is usually zero and the helper
+  // would then do nothing at all -- silently, which is how this failed the
+  // first time.
+  try {
+    await panel.waitFor({ state: "attached", timeout: 15000 });
+  } catch {
+    return;
+  }
   // Set `open` rather than clicking the summary: a click can land before the
   // page has hydrated and then do nothing, which is a flake that looks exactly
   // like a missing element. For a native <details> the two are equivalent.
@@ -34,7 +42,11 @@ export async function openAdvanced(page: Page): Promise<void> {
 // controls live there. Specs that fill any of those open it first.
 export async function openFormPlan(page: Page): Promise<void> {
   const section = page.locator("details.fsec", { hasText: "Plan" }).first();
-  if ((await section.count()) === 0) return;
+  try {
+    await section.waitFor({ state: "attached", timeout: 15000 });
+  } catch {
+    return;
+  }
   await section.evaluate((el) => {
     (el as HTMLDetailsElement).open = true;
   });
