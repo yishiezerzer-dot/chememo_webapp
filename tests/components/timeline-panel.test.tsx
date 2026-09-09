@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TimelinePanel } from "@/components/timeline-panel";
 import { ToastProvider } from "@/components/toast-provider";
@@ -72,6 +72,32 @@ describe("TimelinePanel", () => {
     // The server's timestamp is what renders, so the row on screen is the row
     // in the database.
     expect(screen.getByText("11:00")).toBeTruthy();
+  });
+
+  it("reads the sentence as you type, and says what it based that on", async () => {
+    // The keyless path: no key, no network, no model. It runs on every
+    // keystroke and is the mechanism the AI filer later improves on.
+    render(
+      <ToastProvider>
+        <TimelinePanel experimentId="EXP-1" events={[]} addEntry={async () => ({ ok: true })} />
+      </ToastProvider>
+    );
+
+    const box = screen.getByLabelText("Log entry") as HTMLTextAreaElement;
+    // fireEvent.change, not a hand-dispatched input event: React tracks the
+    // value internally and suppresses onChange when it is set directly.
+    await act(async () => {
+      fireEvent.change(box, { target: { value: "Froze the aliquots at -80 in 250 uL, pH 7.4" } });
+    });
+
+    // "Frozen" also appears in the type picker's options, so this asserts on
+    // the explanation instead -- which is the part that makes the reading
+    // reviewable rather than merely applied.
+    expect(screen.getByText(/from .Froze/)).toBeTruthy();
+    expect(screen.getByText("pH 7.4")).toBeTruthy();
+    expect(screen.getByText("250 uL")).toBeTruthy();
+    // The picker follows the reading until someone overrides it.
+    expect((screen.getByLabelText("Entry type") as HTMLSelectElement).value).toBe("frozen");
   });
 
   it("shows a correction alongside what it corrects, never instead of it", () => {

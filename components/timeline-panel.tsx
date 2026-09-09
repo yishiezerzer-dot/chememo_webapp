@@ -5,32 +5,11 @@ import { Spinner } from "@/components/spinner";
 import { useRunAction } from "@/lib/use-run-action";
 import { useStickyState } from "@/lib/use-sticky-state";
 import type { ActionResult } from "@/lib/types";
-import type { TimelineEvent, TimelineEventType, TimelineEventView } from "@/lib/timeline/service";
+import { EVENT_TYPE_LABELS, type TimelineEventType } from "@/lib/timeline/event-types";
+import { classifyLogText, type Classification } from "@/lib/timeline/classify";
+import type { TimelineEvent, TimelineEventView } from "@/lib/timeline/service";
 
-// §10.1's sixteen, plus 'observed'. Ordered by how often a person reaches for
-// them at a bench, not alphabetically or as the standard happens to list them:
-// the default sits first and the rare ones sink.
-const EVENT_TYPES: { value: TimelineEventType; label: string }[] = [
-  { value: "observed", label: "Observed" },
-  { value: "prepared", label: "Prepared" },
-  { value: "started", label: "Started" },
-  { value: "checked", label: "Checked" },
-  { value: "measured", label: "Measured" },
-  { value: "transferred", label: "Transferred" },
-  { value: "analyzed", label: "Analyzed" },
-  { value: "deviated", label: "Deviated" },
-  { value: "decision", label: "Decision" },
-  { value: "frozen", label: "Frozen" },
-  { value: "thawed", label: "Thawed" },
-  { value: "reconstituted", label: "Reconstituted" },
-  { value: "planned", label: "Planned" },
-  { value: "failed", label: "Failed" },
-  { value: "shipped", label: "Shipped" },
-  { value: "received", label: "Received" },
-  { value: "disposed", label: "Disposed" },
-];
-
-const LABEL = new Map(EVENT_TYPES.map((t) => [t.value, t.label]));
+const LABEL = new Map(EVENT_TYPE_LABELS.map((t) => [t.value, t.label]));
 
 const fmtTime = (iso: string) => iso.slice(11, 16);
 const fmtDay = (iso: string) =>
@@ -85,7 +64,19 @@ export function TimelinePanel({
   const { run, pending } = useRunAction();
   const [items, setItems] = useStickyState(events);
   const [eventType, setEventType] = useState<TimelineEventType>("observed");
+  // Once someone picks a type by hand, stop moving it under them.
+  const [typeOverridden, setTypeOverridden] = useState(false);
+  const [reading, setReading] = useState<Classification | null>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
+
+  // Runs on every keystroke and costs nothing: no network, no key, no model.
+  // This is the mechanism the log is built on -- the AI filer improves how
+  // much it catches, and the notebook works identically without one.
+  function reread(text: string) {
+    const c = text.trim() ? classifyLogText(text) : null;
+    setReading(c);
+    if (c && !typeOverridden) setEventType(c.eventType);
+  }
 
   // Grouped by day, newest first. The service already sorts and folds
   // corrections under what they correct.
@@ -106,14 +97,18 @@ export function TimelinePanel({
           placeholder="What happened?"
           aria-label="Log entry"
           style={{ flex: 1 }}
+          onChange={(e) => reread(e.target.value)}
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <select
             value={eventType}
-            onChange={(e) => setEventType(e.target.value as TimelineEventType)}
+            onChange={(e) => {
+              setEventType(e.target.value as TimelineEventType);
+              setTypeOverridden(true);
+            }}
             aria-label="Entry type"
           >
-            {EVENT_TYPES.map((t) => (
+            {EVENT_TYPE_LABELS.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>
@@ -134,6 +129,8 @@ export function TimelinePanel({
                   // From the server's row: occurred_at is the database's now(),
                   // not this workstation's clock.
                   if (boxRef.current) boxRef.current.value = "";
+                  setReading(null);
+                  setTypeOverridden(false);
                   setItems((cur) => [{ ...row, actorName: "You", corrections: [] }, ...cur]);
                 }
                 return res;
@@ -145,6 +142,37 @@ export function TimelinePanel({
           </button>
         </div>
       </div>
+
+      {/* What was understood, before anything is written. Shown rather than
+          silently applied: the type is a claim about the record, and a claim
+          a scientist cannot see is one they cannot correct. */}
+      {reading && (
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}
+          aria-live="polite"
+        >
+          <span style={{ fontSize: 11.5, color: "var(--ink-mute)" }}>
+            Filing as <b>{LABEL.get(eventType) ?? eventType}</b>
+            {!typeOverridden && reading.matchedOn ? ` — from “${reading.matchedOn}”` : ""}
+          </span>
+          {reading.ph !== null && <span className="chip" style={{ fontSize: 11 }}>pH {reading.ph}</span>}
+          {reading.quantities.map((q) => (
+            <span key={`${q.kind}-${q.unitCode}`} className="chip" style={{ fontSize: 11 }}>
+              {q.value} {q.unitCode === "Cel" ? "°C" : q.unitCode}
+            </span>
+          ))}
+          {reading.mz.map((m) => (
+            <span key={m} className="chip" style={{ fontSize: 11 }}>
+              m/z {m}
+            </span>
+          ))}
+          {reading.subjects.map((sub) => (
+            <span key={sub} className="chip" style={{ fontSize: 11 }}>
+              {sub}
+            </span>
+          ))}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>

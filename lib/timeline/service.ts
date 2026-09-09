@@ -2,19 +2,13 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import type { Json } from "@/lib/database.types";
+import type { TimelineEventType } from "@/lib/timeline/event-types";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-// §10.1's sixteen recommended types plus 'observed'. Kept in step with the
-// CHECK constraint in 20260909120000_timeline_events.sql by hand — the same
-// arrangement AI_SUGGESTIBLE_FIELDS has with its own CHECK, and for the same
-// reason: a DB guarantee behind anything a model can write.
-export const TIMELINE_EVENT_TYPES = [
-  "planned", "prepared", "started", "checked", "reconstituted", "transferred",
-  "frozen", "thawed", "measured", "analyzed", "failed", "deviated", "shipped",
-  "received", "disposed", "decision", "observed",
-] as const;
-export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];
+// The vocabulary lives in event-types.ts, which carries no `server-only` so
+// the classifier and the composer can share it in the browser.
+export { TIMELINE_EVENT_TYPES, type TimelineEventType } from "@/lib/timeline/event-types";
 
 // The domain shape, narrower than the generated row type in two places that
 // matter: event_type is the union above rather than bare string, and
