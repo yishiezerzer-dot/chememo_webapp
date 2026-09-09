@@ -44,6 +44,7 @@ import {
 import { createRelationshipAction, deleteRelationshipAction } from "./relationships-actions";
 import { restoreRevisionAction } from "./restore-actions";
 import { addLogEntryAction } from "./timeline-actions";
+import { proposeLogEntriesAction, commitLogEntriesAction } from "./filer-actions";
 import { addExperimentToSeriesAction, removeExperimentFromSeriesAction } from "@/app/(app)/series/actions";
 import { listComments } from "@/lib/comments/service";
 import { listTasks } from "@/lib/tasks/service";
@@ -303,7 +304,16 @@ export default async function ExperimentDetailPage({
               scientist comes to this page to read and to add to. The structured
               panels below all project into it. */}
           <div style={{ marginBottom: 16 }}>
-            <TimelinePanel experimentId={e.id} events={logEvents} addEntry={addLogEntryAction} />
+            <TimelinePanel
+              experimentId={e.id}
+              experimentName={e.name}
+              events={logEvents}
+              addEntry={addLogEntryAction}
+              // Undefined without a key, and the composer then logs directly
+              // rather than offering a filing step it cannot perform.
+              proposeEntries={aiEnabled ? proposeLogEntriesAction : undefined}
+              commitEntries={aiEnabled ? commitLogEntriesAction : undefined}
+            />
           </div>
 
           <div className="spec-grid">

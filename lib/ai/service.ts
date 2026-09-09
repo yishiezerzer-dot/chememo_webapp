@@ -35,7 +35,9 @@ export type AiEndpoint =
   | "crew_plan"
   | "next_experiment_suggestion"
   | "gap_scan"
-  | "crew_resolve";
+  | "crew_resolve"
+  // The composer's filer. One call per note a scientist writes.
+  | "log_filer";
 
 // Acquire the per-user + global concurrency slot shared by every AI call
 // (Ask, single summary, group summary) — a typed, throw-based replacement

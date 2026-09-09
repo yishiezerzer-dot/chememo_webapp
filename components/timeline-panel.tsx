@@ -7,6 +7,8 @@ import { useStickyState } from "@/lib/use-sticky-state";
 import type { ActionResult } from "@/lib/types";
 import { EVENT_TYPE_LABELS, type TimelineEventType } from "@/lib/timeline/event-types";
 import { classifyLogText, type Classification } from "@/lib/timeline/classify";
+import type { ProposedEntry } from "@/lib/timeline/file-entry";
+import type { FileResult } from "@/app/(app)/experiments/[id]/filer-actions";
 import type { TimelineEvent, TimelineEventView } from "@/lib/timeline/service";
 
 const LABEL = new Map(EVENT_TYPE_LABELS.map((t) => [t.value, t.label]));
@@ -52,6 +54,9 @@ export function TimelinePanel({
   experimentId,
   events,
   addEntry,
+  experimentName,
+  proposeEntries,
+  commitEntries,
 }: {
   experimentId: string;
   events: TimelineEventView[];
@@ -60,6 +65,14 @@ export function TimelinePanel({
     text: string,
     eventType: TimelineEventType
   ) => Promise<ActionResult<TimelineEvent>>;
+  experimentName: string;
+  /** Absent when no AI provider is configured — the composer just logs directly. */
+  proposeEntries?: (
+    experimentId: string,
+    text: string,
+    context: { experimentName: string; recentEntries: string[] }
+  ) => Promise<ActionResult<FileResult>>;
+  commitEntries?: (experimentId: string, entries: ProposedEntry[]) => Promise<ActionResult<TimelineEvent[]>>;
 }) {
   const { run, pending } = useRunAction();
   const [items, setItems] = useStickyState(events);
@@ -67,6 +80,9 @@ export function TimelinePanel({
   // Once someone picks a type by hand, stop moving it under them.
   const [typeOverridden, setTypeOverridden] = useState(false);
   const [reading, setReading] = useState<Classification | null>(null);
+  // What the filer proposed, awaiting the scientist's agreement. Nothing here
+  // has been written; that is the point of the step.
+  const [proposal, setProposal] = useState<ProposedEntry[] | null>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
   // Runs on every keystroke and costs nothing: no network, no key, no model.
@@ -122,6 +138,33 @@ export function TimelinePanel({
             onClick={() => {
               const text = boxRef.current?.value.trim();
               if (!text) return;
+
+              // With a filer available, the note goes for organising first and
+              // nothing is written until the scientist agrees. Without one, it
+              // is logged directly -- same button, same place, one fewer step.
+              if (proposeEntries) {
+                run(async () => {
+                  const res = await proposeEntries(experimentId, text, {
+                    experimentName,
+                    recentEntries: items.slice(0, 5).map(entryText),
+                  });
+                  if (res.ok && res.data) {
+                    if (res.data.written) {
+                      // The AI path failed and the words were saved verbatim
+                      // rather than lost. Show them in the log immediately.
+                      const row = res.data.written;
+                      if (boxRef.current) boxRef.current.value = "";
+                      setReading(null);
+                      setItems((cur) => [{ ...row, actorName: "You", corrections: [] }, ...cur]);
+                    } else {
+                      setProposal(res.data.proposal);
+                    }
+                  }
+                  return res;
+                });
+                return;
+              }
+
               run(async () => {
                 const res = await addEntry(experimentId, text, eventType);
                 if (res.ok && res.data) {
@@ -171,6 +214,83 @@ export function TimelinePanel({
               {sub}
             </span>
           ))}
+        </div>
+      )}
+
+      {proposal && (
+        <div className="obs-box glass" style={{ marginTop: 10 }}>
+          <b style={{ fontSize: 13 }}>
+            {proposal.length === 1 ? "Filing this as one entry" : `Filing this as ${proposal.length} entries`}
+          </b>
+          <p className="sec-sub" style={{ margin: "2px 0 8px" }}>
+            Nothing is saved yet. Change a type, or discard any line you disagree with.
+          </p>
+          {proposal.map((e) => (
+            <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 0" }}>
+              <select
+                value={e.eventType}
+                aria-label={`Type for “${(e.action ?? e.observation ?? "").slice(0, 40)}”`}
+                onChange={(ev) =>
+                  setProposal((cur) =>
+                    (cur ?? []).map((p) =>
+                      p.id === e.id ? { ...p, eventType: ev.target.value as TimelineEventType } : p
+                    )
+                  )
+                }
+              >
+                {EVENT_TYPE_LABELS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <p style={{ margin: 0, fontSize: 13.5, flex: 1 }}>
+                {[e.action, e.observation, e.deviationNote, e.nextAction].filter(Boolean).join(" — ")}
+                {e.subjectLabel && (
+                  <span className="chip" style={{ fontSize: 11, marginLeft: 6 }}>{e.subjectLabel}</span>
+                )}
+              </p>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                aria-label="Discard this entry"
+                onClick={() => setProposal((cur) => (cur ?? []).filter((p) => p.id !== e.id))}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={pending || proposal.length === 0}
+              aria-busy={pending}
+              onClick={() =>
+                commitEntries &&
+                run(async () => {
+                  const res = await commitEntries(experimentId, proposal);
+                  if (res.ok && res.data) {
+                    const rows = res.data;
+                    if (boxRef.current) boxRef.current.value = "";
+                    setProposal(null);
+                    setReading(null);
+                    setItems((cur) => [
+                      ...rows.map((r) => ({ ...r, actorName: "You", corrections: [] })).reverse(),
+                      ...cur,
+                    ]);
+                  }
+                  return res;
+                })
+              }
+            >
+              {pending && <Spinner />}
+              Save {proposal.length === 1 ? "entry" : `${proposal.length} entries`}
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setProposal(null)}>
+              Keep editing
+            </button>
+          </div>
         </div>
       )}
 
