@@ -21,8 +21,12 @@ export async function signIn(page: Page): Promise<void> {
 export async function openAdvanced(page: Page): Promise<void> {
   const panel = page.locator("details.fsec", { hasText: "Everything else" }).first();
   if ((await panel.count()) === 0) return;
-  const alreadyOpen = await panel.evaluate((el) => (el as HTMLDetailsElement).open);
-  if (!alreadyOpen) await panel.locator("summary").first().click();
+  // Set `open` rather than clicking the summary: a click can land before the
+  // page has hydrated and then do nothing, which is a flake that looks exactly
+  // like a missing element. For a native <details> the two are equivalent.
+  await panel.evaluate((el) => {
+    (el as HTMLDetailsElement).open = true;
+  });
 }
 
 // The creation/edit form now leads with Identity and keeps the Plan section
@@ -31,6 +35,7 @@ export async function openAdvanced(page: Page): Promise<void> {
 export async function openFormPlan(page: Page): Promise<void> {
   const section = page.locator("details.fsec", { hasText: "Plan" }).first();
   if ((await section.count()) === 0) return;
-  const alreadyOpen = await section.evaluate((el) => (el as HTMLDetailsElement).open);
-  if (!alreadyOpen) await section.locator("summary").first().click();
+  await section.evaluate((el) => {
+    (el as HTMLDetailsElement).open = true;
+  });
 }
