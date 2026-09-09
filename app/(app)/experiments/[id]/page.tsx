@@ -316,6 +316,45 @@ export default async function ExperimentDetailPage({
             />
           </div>
 
+          {/* What the experiment set out to prove, and what it found. Two
+              fields now, not four -- and both are the lifecycle gates rather
+              than free-form planning prose. */}
+          {(e.acceptance_criteria || e.conclusion) && (
+            <div className="obs-box glass">
+              <h4>Criteria &amp; conclusion</h4>
+              {e.acceptance_criteria && (
+                <>
+                  <h4 style={{ marginTop: 0, fontSize: 12.5, color: "var(--ink-mute)" }}>
+                    How we would know it worked
+                    {e.acceptance_criteria_locked_at ? " (locked at start)" : ""}
+                  </h4>
+                  <p>{e.acceptance_criteria}</p>
+                </>
+              )}
+              {e.conclusion && (
+                <>
+                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>What we found</h4>
+                  <p>{e.conclusion}</p>
+                </>
+              )}
+            </div>
+          )}
+
+          <InputsOutputsPanel
+            inputs={materialInputs}
+            outputs={materialOutputs}
+            lotStockOptions={lotStockOptions}
+            materials={materials}
+            materialRoles={materialRoles}
+            outputRoles={outputRoles}
+            quantityKinds={quantityKinds}
+            addInput={addInputAction.bind(null, e.id)}
+            removeInput={removeInputAction.bind(null, e.id)}
+            addOutput={addOutputAction.bind(null, e.id)}
+            removeOutput={removeOutputAction.bind(null, e.id)}
+            recalculate={recalculateStoichiometryAction.bind(null, e.id)}
+          />
+
           <div className="spec-grid">
             {specs.map((s) => (
               <div key={s.k} className="spec">
@@ -367,6 +406,19 @@ export default async function ExperimentDetailPage({
             )}
           </div>
 
+          {/* Everything a simple experiment does not need. Nothing here is
+              deleted or reduced -- protocol steps, samples, analysis runs,
+              condition programs, controls, relationships, tasks and discussion
+              all work exactly as before. They are one click away instead of
+              being the first thing between a scientist and their log. */}
+          <details className="fsec glass" style={{ marginBottom: 16 }}>
+            <summary>
+              <h3 style={{ display: "inline-flex" }}>Everything else</h3>
+            </summary>
+            <p className="sec-sub">
+              Protocol and steps, samples and batches, analysis runs, condition programs, controls,
+              relationships and series, tasks and discussion.
+            </p>
           {e.protocol_version_id && (
             <div className="obs-box glass">
               <h4>Protocol &amp; steps</h4>
@@ -421,20 +473,6 @@ export default async function ExperimentDetailPage({
             removeFromSeries={removeExperimentFromSeriesAction.bind(null, e.id)}
           />
 
-          <InputsOutputsPanel
-            inputs={materialInputs}
-            outputs={materialOutputs}
-            lotStockOptions={lotStockOptions}
-            materials={materials}
-            materialRoles={materialRoles}
-            outputRoles={outputRoles}
-            quantityKinds={quantityKinds}
-            addInput={addInputAction.bind(null, e.id)}
-            removeInput={removeInputAction.bind(null, e.id)}
-            addOutput={addOutputAction.bind(null, e.id)}
-            removeOutput={removeOutputAction.bind(null, e.id)}
-            recalculate={recalculateStoichiometryAction.bind(null, e.id)}
-          />
 
           <SamplesPanel
             experimentId={e.id}
@@ -470,30 +508,6 @@ export default async function ExperimentDetailPage({
             <CommentsSection experimentId={e.id} />
           </Suspense>
 
-          {/* What the experiment set out to prove, and what it found. Two
-              fields now, not four -- and both are the lifecycle gates rather
-              than free-form planning prose. */}
-          {(e.acceptance_criteria || e.conclusion) && (
-            <div className="obs-box glass">
-              <h4>Criteria &amp; conclusion</h4>
-              {e.acceptance_criteria && (
-                <>
-                  <h4 style={{ marginTop: 0, fontSize: 12.5, color: "var(--ink-mute)" }}>
-                    How we would know it worked
-                    {e.acceptance_criteria_locked_at ? " (locked at start)" : ""}
-                  </h4>
-                  <p>{e.acceptance_criteria}</p>
-                </>
-              )}
-              {e.conclusion && (
-                <>
-                  <h4 style={{ fontSize: 12.5, color: "var(--ink-mute)" }}>What we found</h4>
-                  <p>{e.conclusion}</p>
-                </>
-              )}
-            </div>
-          )}
-
           {e.compounds.length > 0 && (
             <div className="obs-box glass">
               <h4>Compounds</h4>
@@ -520,16 +534,28 @@ export default async function ExperimentDetailPage({
             </div>
           )}
 
-          <div className="obs-box glass">
-            <h4>Observations</h4>
-            <p>{e.observations || "No observations recorded."}</p>
-            {e.notes && (
-              <>
-                <h4 style={{ marginTop: 16 }}>Notes</h4>
-                <p>{e.notes}</p>
-              </>
-            )}
-          </div>
+          </details>
+
+          {/* The log's ancestors. Rendered only when a record actually has
+              them: on anything created since the log exists these are empty,
+              and an empty box saying "No observations recorded" is one more
+              thing on a page this overhaul is trying to quieten. */}
+          {(e.observations || e.notes) && (
+            <div className="obs-box glass">
+              {e.observations && (
+                <>
+                  <h4>Observations</h4>
+                  <p>{e.observations}</p>
+                </>
+              )}
+              {e.notes && (
+                <>
+                  <h4 style={{ marginTop: e.observations ? 16 : 0 }}>Notes</h4>
+                  <p>{e.notes}</p>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <aside className="detail-aside">
