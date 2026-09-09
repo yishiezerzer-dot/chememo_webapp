@@ -22,6 +22,7 @@ test("experiment relationships and series", async ({ page }) => {
   const idB = await createBlankExperiment(nameB);
 
   // Already on experiment B's page — link it as a replicate_of A.
+  await openAdvanced(page);
   const relSection = page.locator(".obs-box", { has: page.locator("h4", { hasText: "Relationships" }) });
   await relSection.getByPlaceholder(/Other experiment ID/).fill(idA);
   await relSection.locator("select").first().selectOption("replicate_of");
